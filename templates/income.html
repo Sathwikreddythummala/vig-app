@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Income - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Income Management{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-currency-rupee"></i></div><div class="stat-info"><small>Today's Income</small><h3 id="statToday">₹0</h3></div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-month"><i class="bi bi-calendar-check"></i></div><div class="stat-info"><small>This Month</small><h3 id="statMonth">₹0</h3></div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-vehicle"><i class="bi bi-hourglass-split"></i></div><div class="stat-info"><small>Pending Amount</small><h3 id="statPending">₹0</h3></div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-signpost-2"></i></div><div class="stat-info"><small>Trips This Month</small><h3 id="statTrips">0</h3></div></div></div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.4s"><h6><i class="bi bi-pie-chart"></i> Vendor Wise Income</h6><div id="vendorChart"></div></div></div>
+    <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.5s"><h6><i class="bi bi-bar-chart"></i> Vehicle Wise Income</h6><div id="vehicleChart"></div></div></div>
+    <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.6s"><h6><i class="bi bi-graph-up"></i> Monthly Trend</h6><div id="trendChart"></div></div></div>
+</div>
+<div class="glass-card mb-3 animate-in" style="animation-delay:0.7s">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:150px">
+            <input type="date" class="form-control glass-input" id="filterDateTo" style="width:150px">
+            <select class="form-select glass-input" id="filterVehicle" style="width:160px"><option value="">All Vehicles</option></select>
+            <select class="form-select glass-input" id="filterVendor" style="width:160px"><option value="">All Vendors</option></select>
+            <select class="form-select glass-input" id="filterPayStatus" style="width:140px"><option value="">All Status</option><option>Pending</option><option>Received</option><option>Partial</option></select>
+            <button class="btn btn-warning btn-sm" onclick="loadIncome()"><i class="bi bi-funnel"></i> Filter</button>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="exportExcel()"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#incomeModal" onclick="resetIncomeForm()"><i class="bi bi-plus-lg"></i> Add Income</button>
+        </div>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.8s">
+    <div class="d-flex justify-content-between mb-2">
+        <div><span class="fw-bold">Total: <span id="totalAmount" class="text-success">₹0</span></span> <span class="ms-3 text-muted">Pending: <span id="pendingAmount" class="text-warning">₹0</span></span> <span class="ms-3 text-muted">Received: <span id="receivedAmount" class="text-success">₹0</span></span></div>
+        <span class="text-muted"><span id="totalRecords">0</span> records</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Vendor</th><th>From</th><th>To</th><th>Material</th><th>Qty</th><th>Rate</th><th>Amount</th><th>Payment</th><th>Actions</th></tr></thead>
+            <tbody id="incomeTable"><tr><td colspan="12" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+    <nav id="pagination" class="d-flex justify-content-center mt-3"></nav>
+</div>
+<div class="modal fade" id="incomeModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="incomeModalTitle">Add Income</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="incomeForm">
+                    <input type="hidden" id="incId">
+                    <div class="row g-3">
+                        <div class="col-md-3"><label class="form-label">Date *</label><input type="date" class="form-control glass-input" id="incDate" required></div>
+                        <div class="col-md-3"><label class="form-label">Vehicle *</label><select class="form-select glass-input" id="incVehicle" required onchange="autoFillDriver()"><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Driver</label><select class="form-select glass-input" id="incDriver"><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Vendor *</label><select class="form-select glass-input" id="incVendor" required><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Trip From</label><input type="text" class="form-control glass-input" id="incFrom"></div>
+                        <div class="col-md-3"><label class="form-label">Trip To</label><input type="text" class="form-control glass-input" id="incTo"></div>
+                        <div class="col-md-3"><label class="form-label">Material</label><input type="text" class="form-control glass-input" id="incMaterial" placeholder="e.g. Sand, Cement, RMC"></div>
+                        <div class="col-md-3"><label class="form-label">Invoice No</label><input type="text" class="form-control glass-input" id="incInvoice"></div>
+                        <div class="col-md-2"><label class="form-label">Quantity</label><input type="number" class="form-control glass-input" id="incQty" min="0" step="0.01" oninput="calcAmount()"></div>
+                        <div class="col-md-2"><label class="form-label">Unit</label>
+                            <select class="form-select glass-input" id="incUnit"><option>Trip</option><option>Ton</option><option>Cu.m</option><option>KM</option><option>Load</option><option>Bag</option><option>Other</option></select>
+                        </div>
+                        <div class="col-md-2"><label class="form-label">Rate (₹)</label><input type="number" class="form-control glass-input" id="incRate" min="0" step="0.01" oninput="calcAmount()"></div>
+                        <div class="col-md-3"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="incAmount" required min="0" step="0.01"></div>
+                        <div class="col-md-3"><label class="form-label">Payment Status</label>
+                            <select class="form-select glass-input" id="incPayStatus"><option>Pending</option><option>Received</option><option>Partial</option></select>
+                        </div>
+                        <div class="col-md-3"><label class="form-label">Payment Date</label><input type="date" class="form-control glass-input" id="incPayDate"></div>
+                        <div class="col-md-9"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="incDescription"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveIncome()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var vehicles=[], drivers=[], vendors=[], currentPage=1;
+var incModalEl = document.getElementById('incomeModal');
+
+document.addEventListener('DOMContentLoaded', async function() {
+    document.getElementById('incDate').value = new Date().toISOString().split('T')[0];
+    var results = await Promise.all([
+        fetch('/vehicles/api/list').then(function(r){return r.json()}),
+        fetch('/drivers/api/list').then(function(r){return r.json()}),
+        fetch('/vendors/api/list').then(function(r){return r.json()})
+    ]);
+    vehicles = results[0].vehicles||[];
+    drivers = results[1].drivers||[];
+    vendors = results[2].vendors||[];
+    var vSel=document.getElementById('incVehicle'), fVeh=document.getElementById('filterVehicle');
+    vehicles.forEach(function(v){ vSel.innerHTML+='<option value="'+v.VehicleNumber+'" data-driver="'+(v.DefaultDriver||'')+'">'+v.VehicleNumber+'</option>'; fVeh.innerHTML+='<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>'; });
+    var dSel=document.getElementById('incDriver');
+    drivers.forEach(function(d){ dSel.innerHTML+='<option value="'+d.DriverName+'">'+d.DriverName+'</option>'; });
+    var vnSel=document.getElementById('incVendor'), fVnd=document.getElementById('filterVendor');
+    vendors.filter(function(v){return v.Status==='Active'}).forEach(function(v){ vnSel.innerHTML+='<option value="'+v.VendorName+'">'+v.VendorName+'</option>'; fVnd.innerHTML+='<option value="'+v.VendorName+'">'+v.VendorName+'</option>'; });
+    loadIncome();
+    loadStats();
+    loadAlerts();
+});
+
+function autoFillDriver() {
+    var sel=document.getElementById('incVehicle'); var opt=sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.driver) document.getElementById('incDriver').value=opt.dataset.driver;
+}
+
+function calcAmount() {
+    var q=parseFloat(document.getElementById('incQty').value)||0;
+    var r=parseFloat(document.getElementById('incRate').value)||0;
+    if (q && r) document.getElementById('incAmount').value=(q*r).toFixed(2);
+}
+
+async function loadStats() {
+    var res=await fetch('/income/api/stats'); var s=await res.json();
+    document.getElementById('statToday').textContent='₹'+Number(s.total_today||0).toLocaleString('en-IN');
+    document.getElementById('statMonth').textContent='₹'+Number(s.total_month||0).toLocaleString('en-IN');
+    document.getElementById('statPending').textContent='₹'+Number(s.total_pending||0).toLocaleString('en-IN');
+    document.getElementById('statTrips').textContent=s.total_trips||0;
+    if (s.vendor_wise && s.vendor_wise.labels.length) {
+        new ApexCharts(document.getElementById('vendorChart'),{chart:{type:'donut',height:220,background:'transparent'},series:s.vendor_wise.values,labels:s.vendor_wise.labels,colors:['#FFD54F','#FFC107','#FFB300','#FFA000','#FF8F00','#FF6F00','#F9A825','#FFCA28'],legend:{position:'bottom',fontSize:'10px'}}).render();
+    } else { document.getElementById('vendorChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+    if (s.vehicle_wise && s.vehicle_wise.labels.length) {
+        new ApexCharts(document.getElementById('vehicleChart'),{chart:{type:'bar',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Income',data:s.vehicle_wise.values}],xaxis:{categories:s.vehicle_wise.labels},colors:['#FFD54F'],plotOptions:{bar:{borderRadius:6,columnWidth:'50%'}}}).render();
+    } else { document.getElementById('vehicleChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+    if (s.monthly_trend && s.monthly_trend.labels.length) {
+        new ApexCharts(document.getElementById('trendChart'),{chart:{type:'area',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Income',data:s.monthly_trend.values}],xaxis:{categories:s.monthly_trend.labels},colors:['#66BB6A'],fill:{type:'gradient',gradient:{opacityFrom:0.5,opacityTo:0.1}},stroke:{curve:'smooth',width:3},dataLabels:{enabled:false}}).render();
+    } else { document.getElementById('trendChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+}
+
+async function loadIncome(page) {
+    currentPage=page||1;
+    var params=new URLSearchParams({page:currentPage,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,vendor:document.getElementById('filterVendor').value,payment_status:document.getElementById('filterPayStatus').value});
+    var res=await fetch('/income/api/list?'+params); var data=await res.json();
+    document.getElementById('totalAmount').textContent='₹'+Number(data.total_amount||0).toLocaleString('en-IN');
+    document.getElementById('pendingAmount').textContent='₹'+Number(data.total_pending||0).toLocaleString('en-IN');
+    document.getElementById('receivedAmount').textContent='₹'+Number(data.total_received||0).toLocaleString('en-IN');
+    document.getElementById('totalRecords').textContent=data.total||0;
+    var tbody=document.getElementById('incomeTable');
+    if (data.income && data.income.length) {
+        tbody.innerHTML=data.income.map(function(r){
+            var pClass=r.PaymentStatus==='Received'?'bg-success':r.PaymentStatus==='Partial'?'bg-info':'bg-warning text-dark';
+            return '<tr><td>'+r.IncomeDate+'</td><td class="fw-bold">'+r.VehicleNumber+'</td><td>'+(r.DriverName||'-')+'</td><td>'+(r.VendorName||'-')+'</td><td>'+(r.TripFrom||'-')+'</td><td>'+(r.TripTo||'-')+'</td><td>'+(r.Material||'-')+'</td><td>'+(r.Quantity||'-')+'</td><td>'+(r.Rate?'₹'+Number(r.Rate).toLocaleString('en-IN'):'-')+'</td><td class="fw-bold text-success">₹'+Number(r.Amount).toLocaleString('en-IN')+'</td><td><span class="badge '+pClass+'">'+r.PaymentStatus+'</span></td><td><button class="btn btn-sm btn-outline-warning" onclick="editIncome(\''+r.IncomeID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteIncome(\''+r.IncomeID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+        }).join('');
+    } else { tbody.innerHTML='<tr><td colspan="12" class="text-center text-muted">No income records</td></tr>'; }
+    renderPagination(data.total_pages||1,currentPage);
+}
+
+function renderPagination(tp,cur) {
+    var nav=document.getElementById('pagination'); if(tp<=1){nav.innerHTML='';return;}
+    var h='<ul class="pagination pagination-sm">';
+    h+='<li class="page-item '+(cur===1?'disabled':'')+'"><a class="page-link" href="#" onclick="loadIncome('+(cur-1)+');return false">‹</a></li>';
+    for(var i=1;i<=tp;i++){if(i===1||i===tp||Math.abs(i-cur)<=2){h+='<li class="page-item '+(i===cur?'active':'')+'"><a class="page-link" href="#" onclick="loadIncome('+i+');return false">'+i+'</a></li>';}else if(Math.abs(i-cur)===3){h+='<li class="page-item disabled"><span class="page-link">…</span></li>';}}
+    h+='<li class="page-item '+(cur===tp?'disabled':'')+'"><a class="page-link" href="#" onclick="loadIncome('+(cur+1)+');return false">›</a></li></ul>';
+    nav.innerHTML=h;
+}
+
+function resetIncomeForm() { document.getElementById('incomeForm').reset(); document.getElementById('incId').value=''; document.getElementById('incomeModalTitle').textContent='Add Income'; document.getElementById('incDate').value=new Date().toISOString().split('T')[0]; }
+
+var allIncomeCache=[];
+function editIncome(iid) {
+    fetch('/income/api/list?search='+iid+'&per_page=100').then(function(r){return r.json()}).then(function(data){
+        var r=(data.income||[]).find(function(x){return x.IncomeID===iid});
+        if(!r){showToast('Not found','danger');return;}
+        document.getElementById('incId').value=r.IncomeID;
+        document.getElementById('incomeModalTitle').textContent='Edit Income';
+        document.getElementById('incDate').value=r.IncomeDate||'';
+        document.getElementById('incVehicle').value=r.VehicleNumber||'';
+        document.getElementById('incDriver').value=r.DriverName||'';
+        document.getElementById('incVendor').value=r.VendorName||'';
+        document.getElementById('incFrom').value=r.TripFrom||'';
+        document.getElementById('incTo').value=r.TripTo||'';
+        document.getElementById('incMaterial').value=r.Material||'';
+        document.getElementById('incInvoice').value=r.InvoiceNumber||'';
+        document.getElementById('incQty').value=r.Quantity||'';
+        document.getElementById('incUnit').value=r.Unit||'Trip';
+        document.getElementById('incRate').value=r.Rate||'';
+        document.getElementById('incAmount').value=r.Amount||'';
+        document.getElementById('incPayStatus').value=r.PaymentStatus||'Pending';
+        document.getElementById('incPayDate').value=r.PaymentDate||'';
+        document.getElementById('incDescription').value=r.Description||'';
+        bootstrap.Modal.getOrCreateInstance(incModalEl).show();
+    });
+}
+
+async function saveIncome() {
+    var id=document.getElementById('incId').value;
+    var payload={IncomeDate:document.getElementById('incDate').value,VehicleNumber:document.getElementById('incVehicle').value,DriverName:document.getElementById('incDriver').value,VendorName:document.getElementById('incVendor').value,TripFrom:document.getElementById('incFrom').value,TripTo:document.getElementById('incTo').value,Material:document.getElementById('incMaterial').value,InvoiceNumber:document.getElementById('incInvoice').value,Quantity:document.getElementById('incQty').value,Unit:document.getElementById('incUnit').value,Rate:document.getElementById('incRate').value,Amount:document.getElementById('incAmount').value,PaymentStatus:document.getElementById('incPayStatus').value,PaymentDate:document.getElementById('incPayDate').value,Description:document.getElementById('incDescription').value};
+    if(!payload.IncomeDate||!payload.VehicleNumber||!payload.Amount){showToast('Fill required fields','danger');return;}
+    try{
+        var res=await fetch(id?'/income/api/'+id:'/income/api/add',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        var data=await res.json();
+        if(data.success){var m=bootstrap.Modal.getInstance(incModalEl);if(m)m.hide();showToast(id?'Updated':'Added','success');loadIncome(currentPage);}
+        else{showToast(data.error||'Failed','danger');}
+    }catch(err){showToast('Network error','danger');}
+}
+
+async function deleteIncome(id) {
+    if(!confirm('Delete this income record?'))return;
+    try{var res=await fetch('/income/api/'+id,{method:'DELETE'});var data=await res.json();if(data.success){showToast('Deleted','success');loadIncome(currentPage);}else{showToast(data.error||'Failed','danger');}}
+    catch(err){showToast('Network error','danger');}
+}
+
+function exportExcel() {
+    var params=new URLSearchParams({date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,vendor:document.getElementById('filterVendor').value});
+    window.open('/income/api/export/excel?'+params);
+}
+</script>
+{% endblock %}

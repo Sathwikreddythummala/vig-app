@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Employees & Drivers - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Employees & Drivers{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            <input type="text" class="form-control glass-input" id="searchDriver" placeholder="Search..." style="width:200px" oninput="filterAll()">
+            <select class="form-select glass-input" id="filterType" style="width:150px" onchange="filterAll()"><option value="">All Types</option><option>Driver</option><option>Employee</option></select>
+        </div>
+        <div class="d-flex gap-2 viewer-hide">
+            <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#driverModal" onclick="resetDriverForm()"><i class="bi bi-plus-lg"></i> Add Driver</button>
+            <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#employeeModal" onclick="resetEmployeeForm()"><i class="bi bi-plus-lg"></i> Add Employee</button>
+        </div>
+    </div>
+</div>
+<div class="row g-3" id="driverCards">
+    <div class="col-12 text-center py-5"><div class="spinner-border text-warning"></div></div>
+</div>
+
+<!-- DRIVER MODAL (full form) -->
+<div class="modal fade" id="driverModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="driverModalTitle">Add Driver</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="driverForm">
+                    <input type="hidden" id="drvId">
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#drvBasic">Personal</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#drvLicense">License</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#drvBank">Bank & Salary</a></li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="drvBasic">
+                            <div class="row g-3">
+                                <div class="col-md-4"><label class="form-label">Driver Name *</label><input type="text" class="form-control glass-input" id="drvName" required></div>
+                                <div class="col-md-4"><label class="form-label">Email (Google Login)</label><input type="email" class="form-control glass-input" id="drvEmail" placeholder="driver@gmail.com"></div>
+                                <div class="col-md-4"><label class="form-label">Mobile Number *</label><input type="text" class="form-control glass-input" id="drvMobile" required></div>
+                                <div class="col-md-4"><label class="form-label">Emergency Contact</label><input type="text" class="form-control glass-input" id="drvEmergency"></div>
+                                <div class="col-md-8"><label class="form-label">Address</label><input type="text" class="form-control glass-input" id="drvAddress"></div>
+                                <div class="col-md-4"><label class="form-label">Aadhaar Number</label><input type="text" class="form-control glass-input" id="drvAadhaar"></div>
+                                <div class="col-md-4"><label class="form-label">Status</label>
+                                    <select class="form-select glass-input" id="drvStatus"><option>Active</option><option>Inactive</option><option>On Leave</option></select>
+                                </div>
+                                <div class="col-md-4"><label class="form-label">Assigned Vehicle</label><select class="form-select glass-input" id="drvVehicle"><option value="">-- None --</option></select></div>
+                                <div class="col-md-4"><label class="form-label">Joining Date</label><input type="date" class="form-control glass-input" id="drvJoining"></div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="drvLicense">
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label">Driving License Number</label><input type="text" class="form-control glass-input" id="drvLicenseNum"></div>
+                                <div class="col-md-6"><label class="form-label">License Expiry Date</label><input type="date" class="form-control glass-input" id="drvLicenseExpiry"></div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="drvBank">
+                            <div class="row g-3">
+                                <div class="col-md-4"><label class="form-label">Bank Name</label><input type="text" class="form-control glass-input" id="drvBankName"></div>
+                                <div class="col-md-4"><label class="form-label">Account Number</label><input type="text" class="form-control glass-input" id="drvAccountNum"></div>
+                                <div class="col-md-4"><label class="form-label">IFSC Code</label><input type="text" class="form-control glass-input" id="drvIFSC"></div>
+                                <div class="col-md-4"><label class="form-label">Salary (₹)</label><input type="number" class="form-control glass-input" id="drvSalary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveDriver()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EMPLOYEE MODAL (simple form) -->
+<div class="modal fade" id="employeeModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="empModalTitle">Add Employee</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="employeeForm">
+                    <input type="hidden" id="empId">
+                    <div class="row g-3">
+                        <div class="col-md-12"><label class="form-label">Name *</label><input type="text" class="form-control glass-input" id="empName" required></div>
+                        <div class="col-md-6"><label class="form-label">Email (Google Login) *</label><input type="email" class="form-control glass-input" id="empEmail" required placeholder="employee@gmail.com"></div>
+                        <div class="col-md-6"><label class="form-label">Mobile Number</label><input type="text" class="form-control glass-input" id="empMobile"></div>
+                        <div class="col-md-6"><label class="form-label">Access Type *</label>
+                            <select class="form-select glass-input" id="empAccess">
+                                <option value="viewer">Viewer (Read Only)</option>
+                                <option value="editor">Editor (Full Access)</option>
+                                <option value="admin">Admin (Full + Users)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">Status</label>
+                            <select class="form-select glass-input" id="empStatus"><option>Active</option><option>Inactive</option></select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveEmployee()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var allDrivers = [], allEmployees = [], allVehicles = [];
+var drvModalEl = document.getElementById('driverModal');
+var empModalEl = document.getElementById('employeeModal');
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        var results = await Promise.all([
+            fetch('/drivers/api/list').then(function(r){return r.json()}),
+            fetch('/vehicles/api/list').then(function(r){return r.json()}),
+            fetch('/access/api/list').then(function(r){return r.json()}).catch(function(){return {users:[]}})
+        ]);
+        var all = results[0].drivers || [];
+        allVehicles = results[1].vehicles || [];
+        var users = results[2].users || [];
+        allDrivers = all.filter(function(d){return (d.EmployeeType||'Driver')==='Driver'});
+        allEmployees = users;
+        var vSel = document.getElementById('drvVehicle');
+        allVehicles.forEach(function(v){ vSel.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>'; });
+        renderAll();
+    } catch(err) {
+        console.error(err);
+        document.getElementById('driverCards').innerHTML = '<div class="col-12 text-center text-muted py-5">Failed to load</div>';
+    }
+    loadAlerts();
+});
+
+function renderAll() {
+    var filter = document.getElementById('filterType').value;
+    var search = document.getElementById('searchDriver').value.toLowerCase();
+    var items = [];
+    if (filter !== 'Employee') {
+        allDrivers.forEach(function(d) {
+            items.push({type:'Driver', id:d.DriverID, name:d.DriverName, mobile:d.MobileNumber||'', status:d.Status||'Active', vehicle:d.AssignedVehicle||'', email:d.Email||'', access:'', data:d});
+        });
+    }
+    if (filter !== 'Driver') {
+        allEmployees.forEach(function(u) {
+            items.push({type:'Employee', id:u.UserID, name:u.Name, mobile:'', status:u.Status||'Active', vehicle:'', email:u.Email||'', access:u.Role||'viewer', data:u});
+        });
+    }
+    if (search) {
+        items = items.filter(function(i){return i.name.toLowerCase().indexOf(search)!==-1 || i.email.toLowerCase().indexOf(search)!==-1 || i.mobile.indexOf(search)!==-1});
+    }
+    var c = document.getElementById('driverCards');
+    if (!items.length) { c.innerHTML = '<div class="col-12 text-center text-muted py-5">No records found</div>'; return; }
+    c.innerHTML = items.map(function(item, i) {
+        var statusBadge = item.status==='Active'?'bg-success':item.status==='Inactive'?'bg-secondary':'bg-info';
+        var typeBadge = item.type==='Driver'?'bg-warning text-dark':'bg-info';
+        var last4 = item.vehicle ? item.vehicle.slice(-4) : '';
+        var accessHtml = '';
+        if (item.type==='Employee' && item.access) {
+            var ac = item.access==='admin'?'bg-danger':item.access==='editor'?'bg-primary':'bg-secondary';
+            accessHtml = '<span class="badge '+ac+'" style="font-size:0.6rem">'+item.access.toUpperCase()+'</span>';
+        }
+        var line2 = item.type==='Driver' ?
+            '<div class="small text-muted mb-1"><i class="bi bi-truck"></i> '+(item.vehicle||'Not assigned')+'</div>' +
+            '<div class="small text-muted mb-2"><i class="bi bi-phone"></i> '+(item.mobile||'-')+'</div>' :
+            '<div class="small text-muted mb-1"><i class="bi bi-envelope"></i> '+(item.email||'-')+'</div>' +
+            '<div class="small text-muted mb-2"><i class="bi bi-phone"></i> '+(item.mobile||'-')+'</div>';
+        var editFn = item.type==='Driver' ? 'editDriver(\''+item.id+'\')' : 'editEmployee(\''+item.id+'\')';
+        var delFn = item.type==='Driver' ? 'deleteDriver(\''+item.id+'\')' : 'deleteEmployee(\''+item.id+'\')';
+        var viewBtn = item.type==='Driver' ? '<a href="/drivers/details/'+item.id+'" class="btn btn-sm btn-outline-warning flex-fill"><i class="bi bi-eye"></i> View</a>' : '';
+        return '<div class="col-xl-4 col-md-6 animate-in" style="animation-delay:'+i*0.05+'s"><div class="glass-card vehicle-card">' +
+            '<div class="d-flex justify-content-between align-items-start mb-2">' +
+                '<div><h5 class="mb-0 fw-bold">'+item.name+(item.status==='Active'&&last4?' <span class="badge bg-dark ms-1" style="font-size:0.65rem">'+last4+'</span>':'')+'</h5></div>' +
+                '<div class="d-flex flex-column gap-1 align-items-end"><span class="badge '+statusBadge+'">'+item.status+'</span><span class="badge '+typeBadge+'" style="font-size:0.65rem">'+item.type+'</span>'+accessHtml+'</div>' +
+            '</div>' + line2 +
+            '<div class="d-flex gap-1 viewer-hide">' + viewBtn +
+                '<button class="btn btn-sm btn-outline-warning" onclick="'+editFn+'"><i class="bi bi-pencil"></i></button>' +
+                '<button class="btn btn-sm btn-outline-danger" onclick="'+delFn+'"><i class="bi bi-trash"></i></button>' +
+            '</div></div></div>';
+    }).join('');
+}
+
+function filterAll() { renderAll(); }
+
+function resetDriverForm() {
+    document.getElementById('driverForm').reset();
+    document.getElementById('drvId').value = '';
+    document.getElementById('driverModalTitle').textContent = 'Add Driver';
+}
+
+function resetEmployeeForm() {
+    document.getElementById('employeeForm').reset();
+    document.getElementById('empId').value = '';
+    document.getElementById('empModalTitle').textContent = 'Add Employee';
+}
+
+function editDriver(did) {
+    var d = allDrivers.find(function(x){return x.DriverID===did});
+    if (!d) return;
+    document.getElementById('drvId').value = d.DriverID;
+    document.getElementById('driverModalTitle').textContent = 'Edit Driver';
+    document.getElementById('drvName').value = d.DriverName||'';
+    document.getElementById('drvEmail').value = d.Email||'';
+    document.getElementById('drvMobile').value = d.MobileNumber||'';
+    document.getElementById('drvEmergency').value = d.EmergencyContact||'';
+    document.getElementById('drvAddress').value = d.Address||'';
+    document.getElementById('drvAadhaar').value = d.AadhaarNumber||'';
+    document.getElementById('drvLicenseNum').value = d.DrivingLicenseNumber||'';
+    document.getElementById('drvLicenseExpiry').value = d.LicenseExpiryDate||'';
+    document.getElementById('drvBankName').value = d.BankName||'';
+    document.getElementById('drvAccountNum').value = d.AccountNumber||'';
+    document.getElementById('drvIFSC').value = d.IFSCCode||'';
+    document.getElementById('drvSalary').value = d.Salary||'';
+    document.getElementById('drvJoining').value = d.JoiningDate||'';
+    document.getElementById('drvStatus').value = d.Status||'Active';
+    document.getElementById('drvVehicle').value = d.AssignedVehicle||'';
+    bootstrap.Modal.getOrCreateInstance(drvModalEl).show();
+}
+
+function editEmployee(uid) {
+    var u = allEmployees.find(function(x){return x.UserID===uid});
+    if (!u) return;
+    document.getElementById('empId').value = u.UserID;
+    document.getElementById('empModalTitle').textContent = 'Edit Employee';
+    document.getElementById('empName').value = u.Name||'';
+    document.getElementById('empEmail').value = u.Email||'';
+    document.getElementById('empMobile').value = u.MobileNumber||'';
+    document.getElementById('empAccess').value = u.Role||'viewer';
+    document.getElementById('empStatus').value = u.Status||'Active';
+    bootstrap.Modal.getOrCreateInstance(empModalEl).show();
+}
+
+async function saveDriver() {
+    var id = document.getElementById('drvId').value;
+    var payload = {
+        EmployeeType: 'Driver',
+        DriverName: document.getElementById('drvName').value.trim(),
+        Email: document.getElementById('drvEmail').value.trim(),
+        MobileNumber: document.getElementById('drvMobile').value.trim(),
+        EmergencyContact: document.getElementById('drvEmergency').value,
+        Address: document.getElementById('drvAddress').value,
+        AadhaarNumber: document.getElementById('drvAadhaar').value,
+        DrivingLicenseNumber: document.getElementById('drvLicenseNum').value.trim().toUpperCase(),
+        LicenseExpiryDate: document.getElementById('drvLicenseExpiry').value,
+        BankName: document.getElementById('drvBankName').value,
+        AccountNumber: document.getElementById('drvAccountNum').value,
+        IFSCCode: document.getElementById('drvIFSC').value.trim().toUpperCase(),
+        Salary: document.getElementById('drvSalary').value,
+        JoiningDate: document.getElementById('drvJoining').value,
+        Status: document.getElementById('drvStatus').value,
+        AssignedVehicle: document.getElementById('drvVehicle').value,
+    };
+    if (!payload.DriverName || !payload.MobileNumber) { showToast('Name and mobile required','danger'); return; }
+    try {
+        var url = id ? '/drivers/api/'+id : '/drivers/api/add';
+        var res = await fetch(url, { method:id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) { var m=bootstrap.Modal.getInstance(drvModalEl);if(m)m.hide(); showToast(id?'Driver updated':'Driver added','success'); location.reload(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function saveEmployee() {
+    var id = document.getElementById('empId').value;
+    var payload = {
+        Name: document.getElementById('empName').value.trim(),
+        Email: document.getElementById('empEmail').value.trim(),
+        MobileNumber: document.getElementById('empMobile').value.trim(),
+        Role: document.getElementById('empAccess').value,
+        Status: document.getElementById('empStatus').value,
+    };
+    if (!payload.Name || !payload.Email) { showToast('Name and email required','danger'); return; }
+    try {
+        var url = id ? '/access/api/'+id : '/access/api/add';
+        var res = await fetch(url, { method:id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) { var m=bootstrap.Modal.getInstance(empModalEl);if(m)m.hide(); showToast(id?'Employee updated':'Employee added','success'); location.reload(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteDriver(id) {
+    if (!confirm('Delete this driver?')) return;
+    try { var res=await fetch('/drivers/api/'+id,{method:'DELETE'}); var data=await res.json(); if(data.success){showToast('Deleted','success');location.reload();}else{showToast(data.error||'Failed','danger');} }
+    catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteEmployee(id) {
+    if (!confirm('Delete this employee?')) return;
+    try { var res=await fetch('/access/api/'+id,{method:'DELETE'}); var data=await res.json(); if(data.success){showToast('Deleted','success');location.reload();}else{showToast(data.error||'Failed','danger');} }
+    catch(err) { showToast('Network error','danger'); }
+}
+</script>
+{% endblock %}

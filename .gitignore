@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+credentials.json
+credentials.json.json
+*.log
+.venv/
+venv/
+test.html

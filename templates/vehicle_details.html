@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Vehicle Details - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Vehicle Details{% endblock %}
+{% block content %}
+<div id="vehicleDetailsContent">
+    <div class="text-center py-5"><div class="spinner-border text-warning"></div><p class="mt-2">Loading vehicle details...</p></div>
+</div>
+<div class="modal fade" id="uploadDocModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title">Upload Document</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="uploadDocForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Document Type</label>
+                        <select class="form-select glass-input" id="uploadDocType">
+                            <option>RC</option><option>Insurance</option><option>Permit</option><option>Fitness</option><option>PUC</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">File</label>
+                        <input type="file" class="form-control glass-input" id="uploadDocFile" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="uploadDoc()"><i class="bi bi-upload"></i> Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var vehicleId = '{{ vehicle_id }}';
+var allDrivers = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadVehicleDetails();
+    loadAlerts();
+});
+
+async function loadVehicleDetails() {
+    var res = await fetch('/vehicles/api/' + vehicleId);
+    var data = await res.json();
+    if (data.error) { document.getElementById('vehicleDetailsContent').innerHTML = '<div class="alert alert-danger">Vehicle not found</div>'; return; }
+    var v = data.vehicle;
+    var docs = data.documents || [];
+    var expenses = data.expenses || [];
+    var totalExp = expenses.reduce(function(s,e){return s + parseFloat(e.Amount||0)}, 0);
+    var catWise = {};
+    expenses.forEach(function(e) { catWise[e.Category] = (catWise[e.Category]||0) + parseFloat(e.Amount||0); });
+
+    var drvRes = await fetch('/drivers/api/list');
+    var drvData = await drvRes.json();
+    allDrivers = drvData.drivers || [];
+    var driverOptions = '<option value="">-- No Driver --</option>';
+    allDrivers.forEach(function(d) {
+        var selected = d.DriverName === v.DefaultDriver ? ' selected' : '';
+        driverOptions += '<option value="' + d.DriverName + '"' + selected + '>' + d.DriverName + (d.AssignedVehicle && d.AssignedVehicle !== v.VehicleNumber ? ' (' + d.AssignedVehicle + ')' : '') + '</option>';
+    });
+
+    var vndRes = await fetch('/vendors/api/list');
+    var vndData = await vndRes.json();
+    var allVendors = vndData.vendors || [];
+    var vendorOptions = '<option value="">-- No Vendor --</option>';
+    allVendors.filter(function(vn){return vn.Status==='Active'}).forEach(function(vn) {
+        var selected = vn.VendorName === v.DefaultVendor ? ' selected' : '';
+        vendorOptions += '<option value="' + vn.VendorName + '"' + selected + '>' + vn.VendorName + '</option>';
+    });
+
+    document.getElementById('vehicleDetailsContent').innerHTML =
+    '<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">' +
+        '<div class="d-flex flex-wrap align-items-center gap-3">' +
+            '<div><h4 class="mb-0">' + v.VehicleNumber + '</h4><small class="text-muted">' + (v.VehicleType||'') + ' | ' + (v.VehicleStatus||'Active') + '</small></div>' +
+            '<div class="d-flex align-items-center gap-2" style="min-width:250px">' +
+                '<label class="form-label mb-0 fw-bold text-nowrap"><i class="bi bi-person"></i> Driver:</label>' +
+                '<select class="form-select glass-input form-select-sm" id="assignDriverSelect" onchange="assignDriver()" style="width:180px">' + driverOptions + '</select>' +
+            '</div>' +
+            '<div class="d-flex align-items-center gap-2" style="min-width:250px">' +
+                '<label class="form-label mb-0 fw-bold text-nowrap"><i class="bi bi-building"></i> Vendor:</label>' +
+                '<select class="form-select glass-input form-select-sm" id="assignVendorSelect" onchange="assignVendor()" style="width:180px">' + vendorOptions + '</select>' +
+            '</div>' +
+        '</div>' +
+        '<div class="d-flex gap-2">' +
+            '<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#uploadDocModal"><i class="bi bi-upload"></i> Upload Document</button>' +
+            '<a href="/vehicles" class="btn btn-outline-warning"><i class="bi bi-arrow-left"></i> Back</a>' +
+        '</div>' +
+    '</div>' +
+    '<div class="row g-3 mb-3">' +
+        '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Expense</small><h4>₹' + totalExp.toLocaleString('en-IN') + '</h4></div></div></div>' +
+        '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-person"></i></div><div class="stat-info"><small>Current Driver</small><h4 id="currentDriverName">' + (v.DefaultDriver||'None') + '</h4></div></div></div>' +
+        '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-month"><i class="bi bi-file-earmark"></i></div><div class="stat-info"><small>Documents</small><h4>' + docs.length + '</h4></div></div></div>' +
+        '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-receipt"></i></div><div class="stat-info"><small>Transactions</small><h4>' + expenses.length + '</h4></div></div></div>' +
+    '</div>' +
+    '<div class="row g-3 mb-3">' +
+        '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.3s">' +
+            '<h6><i class="bi bi-card-text"></i> RC & Insurance</h6><hr>' +
+            '<div class="row g-2 small">' +
+                '<div class="col-6"><strong>RC Number:</strong> ' + (v.RCNumber||'-') + '</div>' +
+                '<div class="col-6"><strong>RC Expiry:</strong> ' + (v.RCExpiry||'-') + '</div>' +
+                '<div class="col-6"><strong>Insurance Policy:</strong> ' + (v.InsurancePolicyNumber||'-') + '</div>' +
+                '<div class="col-6"><strong>Company:</strong> ' + (v.InsuranceCompany||'-') + '</div>' +
+                '<div class="col-6"><strong>Start:</strong> ' + (v.InsuranceStartDate||'-') + '</div>' +
+                '<div class="col-6"><strong>Expiry:</strong> ' + (v.InsuranceExpiryDate||'-') + '</div>' +
+            '</div>' +
+        '</div></div>' +
+        '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.4s">' +
+            '<h6><i class="bi bi-shield-check"></i> Permit & Fitness</h6><hr>' +
+            '<div class="row g-2 small">' +
+                '<div class="col-6"><strong>Permit No:</strong> ' + (v.PermitNumber||'-') + '</div>' +
+                '<div class="col-6"><strong>Permit Expiry:</strong> ' + (v.PermitExpiryDate||'-') + '</div>' +
+                '<div class="col-6"><strong>Fitness Expiry:</strong> ' + (v.FitnessExpiryDate||'-') + '</div>' +
+                '<div class="col-6"><strong>PUC Expiry:</strong> ' + (v.PUCExpiryDate||'-') + '</div>' +
+            '</div>' +
+        '</div></div>' +
+    '</div>' +
+    (v.LoanAvailable==='Yes' ?
+    '<div class="row g-3 mb-3"><div class="col-12"><div class="glass-card animate-in" style="animation-delay:0.5s">' +
+        '<h6><i class="bi bi-bank"></i> Loan & EMI</h6><hr>' +
+        '<div class="row g-2 small">' +
+            '<div class="col-md-3"><strong>Bank:</strong> ' + (v.BankName||'-') + '</div>' +
+            '<div class="col-md-3"><strong>Account:</strong> ' + (v.LoanAccountNumber||'-') + '</div>' +
+            '<div class="col-md-2"><strong>EMI:</strong> ₹' + Number(v.EMIAmount||0).toLocaleString('en-IN') + '</div>' +
+            '<div class="col-md-2"><strong>EMI Day:</strong> ' + (v.EMIDate||'-') + '</div>' +
+            '<div class="col-md-2"><strong>Period:</strong> ' + (v.LoanStartDate||'-') + ' to ' + (v.LoanEndDate||'-') + '</div>' +
+        '</div>' +
+    '</div></div></div>' : '') +
+    '<div class="row g-3 mb-3">' +
+        '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.6s">' +
+            '<h6><i class="bi bi-folder"></i> Documents</h6>' +
+            (docs.length ? docs.map(function(d){return '<div class="d-flex justify-content-between align-items-center border-bottom py-2"><div><i class="bi bi-file-earmark"></i> <strong>' + d.DocumentType + '</strong> - ' + d.FileName + '</div><a href="' + d.DriveURL + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-download"></i></a></div>';}).join('') : '<p class="text-muted">No documents uploaded</p>') +
+        '</div></div>' +
+        '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.7s">' +
+            '<h6><i class="bi bi-pie-chart"></i> Category Wise Expense</h6>' +
+            '<div id="vehCatChart"></div>' +
+        '</div></div>' +
+    '</div>' +
+    '<div class="glass-card animate-in" style="animation-delay:0.8s">' +
+        '<h6><i class="bi bi-clock-history"></i> Expense History</h6>' +
+        '<div class="table-responsive"><table class="table table-hover glass-table small">' +
+            '<thead><tr><th>Date</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Mode</th></tr></thead>' +
+            '<tbody>' + (expenses.length ? expenses.sort(function(a,b){return b.ExpenseDate.localeCompare(a.ExpenseDate)}).map(function(e){return '<tr><td>' + e.ExpenseDate + '</td><td><span class="badge bg-warning text-dark">' + e.Category + '</span></td><td>' + (e.SubCategory||'-') + '</td><td>' + (e.Description||'-') + '</td><td class="fw-bold">₹' + Number(e.Amount).toLocaleString('en-IN') + '</td><td>' + (e.PaymentMode||'-') + '</td></tr>';}).join('') : '<tr><td colspan="6" class="text-center text-muted">No expenses</td></tr>') +
+            '</tbody></table></div>' +
+    '</div>';
+
+    if (Object.keys(catWise).length) {
+        new ApexCharts(document.getElementById('vehCatChart'), {
+            chart:{type:'donut',height:250,background:'transparent'},
+            series:Object.values(catWise), labels:Object.keys(catWise),
+            colors:['#FFD54F','#FFC107','#FFB300','#FFA000','#FF8F00','#FF6F00','#F9A825','#FFCA28'],
+            legend:{position:'bottom'}
+        }).render();
+    } else {
+        document.getElementById('vehCatChart').innerHTML = '<p class="text-muted text-center">No data</p>';
+    }
+}
+
+async function assignDriver() {
+    var newDriver = document.getElementById('assignDriverSelect').value;
+    try {
+        var res = await fetch('/vehicles/api/' + vehicleId + '/assign-driver', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({driver_name: newDriver})
+        });
+        var data = await res.json();
+        if (data.success) {
+            document.getElementById('currentDriverName').textContent = newDriver || 'None';
+            showToast('Driver ' + (newDriver ? 'assigned: ' + newDriver : 'unassigned') + ' successfully', 'success');
+        } else {
+            showToast(data.error || 'Failed to assign driver', 'danger');
+        }
+    } catch(err) {
+        showToast('Network error', 'danger');
+    }
+}
+
+async function assignVendor() {
+    var newVendor = document.getElementById('assignVendorSelect').value;
+    try {
+        var res = await fetch('/vehicles/api/' + vehicleId + '/assign-vendor', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({vendor_name: newVendor})
+        });
+        var data = await res.json();
+        if (data.success) {
+            showToast('Vendor ' + (newVendor ? 'assigned: ' + newVendor : 'unassigned') + ' successfully', 'success');
+        } else {
+            showToast(data.error || 'Failed to assign vendor', 'danger');
+        }
+    } catch(err) {
+        showToast('Network error', 'danger');
+    }
+}
+
+async function uploadDoc() {
+    var form = new FormData();
+    form.append('doc_type', document.getElementById('uploadDocType').value);
+    form.append('file', document.getElementById('uploadDocFile').files[0]);
+    if (!document.getElementById('uploadDocFile').files[0]) { showToast('Select a file','danger'); return; }
+    var res = await fetch('/vehicles/api/' + vehicleId + '/upload', { method:'POST', body: form });
+    var data = await res.json();
+    if (data.success) {
+        var m = bootstrap.Modal.getInstance(document.getElementById('uploadDocModal'));
+        if (m) m.hide();
+        showToast('Document uploaded','success');
+        loadVehicleDetails();
+    } else {
+        showToast(data.error||'Upload failed','danger');
+    }
+}
+</script>
+{% endblock %}

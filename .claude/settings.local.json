@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(python -c \"from routes.gst import router; print\\(router.prefix, [r.path for r in router.routes]\\)\")",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

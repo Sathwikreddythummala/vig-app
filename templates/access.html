@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Access Management - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Access Management{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h6 class="mb-1"><i class="bi bi-shield-lock"></i> User Roles</h6>
+            <small class="text-muted"><strong>Admin</strong> = Full access + manage users | <strong>Editor</strong> = Full access (no user management) | <strong>Viewer</strong> = Read only</small>
+        </div>
+        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#userModal" onclick="resetUserForm()"><i class="bi bi-plus-lg"></i> Add User</button>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.2s">
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody id="userTable"><tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+</div>
+<div class="glass-card mt-3 animate-in" style="animation-delay:0.3s">
+    <h6 class="mb-2"><i class="bi bi-info-circle"></i> System Admins (from .env)</h6>
+    <p class="small text-muted mb-0">These emails always have admin access: <strong>{{ ", ".join(allowed_emails) if allowed_emails else "All emails (no restriction)" }}</strong></p>
+</div>
+<div class="modal fade" id="userModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="userModalTitle">Add User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="row g-3">
+                        <div class="col-md-12"><label class="form-label">Email *</label><input type="email" class="form-control glass-input" id="uEmail" required placeholder="user@gmail.com"></div>
+                        <div class="col-md-6"><label class="form-label">Name</label><input type="text" class="form-control glass-input" id="uName"></div>
+                        <div class="col-md-6"><label class="form-label">Role *</label>
+                            <select class="form-select glass-input" id="uRole">
+                                <option value="viewer">Viewer (Read Only)</option>
+                                <option value="editor">Editor (Full Access)</option>
+                                <option value="admin">Admin (Full + User Management)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">Status</label>
+                            <select class="form-select glass-input" id="uStatus"><option>Active</option><option>Inactive</option></select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveUser()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var allUsers = [];
+var userModalEl = document.getElementById('userModal');
+
+document.addEventListener('DOMContentLoaded', function() { loadUsers(); loadAlerts(); });
+
+async function loadUsers() {
+    var res = await fetch('/access/api/list'); var data = await res.json();
+    allUsers = data.users || [];
+    var tbody = document.getElementById('userTable');
+    if (allUsers.length) {
+        tbody.innerHTML = allUsers.map(function(u) {
+            var roleClass = u.Role==='admin'?'bg-danger':u.Role==='editor'?'bg-info':'bg-secondary';
+            var statusClass = u.Status==='Active'?'bg-success':'bg-secondary';
+            return '<tr><td class="fw-bold">'+(u.Name||'-')+'</td><td>'+u.Email+'</td>'+
+                '<td><span class="badge '+roleClass+'">'+u.Role.toUpperCase()+'</span></td>'+
+                '<td><span class="badge '+statusClass+'">'+u.Status+'</span></td>'+
+                '<td>'+u.CreatedDate+'</td>'+
+                '<td><button class="btn btn-sm btn-outline-warning" onclick="editUser(\''+u.UserID+'\')"><i class="bi bi-pencil"></i></button> '+
+                '<button class="btn btn-sm btn-outline-danger" onclick="deleteUser(\''+u.UserID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+        }).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No users added. System admins from .env have full access by default.</td></tr>';
+    }
+}
+
+function resetUserForm() { document.getElementById('userForm').reset(); document.getElementById('userId').value=''; document.getElementById('userModalTitle').textContent='Add User'; }
+
+function editUser(uid) {
+    var u = allUsers.find(function(x){return x.UserID===uid});
+    if (!u) return;
+    document.getElementById('userId').value = u.UserID;
+    document.getElementById('userModalTitle').textContent = 'Edit User';
+    document.getElementById('uEmail').value = u.Email||'';
+    document.getElementById('uName').value = u.Name||'';
+    document.getElementById('uRole').value = u.Role||'viewer';
+    document.getElementById('uStatus').value = u.Status||'Active';
+    bootstrap.Modal.getOrCreateInstance(userModalEl).show();
+}
+
+async function saveUser() {
+    var id = document.getElementById('userId').value;
+    var payload = { Email:document.getElementById('uEmail').value.trim(), Name:document.getElementById('uName').value.trim(), Role:document.getElementById('uRole').value, Status:document.getElementById('uStatus').value };
+    if (!payload.Email) { showToast('Email required','danger'); return; }
+    try {
+        var res = await fetch(id?'/access/api/'+id:'/access/api/add', { method:id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) { var m=bootstrap.Modal.getInstance(userModalEl);if(m)m.hide(); showToast(id?'Updated':'User added','success'); loadUsers(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteUser(id) {
+    if (!confirm('Remove this user?')) return;
+    try { var res=await fetch('/access/api/'+id,{method:'DELETE'}); var data=await res.json(); if(data.success){showToast('Removed','success');loadUsers();}else{showToast(data.error||'Failed','danger');} }
+    catch(err) { showToast('Network error','danger'); }
+}
+</script>
+{% endblock %}

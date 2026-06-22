@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Portal - Vigneshwara Enterprises</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
+        body{background:linear-gradient(135deg,#FFF9C4 0%,#FFFDE7 50%,#FFF9C4 100%);background-attachment:fixed;min-height:100vh;color:#3E2723}
+        .top-bar{background:rgba(255,253,231,0.7);backdrop-filter:blur(15px);border-bottom:1px solid rgba(255,255,255,0.4);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+        .top-bar h5{font-weight:700;margin:0;font-size:1rem}
+        .top-bar .user-info{display:flex;align-items:center;gap:8px}
+        .top-bar .user-info img{width:32px;height:32px;border-radius:50%;border:2px solid #FFD54F}
+        .container-p{max-width:800px;margin:0 auto;padding:16px}
+        .glass{background:rgba(255,255,255,0.25);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.4);border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(255,193,7,0.15);margin-bottom:16px}
+        .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+        .stat-box{background:rgba(255,255,255,0.3);border-radius:12px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,0.4)}
+        .stat-box small{color:#6D4C41;font-size:0.7rem;font-weight:500}
+        .stat-box h4{margin:4px 0 0;font-weight:700;font-size:1.1rem}
+        .glass-input{background:rgba(255,255,255,0.4)!important;border:1px solid rgba(255,213,79,0.3)!important;border-radius:10px!important;font-size:0.85rem}
+        .glass-input:focus{background:rgba(255,255,255,0.6)!important;border-color:#FFC107!important;box-shadow:0 0 0 3px rgba(255,193,7,0.2)!important}
+        .btn-gold{background:linear-gradient(135deg,#FFD54F,#FFC107);border:none;color:#3E2723;font-weight:600;border-radius:10px;padding:10px 24px;box-shadow:0 2px 10px rgba(255,193,7,0.3)}
+        .btn-gold:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(255,193,7,0.5);color:#3E2723}
+        .tab-btns{display:flex;gap:6px;overflow-x:auto;margin-bottom:16px;padding-bottom:4px}
+        .tab-btn{padding:8px 16px;border-radius:20px;border:1px solid rgba(255,213,79,0.4);background:rgba(255,255,255,0.3);font-size:0.8rem;font-weight:500;cursor:pointer;white-space:nowrap;color:#5D4037;transition:all 0.2s}
+        .tab-btn.active{background:linear-gradient(135deg,#FFD54F,#FFC107);color:#3E2723;border-color:#FFC107;font-weight:600}
+        .tab-content-area{display:none}
+        .tab-content-area.active{display:block}
+        .entry-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,213,79,0.15);font-size:0.85rem}
+        .entry-row:last-child{border-bottom:none}
+        .entry-date{color:#6D4C41;font-size:0.75rem}
+        .entry-amt{font-weight:700}
+        .entry-desc{color:#5D4C41;font-size:0.8rem}
+        .form-label{font-weight:500;font-size:0.8rem;color:#6D4C41;margin-bottom:4px}
+        .vehicle-badge{background:linear-gradient(135deg,#FFD54F,#FFC107);color:#3E2723;padding:4px 12px;border-radius:20px;font-weight:600;font-size:0.8rem;display:inline-block}
+        .toast-container{position:fixed;top:0;right:0;padding:12px;z-index:9999}
+        .toast{background:rgba(255,253,231,0.95)!important;border-radius:12px!important;border:1px solid rgba(255,255,255,0.4)!important}
+        @media(min-width:768px){.stat-row{grid-template-columns:repeat(4,1fr)}}
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <div>
+            <h5><i class="bi bi-truck"></i> Vigneshwara Fleet</h5>
+        </div>
+        <div class="user-info">
+            <img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
+            <span style="font-size:0.85rem;font-weight:500">{{ user.driver_name }}</span>
+            <a href="/auth/logout" class="btn btn-sm btn-outline-danger ms-2" style="border-radius:8px;font-size:0.75rem"><i class="bi bi-box-arrow-left"></i></a>
+        </div>
+    </div>
+    <div class="container-p">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="fw-bold mb-0">Hello, {{ user.driver_name }}!</h5>
+                <small class="text-muted" id="assignedVehicleText">Loading...</small>
+            </div>
+            <span class="vehicle-badge" id="vehicleBadge">--</span>
+        </div>
+        <div class="stat-row">
+            <div class="stat-box"><small>Monthly Salary</small><h4 id="statSalary">₹0</h4></div>
+            <div class="stat-box"><small>Total Advance</small><h4 id="statAdvance">₹0</h4></div>
+            <div class="stat-box"><small>Total Meals</small><h4 id="statMeals">₹0</h4></div>
+            <div class="stat-box"><small>This Month Diesel</small><h4 id="statDiesel">0 L</h4></div>
+        </div>
+        <div class="glass" id="dieselFormCard">
+            <h6 class="mb-3"><i class="bi bi-fuel-pump"></i> Add Diesel Entry</h6>
+            <form id="dieselForm">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control glass-input" id="dslDate">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Vehicle</label>
+                        <input type="text" class="form-control glass-input" id="dslVehicle" readonly style="font-weight:700;background:rgba(255,213,79,0.2)!important">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Amount (₹) *</label>
+                        <input type="number" class="form-control glass-input" id="dslAmount" required min="0" step="0.01" placeholder="₹">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Litres</label>
+                        <input type="number" class="form-control glass-input" id="dslLitres" min="0" step="0.01" placeholder="L">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">KM Reading</label>
+                        <input type="number" class="form-control glass-input" id="dslKM" min="0" placeholder="KM">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Fuel Type</label>
+                        <select class="form-select glass-input" id="dslFuelType">
+                            <option>Diesel</option><option>AdBlue</option><option>Engine Oil</option><option>Coolant</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Payment Mode</label>
+                        <select class="form-select glass-input" id="dslPayMode">
+                            <option>Cash</option><option>UPI</option><option>Card</option><option>Company Account</option>
+                        </select>
+                    </div>
+                    <div class="col-8">
+                        <label class="form-label">Fuel Station (optional)</label>
+                        <input type="text" class="form-control glass-input" id="dslStation" placeholder="Station name">
+                    </div>
+                    <div class="col-4 d-flex align-items-end">
+                        <button type="button" class="btn btn-gold w-100" onclick="submitDiesel()"><i class="bi bi-check-lg"></i> Submit</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="tab-btns">
+            <div class="tab-btn active" onclick="showTab('diesel')"><i class="bi bi-fuel-pump"></i> Diesel</div>
+            <div class="tab-btn" onclick="showTab('salary')"><i class="bi bi-cash"></i> Salary</div>
+            <div class="tab-btn" onclick="showTab('advance')"><i class="bi bi-arrow-up-circle"></i> Advance</div>
+            <div class="tab-btn" onclick="showTab('meals')"><i class="bi bi-cup-hot"></i> Meals</div>
+            <div class="tab-btn" onclick="showTab('all')"><i class="bi bi-list"></i> All</div>
+        </div>
+        <div class="glass tab-content-area active" id="tab-diesel">
+            <h6 class="mb-2"><i class="bi bi-fuel-pump"></i> Diesel Entries</h6>
+            <div id="dieselList"><div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-warning"></div></div></div>
+        </div>
+        <div class="glass tab-content-area" id="tab-salary">
+            <h6 class="mb-2"><i class="bi bi-cash"></i> Salary History</h6>
+            <div id="salaryList"></div>
+        </div>
+        <div class="glass tab-content-area" id="tab-advance">
+            <h6 class="mb-2"><i class="bi bi-arrow-up-circle"></i> Advance History</h6>
+            <div id="advanceList"></div>
+        </div>
+        <div class="glass tab-content-area" id="tab-meals">
+            <h6 class="mb-2"><i class="bi bi-cup-hot"></i> Meals History</h6>
+            <div id="mealsList"></div>
+        </div>
+        <div class="glass tab-content-area" id="tab-all">
+            <h6 class="mb-2"><i class="bi bi-list"></i> All Expenses</h6>
+            <div id="allList"></div>
+        </div>
+    </div>
+    <div class="toast-container" id="toastContainer"></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    var assignedVehicle = '{{ user.assigned_vehicle }}';
+    document.getElementById('dslDate').value = new Date().toISOString().split('T')[0];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('dslVehicle').value = assignedVehicle || 'Not assigned';
+        loadMyData();
+    });
+
+    async function loadMyData() {
+        try {
+            var res = await fetch('/driver-portal/api/my-data');
+            var data = await res.json();
+            if (data.error) return;
+            var d = data.driver;
+            document.getElementById('assignedVehicleText').textContent = 'Vehicle: ' + (d.AssignedVehicle||'Not assigned') + ' | Salary: ₹' + Number(d.Salary||0).toLocaleString('en-IN');
+            var veh = d.AssignedVehicle || '--';
+            document.getElementById('vehicleBadge').textContent = veh.slice(-4) || '--';
+            document.getElementById('statSalary').textContent = '₹' + Number(d.Salary||0).toLocaleString('en-IN');
+            document.getElementById('statAdvance').textContent = '₹' + Number(data.total_advance||0).toLocaleString('en-IN');
+            document.getElementById('statMeals').textContent = '₹' + Number(data.total_meals||0).toLocaleString('en-IN');
+            document.getElementById('statDiesel').textContent = Number(data.month_diesel_litres||0).toLocaleString('en-IN') + ' L';
+            renderFuelEntries('dieselList', data.diesel_entries||[]);
+            renderExpenseEntries('salaryList', data.salary_entries||[]);
+            renderExpenseEntries('advanceList', data.advance_entries||[]);
+            renderExpenseEntries('mealsList', data.meals_entries||[]);
+            renderExpenseEntries('allList', data.recent_expenses||[]);
+        } catch(err) { console.error(err); }
+    }
+
+    function renderFuelEntries(containerId, entries) {
+        var el = document.getElementById(containerId);
+        if (!entries.length) { el.innerHTML = '<div class="text-center text-muted py-3" style="font-size:0.85rem">No entries yet</div>'; return; }
+        el.innerHTML = entries.map(function(e) {
+            var details = [];
+            if (e.Litres) details.push(e.Litres + 'L');
+            if (e.Kilometre) details.push('KM: ' + e.Kilometre);
+            if (e.FuelStation) details.push(e.FuelStation);
+            return '<div class="entry-row">' +
+                '<div><div class="entry-desc">' + (e.FuelType||'Diesel') + ' | ' + (e.VehicleNumber||'-') + '</div>' +
+                '<div class="entry-date">' + (e.EntryDate||'') + (details.length ? ' | ' + details.join(', ') : '') + '</div></div>' +
+                '<div class="entry-amt">₹' + Number(e.Amount||0).toLocaleString('en-IN') + '</div></div>';
+        }).join('');
+    }
+
+    function renderExpenseEntries(containerId, entries) {
+        var el = document.getElementById(containerId);
+        if (!entries.length) { el.innerHTML = '<div class="text-center text-muted py-3" style="font-size:0.85rem">No entries yet</div>'; return; }
+        el.innerHTML = entries.map(function(e) {
+            return '<div class="entry-row">' +
+                '<div><div class="entry-desc">' + (e.Category||'') + (e.SubCategory ? ' - '+e.SubCategory : '') + '</div>' +
+                '<div class="entry-date">' + e.ExpenseDate + ' | ' + (e.VehicleNumber||'-') + (e.Description ? ' | '+e.Description : '') + '</div></div>' +
+                '<div class="entry-amt">₹' + Number(e.Amount||0).toLocaleString('en-IN') + '</div></div>';
+        }).join('');
+    }
+
+    function showTab(name) {
+        document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+        document.querySelectorAll('.tab-content-area').forEach(function(t){t.classList.remove('active')});
+        event.target.closest('.tab-btn').classList.add('active');
+        document.getElementById('tab-'+name).classList.add('active');
+    }
+
+    async function submitDiesel() {
+        var amount = document.getElementById('dslAmount').value;
+        if (!amount || parseFloat(amount) <= 0) { showToast('Enter amount','danger'); return; }
+        var payload = {
+            Date: document.getElementById('dslDate').value,
+            VehicleNumber: document.getElementById('dslVehicle').value,
+            Amount: parseFloat(amount),
+            Litres: document.getElementById('dslLitres').value,
+            Kilometre: document.getElementById('dslKM').value,
+            FuelType: document.getElementById('dslFuelType').value,
+            PaymentMode: document.getElementById('dslPayMode').value,
+            FuelStation: document.getElementById('dslStation').value,
+        };
+        try {
+            var res = await fetch('/driver-portal/api/diesel', {
+                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+            });
+            var data = await res.json();
+            if (data.success) {
+                showToast('Diesel entry added!','success');
+                document.getElementById('dslAmount').value = '';
+                document.getElementById('dslLitres').value = '';
+                document.getElementById('dslKM').value = '';
+                document.getElementById('dslStation').value = '';
+                loadMyData();
+            } else { showToast(data.error||'Failed','danger'); }
+        } catch(err) { showToast('Network error','danger'); }
+    }
+
+    function showToast(msg, type) {
+        var c = document.getElementById('toastContainer');
+        var t = document.createElement('div');
+        t.className = 'toast show';
+        t.innerHTML = '<div class="toast-body d-flex align-items-center gap-2" style="color:'+(type==='success'?'#43A047':'#E53935')+'"><i class="bi '+(type==='success'?'bi-check-circle-fill':'bi-x-circle-fill')+'"></i><span style="color:#3E2723;flex:1">'+msg+'</span><button type="button" class="btn-close btn-close-sm" onclick="this.closest(\'.toast\').remove()"></button></div>';
+        c.appendChild(t);
+        setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove()},300)},3000);
+    }
+    </script>
+</body>
+</html>

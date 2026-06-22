@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Driver Details - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Driver Details{% endblock %}
+{% block content %}
+<div id="driverDetailsContent">
+    <div class="text-center py-5"><div class="spinner-border text-warning"></div><p class="mt-2">Loading driver details...</p></div>
+</div>
+<div class="modal fade" id="uploadDrvDocModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title">Upload Document</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="uploadDrvDocForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Document Type</label>
+                        <select class="form-select glass-input" id="uploadDrvDocType">
+                            <option>License</option><option>Aadhaar</option><option>Passbook</option><option>Photos</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">File</label>
+                        <input type="file" class="form-control glass-input" id="uploadDrvDocFile" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-warning" onclick="uploadDrvDoc()"><i class="bi bi-upload"></i> Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const driverId = '{{ driver_id }}';
+
+document.addEventListener('DOMContentLoaded', () => { loadDriverDetails(); loadAlerts(); });
+
+async function loadDriverDetails() {
+    const res = await fetch(`/drivers/api/${driverId}`);
+    const data = await res.json();
+    if (data.error) { document.getElementById('driverDetailsContent').innerHTML = '<div class="alert alert-danger">Driver not found</div>'; return; }
+    const d = data.driver;
+    const docs = data.documents || [];
+    const expenses = data.expenses || [];
+    const totalExp = expenses.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const advances = expenses.filter(e => e.SubCategory === 'Advance');
+    const meals = expenses.filter(e => e.SubCategory === 'Meals');
+    const salaries = expenses.filter(e => e.SubCategory === 'Salary');
+    const totalAdvance = advances.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const totalMeals = meals.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const totalSalary = salaries.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+
+    document.getElementById('driverDetailsContent').innerHTML = `
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div><h4 class="mb-0">${d.DriverName}</h4><small class="text-muted">${d.Status||'Active'} | ${d.AssignedVehicle||'No vehicle'}</small></div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-warning" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadDrvDocModal')).show()"><i class="bi bi-upload"></i> Upload Document</button>
+            <a href="/drivers" class="btn btn-outline-warning"><i class="bi bi-arrow-left"></i> Back</a>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Expense</small><h4>₹${totalExp.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Total Salary Paid</small><h4>₹${totalSalary.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Total Advance</small><h4>₹${totalAdvance.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Total Meals</small><h4>₹${totalMeals.toLocaleString('en-IN')}</h4></div></div></div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.4s">
+            <h6><i class="bi bi-person"></i> Personal Information</h6><hr>
+            <div class="row g-2 small">
+                <div class="col-6"><strong>Mobile:</strong> ${d.MobileNumber||'-'}</div>
+                <div class="col-6"><strong>Emergency:</strong> ${d.EmergencyContact||'-'}</div>
+                <div class="col-12"><strong>Address:</strong> ${d.Address||'-'}</div>
+                <div class="col-6"><strong>Aadhaar:</strong> ${d.AadhaarNumber||'-'}</div>
+                <div class="col-6"><strong>Joining:</strong> ${d.JoiningDate||'-'}</div>
+            </div>
+        </div></div>
+        <div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.5s">
+            <h6><i class="bi bi-card-checklist"></i> License & Bank</h6><hr>
+            <div class="row g-2 small">
+                <div class="col-6"><strong>License No:</strong> ${d.DrivingLicenseNumber||'-'}</div>
+                <div class="col-6"><strong>License Expiry:</strong> ${d.LicenseExpiryDate||'-'}</div>
+                <div class="col-6"><strong>Bank:</strong> ${d.BankName||'-'}</div>
+                <div class="col-6"><strong>Account:</strong> ${d.AccountNumber||'-'}</div>
+                <div class="col-6"><strong>IFSC:</strong> ${d.IFSCCode||'-'}</div>
+                <div class="col-6"><strong>Salary:</strong> ₹${Number(d.Salary||0).toLocaleString('en-IN')}/month</div>
+            </div>
+        </div></div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.6s">
+            <h6><i class="bi bi-folder"></i> Documents</h6>
+            ${docs.length?docs.map(dc=>`<div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                <div><i class="bi bi-file-earmark"></i> <strong>${dc.DocumentType}</strong> - ${dc.FileName}</div>
+                <a href="${dc.DriveURL}" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-download"></i></a>
+            </div>`).join(''):'<p class="text-muted">No documents uploaded</p>'}
+        </div></div>
+        <div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.7s">
+            <h6><i class="bi bi-arrow-up-circle"></i> Advance History</h6>
+            <div class="table-responsive"><table class="table table-sm glass-table small">
+                <thead><tr><th>Date</th><th>Amount</th><th>Description</th></tr></thead>
+                <tbody>${advances.length?advances.sort((a,b)=>b.ExpenseDate.localeCompare(a.ExpenseDate)).map(e=>`<tr><td>${e.ExpenseDate}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td><td>${e.Description||'-'}</td></tr>`).join(''):'<tr><td colspan="3" class="text-center text-muted">No advances</td></tr>'}</tbody>
+            </table></div>
+        </div></div>
+    </div>
+    <div class="glass-card animate-in" style="animation-delay:0.8s">
+        <h6><i class="bi bi-clock-history"></i> Full Expense History</h6>
+        <div class="table-responsive"><table class="table table-hover glass-table small">
+            <thead><tr><th>Date</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Vehicle</th></tr></thead>
+            <tbody>${expenses.length?expenses.sort((a,b)=>b.ExpenseDate.localeCompare(a.ExpenseDate)).map(e=>`<tr>
+                <td>${e.ExpenseDate}</td><td><span class="badge bg-warning text-dark">${e.Category}</span></td><td>${e.SubCategory||'-'}</td>
+                <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td><td>${e.VehicleNumber||'-'}</td>
+            </tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted">No expenses</td></tr>'}</tbody>
+        </table></div>
+    </div>`;
+}
+
+async function uploadDrvDoc() {
+    const form = new FormData();
+    form.append('doc_type', document.getElementById('uploadDrvDocType').value);
+    form.append('file', document.getElementById('uploadDrvDocFile').files[0]);
+    if (!document.getElementById('uploadDrvDocFile').files[0]) { showToast('Select a file','danger'); return; }
+    const res = await fetch(`/drivers/api/${driverId}/upload`, { method:'POST', body: form });
+    const data = await res.json();
+    if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('uploadDrvDocModal')).hide();
+        showToast('Document uploaded','success');
+        loadDriverDetails();
+    } else {
+        showToast(data.error||'Upload failed','danger');
+    }
+}
+</script>
+{% endblock %}

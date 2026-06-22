@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Expenses - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Expense Management{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:160px">
+            <input type="date" class="form-control glass-input" id="filterDateTo" style="width:160px">
+            <select class="form-select glass-input" id="filterVehicle" style="width:180px"><option value="">All Vehicles</option></select>
+            <select class="form-select glass-input" id="filterCategory" style="width:160px"><option value="">All Categories</option></select>
+            <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search..." style="width:180px">
+            <button class="btn btn-warning" onclick="loadExpenses()"><i class="bi bi-funnel"></i> Filter</button>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning" onclick="exportExcel()"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+            <button class="btn btn-outline-warning" onclick="exportPDF()"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+            <button class="btn btn-warning viewer-hide" data-bs-toggle="modal" data-bs-target="#expenseModal" onclick="resetExpenseForm()"><i class="bi bi-plus-lg"></i> Add Expense</button>
+        </div>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.2s">
+    <div class="d-flex justify-content-between mb-2">
+        <span class="fw-bold">Total: <span id="totalAmount" class="text-warning">₹0</span></span>
+        <span class="text-muted"><span id="totalRecords">0</span> records</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Date</th><th>For</th><th>Vehicle</th><th>Driver</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Mode</th><th>Actions</th></tr></thead>
+            <tbody id="expenseTable"><tr><td colspan="10" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+    <nav id="pagination" class="d-flex justify-content-center mt-3"></nav>
+</div>
+<div class="modal fade" id="expenseModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="expenseModalTitle">Add Expense</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="expenseForm">
+                    <input type="hidden" id="expenseId">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Date *</label>
+                            <input type="date" class="form-control glass-input" id="expDate" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Expense For *</label>
+                            <select class="form-select glass-input" id="expFor" onchange="toggleVehicleFields()">
+                                <option value="Vehicle Expense">Vehicle Expense</option>
+                                <option value="Company Expense">Company Expense</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4" id="vehicleField">
+                            <label class="form-label">Vehicle Number *</label>
+                            <select class="form-select glass-input" id="expVehicle" onchange="autoSelectDriver()"></select>
+                        </div>
+                        <div class="col-md-4" id="driverField">
+                            <label class="form-label">Driver Name</label>
+                            <select class="form-select glass-input" id="expDriver"></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Category *</label>
+                            <select class="form-select glass-input" id="expCategory" required onchange="loadSubCategories()"></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SubCategory</label>
+                            <select class="form-select glass-input" id="expSubCategory"><option value="">-- Select --</option></select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control glass-input" id="expDescription">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Amount *</label>
+                            <input type="number" class="form-control glass-input" id="expAmount" required min="0" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Mode</label>
+                            <select class="form-select glass-input" id="expPaymentMode">
+                                <option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Cheque</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Paid By</label>
+                            <select class="form-select glass-input" id="expPaidBy"><option>TSR</option><option>MSR</option><option>Company</option></select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-warning" onclick="saveExpense()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let categories = {};
+let vehicles = [];
+let drivers = [];
+let currentPage = 1;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('expDate').value = today;
+    const [catRes, vehRes, drvRes] = await Promise.all([
+        fetch('/expenses/api/categories').then(r=>r.json()),
+        fetch('/vehicles/api/list').then(r=>r.json()),
+        fetch('/drivers/api/list').then(r=>r.json())
+    ]);
+    categories = catRes.categories || {};
+    vehicles = vehRes.vehicles || [];
+    drivers = drvRes.drivers || [];
+    let catSel = document.getElementById('expCategory');
+    let filterCat = document.getElementById('filterCategory');
+    catSel.innerHTML = '<option value="">-- Select --</option>';
+    Object.keys(categories).forEach(c => {
+        catSel.innerHTML += `<option value="${c}">${c}</option>`;
+        filterCat.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+    let vehSel = document.getElementById('expVehicle');
+    let filterVeh = document.getElementById('filterVehicle');
+    vehSel.innerHTML = '<option value="">-- Select --</option>';
+    vehicles.forEach(v => {
+        vehSel.innerHTML += `<option value="${v.VehicleNumber}" data-driver="${v.DefaultDriver||''}">${v.VehicleNumber}</option>`;
+        filterVeh.innerHTML += `<option value="${v.VehicleNumber}">${v.VehicleNumber}</option>`;
+    });
+    let drvSel = document.getElementById('expDriver');
+    drvSel.innerHTML = '<option value="">-- Select --</option>';
+    drivers.forEach(d => {
+        drvSel.innerHTML += `<option value="${d.DriverName}">${d.DriverName}</option>`;
+    });
+    loadExpenses();
+    loadAlerts();
+});
+
+function toggleVehicleFields() {
+    const isVehicle = document.getElementById('expFor').value === 'Vehicle Expense';
+    document.getElementById('vehicleField').style.display = isVehicle ? '' : 'none';
+    document.getElementById('driverField').style.display = isVehicle ? '' : 'none';
+}
+
+function autoSelectDriver() {
+    const sel = document.getElementById('expVehicle');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.driver) {
+        document.getElementById('expDriver').value = opt.dataset.driver;
+    }
+}
+
+function loadSubCategories() {
+    const cat = document.getElementById('expCategory').value;
+    const subSel = document.getElementById('expSubCategory');
+    subSel.innerHTML = '<option value="">-- None --</option>';
+    if (categories[cat]) {
+        categories[cat].forEach(s => subSel.innerHTML += `<option value="${s}">${s}</option>`);
+    }
+}
+
+async function loadExpenses(page) {
+    currentPage = page || 1;
+    const params = new URLSearchParams({
+        page: currentPage,
+        date_from: document.getElementById('filterDateFrom').value,
+        date_to: document.getElementById('filterDateTo').value,
+        vehicle: document.getElementById('filterVehicle').value,
+        category: document.getElementById('filterCategory').value,
+        search: document.getElementById('filterSearch').value,
+    });
+    const res = await fetch('/expenses/api/list?' + params);
+    const data = await res.json();
+    document.getElementById('totalAmount').textContent = '₹' + Number(data.total_amount||0).toLocaleString('en-IN');
+    document.getElementById('totalRecords').textContent = data.total || 0;
+    const tbody = document.getElementById('expenseTable');
+    if (data.expenses && data.expenses.length) {
+        tbody.innerHTML = data.expenses.map(e => `<tr>
+            <td>${e.ExpenseDate}</td><td>${e.ExpenseFor||'-'}</td><td>${e.VehicleNumber||'-'}</td><td>${e.DriverName||'-'}</td>
+            <td><span class="badge bg-warning text-dark">${e.Category}</span></td><td>${e.SubCategory||'-'}</td>
+            <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
+            <td>${e.PaymentMode||'-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-warning" onclick="editExpense('${e.ExpenseID}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteExpense('${e.ExpenseID}')"><i class="bi bi-trash"></i></button>
+            </td></tr>`).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No expenses found</td></tr>';
+    }
+    renderPagination(data.total_pages || 1, currentPage);
+}
+
+function renderPagination(totalPages, current) {
+    const nav = document.getElementById('pagination');
+    if (totalPages <= 1) { nav.innerHTML = ''; return; }
+    let html = '<ul class="pagination pagination-sm">';
+    html += `<li class="page-item ${current===1?'disabled':''}"><a class="page-link" href="#" onclick="loadExpenses(${current-1});return false">‹</a></li>`;
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || Math.abs(i - current) <= 2) {
+            html += `<li class="page-item ${i===current?'active':''}"><a class="page-link" href="#" onclick="loadExpenses(${i});return false">${i}</a></li>`;
+        } else if (Math.abs(i - current) === 3) {
+            html += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+        }
+    }
+    html += `<li class="page-item ${current===totalPages?'disabled':''}"><a class="page-link" href="#" onclick="loadExpenses(${current+1});return false">›</a></li></ul>`;
+    nav.innerHTML = html;
+}
+
+var expModalEl = document.getElementById('expenseModal');
+
+function resetExpenseForm() {
+    document.getElementById('expenseForm').reset();
+    document.getElementById('expenseId').value = '';
+    document.getElementById('expenseModalTitle').textContent = 'Add Expense';
+    document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+    toggleVehicleFields();
+}
+
+function editExpense(eid) {
+    var allExp = document.getElementById('expenseTable');
+    var e = null;
+    // fetch the expense fresh
+    fetch('/expenses/api/list?search=' + eid).then(function(r){return r.json()}).then(function(data){
+        e = (data.expenses||[]).find(function(x){return x.ExpenseID===eid});
+        if (!e) { showToast('Expense not found','danger'); return; }
+        document.getElementById('expenseId').value = e.ExpenseID;
+        document.getElementById('expenseModalTitle').textContent = 'Edit Expense';
+        document.getElementById('expDate').value = e.ExpenseDate;
+        document.getElementById('expFor').value = e.ExpenseFor || 'Vehicle Expense';
+        toggleVehicleFields();
+        document.getElementById('expVehicle').value = e.VehicleNumber || '';
+        document.getElementById('expDriver').value = e.DriverName || '';
+        document.getElementById('expCategory').value = e.Category || '';
+        loadSubCategories();
+        document.getElementById('expSubCategory').value = e.SubCategory || '';
+        document.getElementById('expDescription').value = e.Description || '';
+        document.getElementById('expAmount').value = e.Amount || '';
+        document.getElementById('expPaymentMode').value = e.PaymentMode || 'Cash';
+        document.getElementById('expPaidBy').value = e.PaidBy || '';
+        bootstrap.Modal.getOrCreateInstance(expModalEl).show();
+    });
+}
+
+function hideExpModal() {
+    var m = bootstrap.Modal.getInstance(expModalEl);
+    if (m) m.hide();
+}
+
+async function saveExpense() {
+    var id = document.getElementById('expenseId').value;
+    var payload = {
+        ExpenseDate: document.getElementById('expDate').value,
+        ExpenseFor: document.getElementById('expFor').value,
+        VehicleNumber: document.getElementById('expVehicle').value,
+        DriverName: document.getElementById('expDriver').value,
+        Category: document.getElementById('expCategory').value,
+        SubCategory: document.getElementById('expSubCategory').value,
+        Description: document.getElementById('expDescription').value,
+        Amount: parseFloat(document.getElementById('expAmount').value) || 0,
+        PaymentMode: document.getElementById('expPaymentMode').value,
+        PaidBy: document.getElementById('expPaidBy').value,
+    };
+    if (!payload.ExpenseDate || !payload.Category || !payload.Amount) {
+        showToast('Please fill required fields', 'danger'); return;
+    }
+    try {
+        var url = id ? '/expenses/api/' + id : '/expenses/api/add';
+        var method = id ? 'PUT' : 'POST';
+        var res = await fetch(url, { method: method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) {
+            hideExpModal();
+            showToast(id ? 'Expense updated' : 'Expense added', 'success');
+            loadExpenses(currentPage);
+        } else {
+            showToast(data.error || 'Failed to save', 'danger');
+        }
+    } catch(err) {
+        showToast('Network error', 'danger');
+    }
+}
+
+async function deleteExpense(id) {
+    if (!confirm('Delete this expense?')) return;
+    try {
+        var res = await fetch('/expenses/api/' + id, { method: 'DELETE' });
+        var data = await res.json();
+        if (data.success) {
+            showToast('Expense deleted', 'success');
+            loadExpenses(currentPage);
+        } else {
+            showToast(data.error || 'Failed to delete', 'danger');
+        }
+    } catch(err) {
+        showToast('Network error', 'danger');
+    }
+}
+
+function exportExcel() {
+    const params = new URLSearchParams({
+        date_from: document.getElementById('filterDateFrom').value,
+        date_to: document.getElementById('filterDateTo').value,
+        vehicle: document.getElementById('filterVehicle').value,
+        category: document.getElementById('filterCategory').value,
+    });
+    window.open('/expenses/api/export/excel?' + params);
+}
+
+function exportPDF() {
+    const params = new URLSearchParams({
+        date_from: document.getElementById('filterDateFrom').value,
+        date_to: document.getElementById('filterDateTo').value,
+        vehicle: document.getElementById('filterVehicle').value,
+        category: document.getElementById('filterCategory').value,
+    });
+    window.open('/expenses/api/export/pdf?' + params);
+}
+</script>
+{% endblock %}

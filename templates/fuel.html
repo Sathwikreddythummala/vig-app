@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Fuel Management - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Fuel Management{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-fuel-pump"></i></div><div class="stat-info"><small>Today's Fuel</small><h3 id="statToday">₹0</h3></div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-month"><i class="bi bi-calendar-check"></i></div><div class="stat-info"><small>This Month</small><h3 id="statMonth">₹0</h3></div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-vehicle"><i class="bi bi-droplet"></i></div><div class="stat-info"><small>Month Litres</small><h3 id="statLitres">0</h3></div></div></div>
+    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-receipt"></i></div><div class="stat-info"><small>Month Entries</small><h3 id="statEntries">0</h3></div></div></div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.4s"><h6><i class="bi bi-bar-chart"></i> Vehicle Wise Fuel</h6><div id="vehicleChart"></div></div></div>
+    <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.5s"><h6><i class="bi bi-pie-chart"></i> Driver Wise Fuel</h6><div id="driverChart"></div></div></div>
+    <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.6s"><h6><i class="bi bi-graph-up"></i> Monthly Trend</h6><div id="trendChart"></div></div></div>
+</div>
+<div class="glass-card mb-3 animate-in" style="animation-delay:0.7s">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:150px">
+            <input type="date" class="form-control glass-input" id="filterDateTo" style="width:150px">
+            <select class="form-select glass-input" id="filterVehicle" style="width:160px"><option value="">All Vehicles</option></select>
+            <select class="form-select glass-input" id="filterDriver" style="width:160px"><option value="">All Drivers</option></select>
+            <select class="form-select glass-input" id="filterFuelType" style="width:140px"><option value="">All Types</option><option>Diesel</option><option>AdBlue</option><option>Engine Oil</option><option>Coolant</option></select>
+            <button class="btn btn-warning btn-sm" onclick="loadFuel()"><i class="bi bi-funnel"></i> Filter</button>
+        </div>
+        <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#fuelModal" onclick="resetFuelForm()"><i class="bi bi-plus-lg"></i> Add Fuel Entry</button>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.8s">
+    <div class="d-flex justify-content-between mb-2">
+        <div><span class="fw-bold">Total: <span id="totalAmount" class="text-warning">₹0</span></span> <span class="ms-3 text-muted">Litres: <span id="totalLitres" class="text-info fw-bold">0</span></span></div>
+        <span class="text-muted"><span id="totalRecords">0</span> entries</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Fuel Type</th><th>Litres</th><th>Amount</th><th>KM Reading</th><th>Station</th><th>Payment</th><th>Actions</th></tr></thead>
+            <tbody id="fuelTable"><tr><td colspan="9" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+    <nav id="pagination" class="d-flex justify-content-center mt-3"></nav>
+</div>
+<div class="modal fade" id="fuelModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="fuelModalTitle">Add Fuel Entry</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="fuelForm">
+                    <input type="hidden" id="fuelId">
+                    <div class="row g-3">
+                        <div class="col-md-3"><label class="form-label">Date *</label><input type="date" class="form-control glass-input" id="fDate" required></div>
+                        <div class="col-md-3"><label class="form-label">Vehicle *</label><select class="form-select glass-input" id="fVehicle" required onchange="autoFillDriver()"><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Driver</label><select class="form-select glass-input" id="fDriver"><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Fuel Type</label>
+                            <select class="form-select glass-input" id="fFuelType"><option>Diesel</option><option>AdBlue</option><option>Engine Oil</option><option>Coolant</option></select>
+                        </div>
+                        <div class="col-md-3"><label class="form-label">Litres</label><input type="number" class="form-control glass-input" id="fLitres" min="0" step="0.01"></div>
+                        <div class="col-md-3"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="fAmount" required min="0" step="0.01"></div>
+                        <div class="col-md-3"><label class="form-label">KM Reading</label><input type="number" class="form-control glass-input" id="fKM" min="0"></div>
+                        <div class="col-md-3"><label class="form-label">Payment Mode</label>
+                            <select class="form-select glass-input" id="fPayMode"><option>Cash</option><option>UPI</option><option>Card</option><option>Company Account</option></select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">Fuel Station</label><input type="text" class="form-control glass-input" id="fStation"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveFuel()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var currentPage = 1;
+var allVehicles = [], allDrivers = [], allFuelData = [];
+var fuelModalEl = document.getElementById('fuelModal');
+
+document.addEventListener('DOMContentLoaded', async function() {
+    var results = await Promise.all([
+        fetch('/vehicles/api/list').then(function(r){return r.json()}),
+        fetch('/drivers/api/list').then(function(r){return r.json()})
+    ]);
+    allVehicles = results[0].vehicles || [];
+    allDrivers = results[1].drivers || [];
+    var fVeh = document.getElementById('filterVehicle');
+    var mVeh = document.getElementById('fVehicle');
+    allVehicles.forEach(function(v){ fVeh.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>'; mVeh.innerHTML += '<option value="'+v.VehicleNumber+'" data-driver="'+(v.DefaultDriver||'')+'">'+v.VehicleNumber+'</option>'; });
+    var fDrv = document.getElementById('filterDriver');
+    var mDrv = document.getElementById('fDriver');
+    allDrivers.forEach(function(d){ fDrv.innerHTML += '<option value="'+d.DriverName+'">'+d.DriverName+'</option>'; mDrv.innerHTML += '<option value="'+d.DriverName+'">'+d.DriverName+'</option>'; });
+    loadFuel();
+    loadStats();
+    loadAlerts();
+});
+
+async function loadStats() {
+    var res = await fetch('/fuel/api/stats'); var s = await res.json();
+    document.getElementById('statToday').textContent = '₹'+Number(s.total_today||0).toLocaleString('en-IN');
+    document.getElementById('statMonth').textContent = '₹'+Number(s.total_month||0).toLocaleString('en-IN');
+    document.getElementById('statLitres').textContent = Number(s.month_litres||0).toLocaleString('en-IN');
+    document.getElementById('statEntries').textContent = s.month_entries||0;
+    if (s.vehicle_wise && s.vehicle_wise.labels.length) {
+        new ApexCharts(document.getElementById('vehicleChart'),{chart:{type:'bar',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel ₹',data:s.vehicle_wise.values}],xaxis:{categories:s.vehicle_wise.labels},colors:['#FFD54F'],plotOptions:{bar:{borderRadius:6,columnWidth:'50%'}}}).render();
+    } else { document.getElementById('vehicleChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+    if (s.driver_wise && s.driver_wise.labels.length) {
+        new ApexCharts(document.getElementById('driverChart'),{chart:{type:'donut',height:220,background:'transparent'},series:s.driver_wise.values,labels:s.driver_wise.labels,colors:['#FFD54F','#FFC107','#FFB300','#FFA000','#FF8F00','#FF6F00','#F9A825','#FFCA28'],legend:{position:'bottom',fontSize:'10px'}}).render();
+    } else { document.getElementById('driverChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+    if (s.monthly_trend && s.monthly_trend.labels.length) {
+        new ApexCharts(document.getElementById('trendChart'),{chart:{type:'area',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel',data:s.monthly_trend.values}],xaxis:{categories:s.monthly_trend.labels},colors:['#FF8F00'],fill:{type:'gradient',gradient:{opacityFrom:0.5,opacityTo:0.1}},stroke:{curve:'smooth',width:3},dataLabels:{enabled:false}}).render();
+    } else { document.getElementById('trendChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+}
+
+async function loadFuel(page) {
+    currentPage = page||1;
+    var params = new URLSearchParams({page:currentPage,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,driver:document.getElementById('filterDriver').value,fuel_type:document.getElementById('filterFuelType').value});
+    var res = await fetch('/fuel/api/list?'+params); var data = await res.json();
+    document.getElementById('totalAmount').textContent = '₹'+Number(data.total_amount||0).toLocaleString('en-IN');
+    document.getElementById('totalLitres').textContent = Number(data.total_litres||0).toLocaleString('en-IN');
+    document.getElementById('totalRecords').textContent = data.total||0;
+    var tbody = document.getElementById('fuelTable');
+    if (data.entries && data.entries.length) {
+        tbody.innerHTML = data.entries.map(function(e) {
+            return '<tr>' +
+                '<td>'+e.EntryDate+'</td>' +
+                '<td class="fw-bold">'+e.VehicleNumber+'</td>' +
+                '<td>'+e.DriverName+'</td>' +
+                '<td><span class="badge bg-warning text-dark">'+(e.FuelType||'Diesel')+'</span></td>' +
+                '<td>'+(e.Litres||'-')+'</td>' +
+                '<td class="fw-bold">₹'+Number(e.Amount||0).toLocaleString('en-IN')+'</td>' +
+                '<td>'+(e.Kilometre||'-')+'</td>' +
+                '<td>'+(e.FuelStation||'-')+'</td>' +
+                '<td>'+(e.PaymentMode||'-')+'</td>' +
+                '<td><button class="btn btn-sm btn-outline-warning" onclick="editFuel(\''+e.FuelID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteFuel(\''+e.FuelID+'\')"><i class="bi bi-trash"></i></button></td>' +
+                '</tr>';
+        }).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No fuel entries yet</td></tr>';
+    }
+    renderPagination(data.total_pages||1, currentPage);
+}
+
+function renderPagination(tp, cur) {
+    var nav=document.getElementById('pagination'); if(tp<=1){nav.innerHTML='';return;}
+    var h='<ul class="pagination pagination-sm">';
+    h+='<li class="page-item '+(cur===1?'disabled':'')+'"><a class="page-link" href="#" onclick="loadFuel('+(cur-1)+');return false">‹</a></li>';
+    for(var i=1;i<=tp;i++){if(i===1||i===tp||Math.abs(i-cur)<=2){h+='<li class="page-item '+(i===cur?'active':'')+'"><a class="page-link" href="#" onclick="loadFuel('+i+');return false">'+i+'</a></li>';}else if(Math.abs(i-cur)===3){h+='<li class="page-item disabled"><span class="page-link">…</span></li>';}}
+    h+='<li class="page-item '+(cur===tp?'disabled':'')+'"><a class="page-link" href="#" onclick="loadFuel('+(cur+1)+');return false">›</a></li></ul>';
+    nav.innerHTML=h;
+}
+
+function autoFillDriver() {
+    var sel = document.getElementById('fVehicle');
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.driver) document.getElementById('fDriver').value = opt.dataset.driver;
+}
+
+function resetFuelForm() {
+    document.getElementById('fuelForm').reset();
+    document.getElementById('fuelId').value = '';
+    document.getElementById('fuelModalTitle').textContent = 'Add Fuel Entry';
+    document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+}
+
+function editFuel(fid) {
+    fetch('/fuel/api/list?per_page=200').then(function(r){return r.json()}).then(function(data) {
+        var e = (data.entries||[]).find(function(x){return x.FuelID===fid});
+        if (!e) { showToast('Not found','danger'); return; }
+        document.getElementById('fuelId').value = e.FuelID;
+        document.getElementById('fuelModalTitle').textContent = 'Edit Fuel Entry';
+        document.getElementById('fDate').value = e.EntryDate||'';
+        document.getElementById('fVehicle').value = e.VehicleNumber||'';
+        document.getElementById('fDriver').value = e.DriverName||'';
+        document.getElementById('fFuelType').value = e.FuelType||'Diesel';
+        document.getElementById('fLitres').value = e.Litres||'';
+        document.getElementById('fAmount').value = e.Amount||'';
+        document.getElementById('fKM').value = e.Kilometre||'';
+        document.getElementById('fStation').value = e.FuelStation||'';
+        document.getElementById('fPayMode').value = e.PaymentMode||'Cash';
+        bootstrap.Modal.getOrCreateInstance(fuelModalEl).show();
+    });
+}
+
+function hideFuelModal() {
+    var m = bootstrap.Modal.getInstance(fuelModalEl);
+    if (m) m.hide();
+}
+
+async function saveFuel() {
+    var id = document.getElementById('fuelId').value;
+    var payload = {
+        EntryDate: document.getElementById('fDate').value,
+        VehicleNumber: document.getElementById('fVehicle').value,
+        DriverName: document.getElementById('fDriver').value,
+        FuelType: document.getElementById('fFuelType').value,
+        Litres: document.getElementById('fLitres').value,
+        Amount: document.getElementById('fAmount').value,
+        Kilometre: document.getElementById('fKM').value,
+        FuelStation: document.getElementById('fStation').value,
+        PaymentMode: document.getElementById('fPayMode').value,
+    };
+    if (!payload.EntryDate || !payload.VehicleNumber || !payload.Amount) { showToast('Fill required fields','danger'); return; }
+    try {
+        var url = id ? '/fuel/api/'+id : '/fuel/api/add';
+        var method = id ? 'PUT' : 'POST';
+        var res = await fetch(url, { method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) { hideFuelModal(); showToast(id?'Updated':'Added','success'); loadFuel(currentPage); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteFuel(id) {
+    if (!confirm('Delete this fuel entry?')) return;
+    try {
+        var res = await fetch('/fuel/api/'+id, { method:'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('Deleted','success'); loadFuel(currentPage); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+</script>
+{% endblock %}

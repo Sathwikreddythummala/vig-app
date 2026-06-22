@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Purse - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Purse Management{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="glass-card animate-in" style="min-height:180px">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-wallet2"></i> TSR</h5>
+                <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#purseModal" onclick="resetPurseForm('TSR')"><i class="bi bi-plus-lg"></i> Give Money</button>
+            </div>
+            <div class="row g-2 text-center">
+                <div class="col-4"><div class="stat-box"><small>Given</small><h4 id="tsrGiven" class="text-success">₹0</h4></div></div>
+                <div class="col-4"><div class="stat-box"><small>Spent</small><h4 id="tsrSpent" class="text-danger">₹0</h4></div></div>
+                <div class="col-4"><div class="stat-box"><small>Balance</small><h4 id="tsrBalance" class="fw-bold">₹0</h4></div></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card animate-in" style="animation-delay:0.1s;min-height:180px">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-wallet2"></i> MSR</h5>
+                <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#purseModal" onclick="resetPurseForm('MSR')"><i class="bi bi-plus-lg"></i> Give Money</button>
+            </div>
+            <div class="row g-2 text-center">
+                <div class="col-4"><div class="stat-box"><small>Given</small><h4 id="msrGiven" class="text-success">₹0</h4></div></div>
+                <div class="col-4"><div class="stat-box"><small>Spent</small><h4 id="msrSpent" class="text-danger">₹0</h4></div></div>
+                <div class="col-4"><div class="stat-box"><small>Balance</small><h4 id="msrBalance" class="fw-bold">₹0</h4></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="glass-card mb-3 animate-in" style="animation-delay:0.2s">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select glass-input" id="filterHolder" style="width:140px" onchange="loadEntries()"><option value="">All</option><option>TSR</option><option>MSR</option></select>
+            <span class="text-muted small"><i class="bi bi-info-circle"></i> Shows purse entries + expenses paid by TSR/MSR</span>
+        </div>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.3s">
+    <div class="table-responsive">
+        <table class="table table-hover glass-table small">
+            <thead><tr><th>Date</th><th>Holder</th><th>Type</th><th>Amount</th><th>Description</th><th>Vehicle</th><th>Source</th><th>Actions</th></tr></thead>
+            <tbody id="entryTable"><tr><td colspan="8" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+</div>
+<div class="modal fade" id="purseModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="purseModalTitle">Add Entry</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="purseForm">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Date *</label><input type="date" class="form-control glass-input" id="pDate" required></div>
+                        <div class="col-md-6"><label class="form-label">Holder *</label>
+                            <select class="form-select glass-input" id="pHolder" required><option>TSR</option><option>MSR</option></select>
+                        </div>
+                        <input type="hidden" id="pType" value="Credit">
+                        <div class="col-md-6"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="pAmount" required min="0" step="0.01"></div>
+                        <div class="col-md-6"><label class="form-label">Vehicle (optional)</label><select class="form-select glass-input" id="pVehicle"><option value="">-- None --</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Category</label><input type="text" class="form-control glass-input" id="pCategory" placeholder="e.g. Cash Given, Fuel, Toll"></div>
+                        <div class="col-md-12"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="pDesc"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="savePurse()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var purseModalEl = document.getElementById('purseModal');
+
+document.addEventListener('DOMContentLoaded', async function() {
+    document.getElementById('pDate').value = new Date().toISOString().split('T')[0];
+    try {
+        var vRes = await fetch('/vehicles/api/list').then(function(r){return r.json()});
+        var vSel = document.getElementById('pVehicle');
+        (vRes.vehicles||[]).forEach(function(v){ vSel.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>'; });
+    } catch(e){}
+    loadSummary();
+    loadEntries();
+    loadAlerts();
+});
+
+async function loadSummary() {
+    var res = await fetch('/purse/api/summary'); var data = await res.json();
+    var s = data.summary || {};
+    if (s.TSR) {
+        document.getElementById('tsrGiven').textContent = '₹'+Number(s.TSR.given||0).toLocaleString('en-IN');
+        document.getElementById('tsrSpent').textContent = '₹'+Number(s.TSR.total_spent||0).toLocaleString('en-IN');
+        var tb = s.TSR.balance||0;
+        document.getElementById('tsrBalance').textContent = '₹'+Number(tb).toLocaleString('en-IN');
+        document.getElementById('tsrBalance').className = 'fw-bold '+(tb>=0?'text-success':'text-danger');
+    }
+    if (s.MSR) {
+        document.getElementById('msrGiven').textContent = '₹'+Number(s.MSR.given||0).toLocaleString('en-IN');
+        document.getElementById('msrSpent').textContent = '₹'+Number(s.MSR.total_spent||0).toLocaleString('en-IN');
+        var mb = s.MSR.balance||0;
+        document.getElementById('msrBalance').textContent = '₹'+Number(mb).toLocaleString('en-IN');
+        document.getElementById('msrBalance').className = 'fw-bold '+(mb>=0?'text-success':'text-danger');
+    }
+}
+
+async function loadEntries() {
+    var holder = document.getElementById('filterHolder').value;
+    var res = await fetch('/purse/api/list?holder='+holder); var data = await res.json();
+    var tbody = document.getElementById('entryTable');
+    var entries = data.entries || [];
+    if (entries.length) {
+        tbody.innerHTML = entries.map(function(e) {
+            var typeClass = e.Type==='Credit'?'text-success fw-bold':e.Type==='Debit'?'text-danger fw-bold':'text-warning fw-bold';
+            var typeBadge = e.Type==='Credit'?'bg-success':e.Type==='Debit'?'bg-danger':'bg-warning text-dark';
+            var srcBadge = e.Source==='expense'?'<span class="badge bg-info" style="font-size:0.6rem">Expense</span>':'<span class="badge bg-secondary" style="font-size:0.6rem">Purse</span>';
+            var sign = e.Type==='Credit'?'+':'-';
+            var actions = e.Source==='purse' && e.PurseID ? '<button class="btn btn-sm btn-outline-danger" onclick="deletePurse(\''+e.PurseID+'\')"><i class="bi bi-trash"></i></button>' : '-';
+            return '<tr><td>'+e.Date+'</td><td class="fw-bold">'+e.Holder+'</td><td><span class="badge '+typeBadge+'">'+e.Type+'</span></td><td class="'+typeClass+'">'+sign+'₹'+Number(e.Amount||0).toLocaleString('en-IN')+'</td><td>'+(e.Description||'-')+'</td><td>'+(e.VehicleNumber||'-')+'</td><td>'+srcBadge+'</td><td>'+actions+'</td></tr>';
+        }).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No entries yet</td></tr>';
+    }
+}
+
+function resetPurseForm(holder) {
+    document.getElementById('purseForm').reset();
+    document.getElementById('pDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pHolder').value = holder || 'TSR';
+    document.getElementById('purseModalTitle').textContent = 'Give Money to ' + (holder||'TSR');
+}
+
+async function savePurse() {
+    var payload = {
+        Date: document.getElementById('pDate').value,
+        Holder: document.getElementById('pHolder').value,
+        Type: document.getElementById('pType').value,
+        Amount: document.getElementById('pAmount').value,
+        VehicleNumber: document.getElementById('pVehicle').value,
+        Category: document.getElementById('pCategory').value,
+        Description: document.getElementById('pDesc').value,
+    };
+    if (!payload.Date || !payload.Amount) { showToast('Fill required fields','danger'); return; }
+    try {
+        var res = await fetch('/purse/api/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) {
+            var m = bootstrap.Modal.getInstance(purseModalEl); if(m) m.hide();
+            showToast('Entry added','success');
+            loadSummary();
+            loadEntries();
+        } else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deletePurse(id) {
+    if (!confirm('Delete this entry?')) return;
+    try {
+        var res = await fetch('/purse/api/'+id, { method:'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('Deleted','success'); loadSummary(); loadEntries(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./.env:/app/.env:ro
+    environment:
+      - OAUTHLIB_INSECURE_TRANSPORT=1
+    restart: unless-stopped

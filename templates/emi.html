@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}EMI Management - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}EMI Management{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Monthly EMI Total</small><h3 id="statMonthly">₹0</h3></div></div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-check-circle"></i></div><div class="stat-info"><small>Active Loans</small><h3 id="statActive">0</h3></div></div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-driver"><i class="bi bi-flag"></i></div><div class="stat-info"><small>Completed Loans</small><h3 id="statCompleted">0</h3></div></div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-month"><i class="bi bi-wallet2"></i></div><div class="stat-info"><small>Total EMI Paid</small><h3 id="statPaid">₹0</h3></div></div>
+    </div>
+</div>
+<div class="glass-card mb-4 animate-in" style="animation-delay:0.4s">
+    <h6 class="mb-3"><i class="bi bi-truck"></i> Vehicle EMIs</h6>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Vehicle</th><th>Type</th><th>Bank</th><th>Account No</th><th>EMI Amount</th><th>EMI Day</th><th>Loan Period</th><th>Next Due</th><th>Days Left</th><th>Status</th></tr></thead>
+            <tbody id="vehicleEmiTable"><tr><td colspan="10" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+</div>
+<div class="glass-card mb-4 animate-in" style="animation-delay:0.5s">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0"><i class="bi bi-credit-card"></i> Other EMIs (Tyres, Equipment, Loans etc.)</h6>
+        <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#otherEmiModal" onclick="resetOtherEmiForm()"><i class="bi bi-plus-lg"></i> Add EMI</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Name</th><th>Category</th><th>Vehicle</th><th>Lender</th><th>Total Amt</th><th>Down Pay</th><th>EMI Amt</th><th>EMI Day</th><th>Period</th><th>Paid/Total</th><th>Next Due</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="otherEmiTable"><tr><td colspan="14" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.6s">
+    <h6 class="mb-3"><i class="bi bi-clock-history"></i> EMI Payment History</h6>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Description</th><th>Amount</th><th>Mode</th><th>Paid By</th></tr></thead>
+            <tbody id="emiHistoryTable"><tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+</div>
+<div class="modal fade" id="otherEmiModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="otherEmiModalTitle">Add Other EMI</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="otherEmiForm">
+                    <input type="hidden" id="oeId">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">EMI Name *</label>
+                            <input type="text" class="form-control glass-input" id="oeName" required placeholder="e.g. Tyre Purchase - MRF Set">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Category *</label>
+                            <select class="form-select glass-input" id="oeCategory">
+                                <option>Tyres</option>
+                                <option>Equipment</option>
+                                <option>Body Building</option>
+                                <option>Engine</option>
+                                <option>Battery</option>
+                                <option>Spare Parts</option>
+                                <option>Personal Loan</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Vehicle (optional)</label>
+                            <select class="form-select glass-input" id="oeVehicle"><option value="">-- None --</option></select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control glass-input" id="oeDescription" placeholder="Details about the loan/purchase">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Lender / Shop Name</label>
+                            <input type="text" class="form-control glass-input" id="oeLender" placeholder="e.g. Tyre Shop Name">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Total Amount *</label>
+                            <input type="number" class="form-control glass-input" id="oeTotalAmount" required min="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Down Payment (₹)</label>
+                            <input type="number" class="form-control glass-input" id="oeDownPayment" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">EMI Amount *</label>
+                            <input type="number" class="form-control glass-input" id="oeEMIAmount" required min="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">EMI Day (1-31) *</label>
+                            <input type="number" class="form-control glass-input" id="oeEMIDate" required min="1" max="31">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Start Date *</label>
+                            <input type="date" class="form-control glass-input" id="oeStartDate" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">End Date *</label>
+                            <input type="date" class="form-control glass-input" id="oeEndDate" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Total Installments</label>
+                            <input type="number" class="form-control glass-input" id="oeTotalInst" min="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Paid Installments</label>
+                            <input type="number" class="form-control glass-input" id="oePaidInst" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select glass-input" id="oeStatus"><option>Active</option><option>Completed</option><option>Cancelled</option></select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveOtherEmi()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var allOtherEmis = [];
+var oeModalEl = document.getElementById('otherEmiModal');
+
+document.addEventListener('DOMContentLoaded', async function() {
+    var vRes = await fetch('/vehicles/api/list').then(function(r){return r.json()});
+    var vSel = document.getElementById('oeVehicle');
+    (vRes.vehicles||[]).forEach(function(v) { vSel.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>'; });
+    loadEMIs();
+    loadAlerts();
+});
+
+async function loadEMIs() {
+    try {
+        var res = await fetch('/emi/api/list');
+        var data = await res.json();
+        document.getElementById('statMonthly').textContent = '₹' + Number(data.total_monthly||0).toLocaleString('en-IN');
+        document.getElementById('statActive').textContent = data.total_active || 0;
+        document.getElementById('statCompleted').textContent = data.total_completed || 0;
+        document.getElementById('statPaid').textContent = '₹' + Number(data.total_paid||0).toLocaleString('en-IN');
+
+        var vBody = document.getElementById('vehicleEmiTable');
+        var emis = data.vehicle_emis || [];
+        if (emis.length) {
+            vBody.innerHTML = emis.map(function(e) {
+                var statusClass = e.Status==='Active'?'bg-success':'bg-secondary';
+                var daysClass=''; var daysText='-';
+                if (e.DaysLeft!==null && e.Status==='Active') { daysText=e.DaysLeft+' days'; if(e.DaysLeft<=3)daysClass='text-danger fw-bold'; else if(e.DaysLeft<=7)daysClass='text-warning fw-bold'; }
+                return '<tr><td class="fw-bold">'+e.VehicleNumber+'</td><td>'+(e.VehicleType||'-')+'</td><td>'+(e.BankName||'-')+'</td><td>'+(e.LoanAccountNumber||'-')+'</td><td class="fw-bold">₹'+Number(e.EMIAmount).toLocaleString('en-IN')+'</td><td>Day '+(e.EMIDate||'-')+'</td><td>'+(e.LoanStartDate||'-')+' to '+(e.LoanEndDate||'-')+'</td><td>'+(e.NextDue||'-')+'</td><td class="'+daysClass+'">'+daysText+'</td><td><span class="badge '+statusClass+'">'+e.Status+'</span></td></tr>';
+            }).join('');
+        } else {
+            vBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No vehicle EMIs found</td></tr>';
+        }
+
+        allOtherEmis = data.other_emis || [];
+        var oBody = document.getElementById('otherEmiTable');
+        if (allOtherEmis.length) {
+            oBody.innerHTML = allOtherEmis.map(function(e) {
+                var statusClass = e.Status==='Active'?'bg-success':e.Status==='Completed'?'bg-secondary':'bg-danger';
+                var daysClass=''; var daysText='-';
+                if (e.DaysLeft!==null && e.DaysLeft!==undefined && e.Status==='Active') { daysText=e.DaysLeft+' days'; if(e.DaysLeft<=3)daysClass='text-danger fw-bold'; else if(e.DaysLeft<=7)daysClass='text-warning fw-bold'; }
+                return '<tr><td class="fw-bold">'+e.EMIName+'</td><td><span class="badge bg-warning text-dark">'+e.Category+'</span></td><td>'+(e.VehicleNumber||'-')+'</td><td>'+(e.LenderName||'-')+'</td><td>₹'+Number(e.TotalAmount||0).toLocaleString('en-IN')+'</td><td>₹'+Number(e.DownPayment||0).toLocaleString('en-IN')+'</td><td class="fw-bold">₹'+Number(e.EMIAmount||0).toLocaleString('en-IN')+'</td><td>Day '+(e.EMIDate||'-')+'</td><td>'+(e.StartDate||'-')+' to '+(e.EndDate||'-')+'</td><td>'+(e.PaidInstallments||0)+'/'+(e.TotalInstallments||'-')+'</td><td>'+(e.NextDue||'-')+'</td><td class="'+daysClass+'">'+daysText+'</td><td><span class="badge '+statusClass+'">'+e.Status+'</span></td><td><button class="btn btn-sm btn-outline-warning" onclick="editOtherEmi(\''+e.EMIID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteOtherEmi(\''+e.EMIID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+            }).join('');
+        } else {
+            oBody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">No other EMIs. Click "Add EMI" to add one.</td></tr>';
+        }
+
+        var hBody = document.getElementById('emiHistoryTable');
+        var history = data.emi_expenses || [];
+        if (history.length) {
+            hBody.innerHTML = history.map(function(e) {
+                return '<tr><td>'+e.ExpenseDate+'</td><td>'+(e.VehicleNumber||'-')+'</td><td>'+(e.Description||'-')+'</td><td class="fw-bold">₹'+Number(e.Amount).toLocaleString('en-IN')+'</td><td>'+(e.PaymentMode||'-')+'</td><td>'+(e.PaidBy||'-')+'</td></tr>';
+            }).join('');
+        } else {
+            hBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No EMI payments recorded</td></tr>';
+        }
+    } catch(err) { console.error('EMI load error:', err); }
+}
+
+function resetOtherEmiForm() {
+    document.getElementById('otherEmiForm').reset();
+    document.getElementById('oeId').value = '';
+    document.getElementById('otherEmiModalTitle').textContent = 'Add Other EMI';
+    document.getElementById('oePaidInst').value = '0';
+}
+
+function editOtherEmi(eid) {
+    var e = allOtherEmis.find(function(x){return x.EMIID===eid});
+    if (!e) return;
+    document.getElementById('oeId').value = e.EMIID;
+    document.getElementById('otherEmiModalTitle').textContent = 'Edit EMI';
+    document.getElementById('oeName').value = e.EMIName||'';
+    document.getElementById('oeCategory').value = e.Category||'Tyres';
+    document.getElementById('oeDescription').value = e.Description||'';
+    document.getElementById('oeVehicle').value = e.VehicleNumber||'';
+    document.getElementById('oeLender').value = e.LenderName||'';
+    document.getElementById('oeTotalAmount').value = e.TotalAmount||'';
+    document.getElementById('oeDownPayment').value = e.DownPayment||'0';
+    document.getElementById('oeEMIAmount').value = e.EMIAmount||'';
+    document.getElementById('oeEMIDate').value = e.EMIDate||'';
+    document.getElementById('oeStartDate').value = e.StartDate||'';
+    document.getElementById('oeEndDate').value = e.EndDate||'';
+    document.getElementById('oeTotalInst').value = e.TotalInstallments||'';
+    document.getElementById('oePaidInst').value = e.PaidInstallments||'0';
+    document.getElementById('oeStatus').value = e.Status||'Active';
+    bootstrap.Modal.getOrCreateInstance(oeModalEl).show();
+}
+
+function hideOeModal() {
+    var m = bootstrap.Modal.getInstance(oeModalEl);
+    if (m) m.hide();
+}
+
+async function saveOtherEmi() {
+    var id = document.getElementById('oeId').value;
+    var payload = {
+        EMIName: document.getElementById('oeName').value.trim(),
+        Category: document.getElementById('oeCategory').value,
+        Description: document.getElementById('oeDescription').value,
+        VehicleNumber: document.getElementById('oeVehicle').value,
+        LenderName: document.getElementById('oeLender').value,
+        TotalAmount: document.getElementById('oeTotalAmount').value,
+        DownPayment: document.getElementById('oeDownPayment').value,
+        EMIAmount: document.getElementById('oeEMIAmount').value,
+        EMIDate: document.getElementById('oeEMIDate').value,
+        StartDate: document.getElementById('oeStartDate').value,
+        EndDate: document.getElementById('oeEndDate').value,
+        TotalInstallments: document.getElementById('oeTotalInst').value,
+        PaidInstallments: document.getElementById('oePaidInst').value,
+        Status: document.getElementById('oeStatus').value,
+    };
+    if (!payload.EMIName || !payload.EMIAmount || !payload.EMIDate) { showToast('Fill required fields','danger'); return; }
+    try {
+        var url = id ? '/emi/api/other/'+id : '/emi/api/other/add';
+        var method = id ? 'PUT' : 'POST';
+        var res = await fetch(url, { method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) {
+            hideOeModal();
+            showToast(id?'EMI updated':'EMI added','success');
+            loadEMIs();
+        } else {
+            showToast(data.error||'Failed to save','danger');
+        }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteOtherEmi(id) {
+    if (!confirm('Delete this EMI?')) return;
+    try {
+        var res = await fetch('/emi/api/other/'+id, { method:'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('EMI deleted','success'); loadEMIs(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+</script>
+{% endblock %}
