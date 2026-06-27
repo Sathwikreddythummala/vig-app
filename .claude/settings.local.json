@@ -7,7 +7,12 @@
       "Bash(python -c \"from routes.gst import router; print\\(router.prefix, [r.path for r in router.routes]\\)\")",
       "Bash(git config *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(grep -E \"\\\\.env$|credentials\")",
+      "Bash(npx create-next-app@latest vsp-astra-portal --typescript --tailwind --eslint --app --src-dir --no-import-alias --use-npm)",
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Program Files\\\\nodejs\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\nvm\" -ErrorAction SilentlyContinue | Select-Object -First 5)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; node --version; npm --version)"
     ]
   }
 }

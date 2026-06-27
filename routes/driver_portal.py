@@ -25,11 +25,20 @@ async def portal_home(request: Request):
 
 
 @router.get("/api/my-data")
-async def my_data(request: Request):
+async def my_data(request: Request, month: str = ""):
     user = get_driver_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     driver_name = user.get("driver_name", "")
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+    month_start = month + "-01"
+    month_parts = month.split("-")
+    y, m = int(month_parts[0]), int(month_parts[1])
+    if m == 12:
+        month_end = f"{y+1}-01-01"
+    else:
+        month_end = f"{y}-{m+1:02d}-01"
     drivers = get_all_records("Drivers")
     driver = None
     for d in drivers:
@@ -40,30 +49,30 @@ async def my_data(request: Request):
         return JSONResponse({"error": "Driver not found"}, 404)
     expenses = get_all_records("Expenses")
     my_expenses = [e for e in expenses if str(e.get("DriverName", "")) == driver_name]
-    my_expenses.sort(key=lambda x: str(x.get("ExpenseDate", "")), reverse=True)
-    salary_entries = [e for e in my_expenses if e.get("SubCategory") == "Salary"]
-    advance_entries = [e for e in my_expenses if e.get("SubCategory") == "Advance"]
-    meals_entries = [e for e in my_expenses if e.get("SubCategory") == "Meals"]
+    month_expenses = [e for e in my_expenses if month_start <= str(e.get("ExpenseDate", "")) < month_end]
+    month_expenses.sort(key=lambda x: str(x.get("ExpenseDate", "")), reverse=True)
+    salary_entries = [e for e in month_expenses if e.get("SubCategory") == "Salary"]
+    advance_entries = [e for e in month_expenses if e.get("SubCategory") == "Advance"]
+    meals_entries = [e for e in month_expenses if e.get("SubCategory") == "Meals"]
     fuel_records = get_all_records("FuelEntries")
-    diesel_entries = [f for f in fuel_records if str(f.get("DriverName", "")) == driver_name]
+    diesel_entries = [f for f in fuel_records if str(f.get("DriverName", "")) == driver_name and month_start <= str(f.get("EntryDate", "")) < month_end]
     diesel_entries.sort(key=lambda x: str(x.get("EntryDate", "")), reverse=True)
-    month_start = datetime.now().strftime("%Y-%m-01")
-    month_expenses = [e for e in my_expenses if str(e.get("ExpenseDate", "")) >= month_start]
     total_salary = sum(float(e.get("Amount", 0) or 0) for e in salary_entries)
     total_advance = sum(float(e.get("Amount", 0) or 0) for e in advance_entries)
     total_meals = sum(float(e.get("Amount", 0) or 0) for e in meals_entries)
-    month_diesel_litres = sum(float(f.get("Litres", 0) or 0) for f in diesel_entries if str(f.get("EntryDate", "")) >= month_start)
+    month_diesel_litres = sum(float(f.get("Litres", 0) or 0) for f in diesel_entries)
     return {
         "driver": driver,
-        "salary_entries": salary_entries[:30],
-        "advance_entries": advance_entries[:30],
-        "meals_entries": meals_entries[:30],
-        "diesel_entries": diesel_entries[:30],
+        "month": month,
+        "salary_entries": salary_entries,
+        "advance_entries": advance_entries,
+        "meals_entries": meals_entries,
+        "diesel_entries": diesel_entries,
         "total_salary": total_salary,
         "total_advance": total_advance,
         "total_meals": total_meals,
         "month_diesel_litres": month_diesel_litres,
-        "recent_expenses": my_expenses[:20],
+        "recent_expenses": month_expenses,
     }
 
 

@@ -60,11 +60,17 @@
             </div>
             <span class="vehicle-badge" id="vehicleBadge">--</span>
         </div>
+        <div class="glass mb-3 d-flex align-items-center gap-2" style="padding:10px 14px">
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)" style="border-radius:8px"><i class="bi bi-chevron-left"></i></button>
+            <input type="month" class="form-control glass-input text-center" id="selectedMonth" style="max-width:180px;font-weight:600" onchange="loadMyData()">
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)" style="border-radius:8px"><i class="bi bi-chevron-right"></i></button>
+            <span class="text-muted small ms-1" id="monthLabel"></span>
+        </div>
         <div class="stat-row">
-            <div class="stat-box"><small>Monthly Salary</small><h4 id="statSalary">₹0</h4></div>
-            <div class="stat-box"><small>Total Advance</small><h4 id="statAdvance">₹0</h4></div>
-            <div class="stat-box"><small>Total Meals</small><h4 id="statMeals">₹0</h4></div>
-            <div class="stat-box"><small>This Month Diesel</small><h4 id="statDiesel">0 L</h4></div>
+            <div class="stat-box"><small>Salary</small><h4 id="statSalary">₹0</h4></div>
+            <div class="stat-box"><small>Advance</small><h4 id="statAdvance">₹0</h4></div>
+            <div class="stat-box"><small>Meals</small><h4 id="statMeals">₹0</h4></div>
+            <div class="stat-box"><small>Diesel</small><h4 id="statDiesel">0 L</h4></div>
         </div>
         <div class="glass" id="dieselFormCard">
             <h6 class="mb-3"><i class="bi bi-fuel-pump"></i> Add Diesel Entry</h6>
@@ -148,12 +154,27 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('dslVehicle').value = assignedVehicle || 'Not assigned';
+        document.getElementById('selectedMonth').value = new Date().toISOString().slice(0,7);
         loadMyData();
     });
 
+    function changeMonth(delta) {
+        var sel = document.getElementById('selectedMonth');
+        var parts = sel.value.split('-');
+        var y = parseInt(parts[0]), m = parseInt(parts[1]) + delta;
+        if (m > 12) { m = 1; y++; }
+        if (m < 1) { m = 12; y--; }
+        sel.value = y + '-' + String(m).padStart(2,'0');
+        loadMyData();
+    }
+
     async function loadMyData() {
         try {
-            var res = await fetch('/driver-portal/api/my-data');
+            var month = document.getElementById('selectedMonth').value;
+            var monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+            var parts = month.split('-');
+            document.getElementById('monthLabel').textContent = monthNames[parseInt(parts[1])] + ' ' + parts[0];
+            var res = await fetch('/driver-portal/api/my-data?month=' + month);
             var data = await res.json();
             if (data.error) return;
             var d = data.driver;
