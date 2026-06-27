@@ -60,6 +60,7 @@ async def list_drivers(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     drivers = get_all_records("Drivers")
+    drivers.sort(key=lambda d: str(d.get("AssignedVehicle", "") or "ZZZ"))
     return {"drivers": drivers}
 
 

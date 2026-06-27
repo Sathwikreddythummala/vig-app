@@ -32,6 +32,7 @@ async def list_vehicles(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     vehicles = get_all_records("Vehicles")
+    vehicles.sort(key=lambda v: str(v.get("VehicleNumber", "")))
     return {"vehicles": vehicles}
 
 
