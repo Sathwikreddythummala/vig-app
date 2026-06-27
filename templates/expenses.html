@@ -65,7 +65,12 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">SubCategory</label>
-                            <select class="form-select glass-input" id="expSubCategory"><option value="">-- Select --</option></select>
+                            <select class="form-select glass-input" id="expSubCategory" onchange="toggleForMonth()"><option value="">-- Select --</option></select>
+                        </div>
+                        <div class="col-md-4" id="forMonthField" style="display:none">
+                            <label class="form-label">For Month *</label>
+                            <input type="month" class="form-control glass-input" id="expForMonth">
+                            <small class="text-muted">Which month is this for?</small>
                         </div>
                         <div class="col-md-12">
                             <label class="form-label">Description</label>
@@ -158,6 +163,17 @@ function loadSubCategories() {
     if (categories[cat]) {
         categories[cat].forEach(s => subSel.innerHTML += `<option value="${s}">${s}</option>`);
     }
+    toggleForMonth();
+}
+
+function toggleForMonth() {
+    var cat = document.getElementById('expCategory').value;
+    var sub = document.getElementById('expSubCategory').value;
+    var show = (cat === 'Driver Expense' && (sub === 'Salary' || sub === 'Advance' || sub === 'Meals'));
+    document.getElementById('forMonthField').style.display = show ? '' : 'none';
+    if (show && !document.getElementById('expForMonth').value) {
+        document.getElementById('expForMonth').value = document.getElementById('expDate').value.slice(0,7);
+    }
 }
 
 async function loadExpenses(page) {
@@ -234,6 +250,8 @@ function editExpense(eid) {
         document.getElementById('expCategory').value = e.Category || '';
         loadSubCategories();
         document.getElementById('expSubCategory').value = e.SubCategory || '';
+        document.getElementById('expForMonth').value = e.ForMonth || '';
+        toggleForMonth();
         document.getElementById('expDescription').value = e.Description || '';
         document.getElementById('expAmount').value = e.Amount || '';
         document.getElementById('expPaymentMode').value = e.PaymentMode || 'Cash';
@@ -251,6 +269,7 @@ async function saveExpense() {
     var id = document.getElementById('expenseId').value;
     var payload = {
         ExpenseDate: document.getElementById('expDate').value,
+        ForMonth: document.getElementById('expForMonth').value || '',
         ExpenseFor: document.getElementById('expFor').value,
         VehicleNumber: document.getElementById('expVehicle').value,
         DriverName: document.getElementById('expDriver').value,

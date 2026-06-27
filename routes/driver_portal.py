@@ -51,9 +51,14 @@ async def my_data(request: Request, month: str = ""):
     my_expenses = [e for e in expenses if str(e.get("DriverName", "")) == driver_name]
     month_expenses = [e for e in my_expenses if month_start <= str(e.get("ExpenseDate", "")) < month_end]
     month_expenses.sort(key=lambda x: str(x.get("ExpenseDate", "")), reverse=True)
-    salary_entries = [e for e in month_expenses if e.get("SubCategory") == "Salary"]
-    advance_entries = [e for e in month_expenses if e.get("SubCategory") == "Advance"]
-    meals_entries = [e for e in month_expenses if e.get("SubCategory") == "Meals"]
+    def get_for_month(e):
+        fm = str(e.get("ForMonth", "")).strip()
+        if fm:
+            return fm
+        return str(e.get("ExpenseDate", ""))[:7]
+    salary_entries = [e for e in my_expenses if e.get("SubCategory") == "Salary" and get_for_month(e) == month]
+    advance_entries = [e for e in my_expenses if e.get("SubCategory") == "Advance" and get_for_month(e) == month]
+    meals_entries = [e for e in my_expenses if e.get("SubCategory") == "Meals" and get_for_month(e) == month]
     fuel_records = get_all_records("FuelEntries")
     diesel_entries = [f for f in fuel_records if str(f.get("DriverName", "")) == driver_name and month_start <= str(f.get("EntryDate", "")) < month_end]
     diesel_entries.sort(key=lambda x: str(x.get("EntryDate", "")), reverse=True)

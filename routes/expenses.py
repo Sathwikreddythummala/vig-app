@@ -103,9 +103,13 @@ async def add_expense(request: Request):
     }):
         return JSONResponse({"error": "Duplicate expense already exists"}, 400)
     eid = gen_id("EXP")
+    for_month = data.get("ForMonth", "")
+    if not for_month:
+        for_month = str(data.get("ExpenseDate", ""))[:7]
     row = [
         eid,
         data.get("ExpenseDate", ""),
+        for_month,
         data.get("ExpenseFor", "Vehicle Expense"),
         data.get("VehicleNumber", ""),
         data.get("DriverName", ""),
@@ -132,9 +136,13 @@ async def update_expense(request: Request, expense_id: str):
     if not result:
         return JSONResponse({"error": "Expense not found"}, 404)
     row_num, existing = result
+    for_month = data.get("ForMonth", "")
+    if not for_month:
+        for_month = existing.get("ForMonth", str(data.get("ExpenseDate", ""))[:7])
     row = [
         expense_id,
         data.get("ExpenseDate", ""),
+        for_month,
         data.get("ExpenseFor", "Vehicle Expense"),
         data.get("VehicleNumber", ""),
         data.get("DriverName", ""),
