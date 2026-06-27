@@ -123,12 +123,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('rDate').value = new Date().toISOString().split('T')[0];
     var results = await Promise.all([
         fetch('/vehicles/api/list').then(function(r){return r.json()}),
-        fetch('/vendors/api/list').then(function(r){return r.json()})
+        fetch('/vendors/api/list').then(function(r){return r.json()}),
+        fetch('/outside/api/vehicles').then(function(r){return r.json()}).catch(function(){return {vehicles:[]}})
     ]);
     allVehicles = results[0].vehicles||[];
     allVendors = results[1].vendors||[];
+    var outsideVehicles = results[2].vehicles||[];
     var selIds = ['bVehicle','filterVehicle'];
-    selIds.forEach(function(id){ var s=document.getElementById(id); allVehicles.forEach(function(v){ s.innerHTML+='<option value="'+v.VehicleNumber+'" data-vendor="'+(v.DefaultVendor||'')+'">'+v.VehicleNumber+'</option>'; }); });
+    selIds.forEach(function(id){
+        var s=document.getElementById(id);
+        if (allVehicles.length) { s.innerHTML+='<optgroup label="Own Vehicles">'; allVehicles.forEach(function(v){ s.innerHTML+='<option value="'+v.VehicleNumber+'" data-vendor="'+(v.DefaultVendor||'')+'">'+v.VehicleNumber+'</option>'; }); s.innerHTML+='</optgroup>'; }
+        if (outsideVehicles.length) { s.innerHTML+='<optgroup label="Outside Vehicles">'; outsideVehicles.filter(function(v){return v.Status==='Active'}).forEach(function(v){ s.innerHTML+='<option value="'+v.VehicleNumber+'" data-vendor="">'+v.VehicleNumber+' ('+v.OwnerName+')</option>'; }); s.innerHTML+='</optgroup>'; }
+    });
     var vSelIds = ['bVendor','filterVendor','rVendor'];
     vSelIds.forEach(function(id){ var s=document.getElementById(id); allVendors.filter(function(v){return v.Status==='Active'}).forEach(function(v){ s.innerHTML+='<option value="'+v.VendorName+'">'+v.VendorName+'</option>'; }); });
     loadBills();

@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Outside Vehicles - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Outside Vehicles{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            <label class="form-label mb-0 fw-bold">Month:</label>
+            <input type="month" class="form-control glass-input" id="selMonth" style="width:180px" onchange="loadAll()">
+        </div>
+        <div class="d-flex gap-2 viewer-hide">
+            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#ovModal" onclick="resetOVForm()"><i class="bi bi-plus-lg"></i> Add Vehicle</button>
+            <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#txnModal" onclick="resetTxnForm()"><i class="bi bi-plus-lg"></i> Add Advance/Deduction</button>
+        </div>
+    </div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-xl-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Billed (from Billing)</small><h3 id="statPayment">₹0</h3></div></div></div>
+    <div class="col-xl-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-expense"><i class="bi bi-arrow-down-circle"></i></div><div class="stat-info"><small>Total Deductions</small><h3 id="statDeductions">₹0</h3></div></div></div>
+    <div class="col-xl-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-month"><i class="bi bi-wallet2"></i></div><div class="stat-info"><small>Balance to Pay</small><h3 id="statBalance">₹0</h3></div></div></div>
+</div>
+<div class="glass-card mb-4 animate-in" style="animation-delay:0.4s">
+    <h6 class="mb-3"><i class="bi bi-calculator"></i> Monthly Settlement</h6>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table small">
+            <thead><tr><th>Vehicle</th><th>Owner</th><th>Billed Amount</th><th>Advance</th><th>Diesel</th><th>Other</th><th>Total Deductions</th><th>Balance to Pay</th></tr></thead>
+            <tbody id="summaryTable"><tr><td colspan="8" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+        </table>
+    </div>
+</div>
+<ul class="nav nav-tabs mb-3" style="border-color:rgba(255,213,79,0.3)">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabTxns" style="color:var(--text-dark);font-weight:600"><i class="bi bi-list"></i> Transactions</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabVehicles" style="color:var(--text-muted)"><i class="bi bi-truck"></i> Vehicles</a></li>
+</ul>
+<div class="tab-content">
+<div class="tab-pane fade show active" id="tabTxns">
+    <div class="glass-card">
+        <div class="d-flex gap-2 mb-3">
+            <select class="form-select glass-input" id="filterVehicle" style="width:180px" onchange="loadTxns()"><option value="">All Vehicles</option></select>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover glass-table small">
+                <thead><tr><th>Date</th><th>For Month</th><th>Vehicle</th><th>Owner</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th>Mode</th><th>Actions</th></tr></thead>
+                <tbody id="txnTable"><tr><td colspan="10" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="tab-pane fade" id="tabVehicles">
+    <div class="glass-card">
+        <div class="table-responsive">
+            <table class="table table-hover glass-table small">
+                <thead><tr><th>Vehicle</th><th>Owner</th><th>Mobile</th><th>Bank</th><th>Account</th><th>IFSC</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="vehicleTable"><tr><td colspan="8" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+<!-- Vehicle Modal -->
+<div class="modal fade" id="ovModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title" id="ovModalTitle">Add Outside Vehicle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="ovForm">
+                    <input type="hidden" id="ovId">
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label">Vehicle Number *</label><input type="text" class="form-control glass-input" id="ovNumber" required></div>
+                        <div class="col-md-4"><label class="form-label">Owner Name *</label><input type="text" class="form-control glass-input" id="ovOwner" required></div>
+                        <div class="col-md-4"><label class="form-label">Mobile</label><input type="text" class="form-control glass-input" id="ovMobile"></div>
+                        <div class="col-md-4"><label class="form-label">Bank Name</label><input type="text" class="form-control glass-input" id="ovBank"></div>
+                        <div class="col-md-4"><label class="form-label">Account Number</label><input type="text" class="form-control glass-input" id="ovAccount"></div>
+                        <div class="col-md-4"><label class="form-label">IFSC</label><input type="text" class="form-control glass-input" id="ovIFSC"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveOV()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Transaction Modal -->
+<div class="modal fade" id="txnModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title">Add Transaction</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="txnForm">
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label">Date *</label><input type="date" class="form-control glass-input" id="txDate" required></div>
+                        <div class="col-md-4"><label class="form-label">For Month *</label><input type="month" class="form-control glass-input" id="txForMonth" required></div>
+                        <div class="col-md-4"><label class="form-label">Vehicle *</label><select class="form-select glass-input" id="txVehicle" required><option value="">-- Select --</option></select></div>
+                        <div class="col-md-4"><label class="form-label">Type *</label>
+                            <select class="form-select glass-input" id="txType" required>
+                                <option value="Advance">Advance</option>
+                                <option value="Diesel">Diesel</option>
+                                <option value="Deduction">Other Deduction</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="txAmount" required min="0" step="0.01"></div>
+                        <div class="col-md-4"><label class="form-label">Payment Mode</label>
+                            <select class="form-select glass-input" id="txPayMode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Cheque</option></select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">Category</label><input type="text" class="form-control glass-input" id="txCategory" placeholder="e.g. Trip Payment, Fuel Advance"></div>
+                        <div class="col-md-6"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="txDesc"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveTxn()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var allOV=[], ovModalEl=document.getElementById('ovModal'), txnModalEl=document.getElementById('txnModal');
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('selMonth').value = new Date().toISOString().slice(0,7);
+    document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('txForMonth').value = new Date().toISOString().slice(0,7);
+    loadAll();
+    loadAlerts();
+});
+
+async function loadAll() { await loadVehicles(); loadSummary(); loadTxns(); }
+
+async function loadVehicles() {
+    var res = await fetch('/outside/api/vehicles'); var data = await res.json();
+    allOV = data.vehicles||[];
+    var tbody = document.getElementById('vehicleTable');
+    var fSel = document.getElementById('filterVehicle');
+    var tSel = document.getElementById('txVehicle');
+    fSel.innerHTML = '<option value="">All Vehicles</option>';
+    tSel.innerHTML = '<option value="">-- Select --</option>';
+    allOV.forEach(function(v) {
+        fSel.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>';
+        if (v.Status==='Active') tSel.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+' ('+v.OwnerName+')</option>';
+    });
+    if (allOV.length) {
+        tbody.innerHTML = allOV.map(function(v) {
+            return '<tr><td class="fw-bold">'+v.VehicleNumber+'</td><td>'+v.OwnerName+'</td><td>'+(v.MobileNumber||'-')+'</td><td>'+(v.BankName||'-')+'</td><td>'+(v.AccountNumber||'-')+'</td><td>'+(v.IFSCCode||'-')+'</td><td><span class="badge '+(v.Status==='Active'?'bg-success':'bg-secondary')+'">'+v.Status+'</span></td><td class="viewer-hide"><button class="btn btn-sm btn-outline-warning" onclick="editOV(\''+v.OVID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteOV(\''+v.OVID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+        }).join('');
+    } else { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No outside vehicles</td></tr>'; }
+}
+
+async function loadSummary() {
+    var month = document.getElementById('selMonth').value;
+    var res = await fetch('/outside/api/summary?month='+month); var data = await res.json();
+    document.getElementById('statPayment').textContent = '₹'+Number(data.total_payment||0).toLocaleString('en-IN');
+    document.getElementById('statDeductions').textContent = '₹'+Number(data.total_deductions||0).toLocaleString('en-IN');
+    var bal = data.total_balance||0;
+    document.getElementById('statBalance').textContent = '₹'+Number(bal).toLocaleString('en-IN');
+    document.getElementById('statBalance').className = bal>=0?'text-success':'text-danger';
+    var tbody = document.getElementById('summaryTable');
+    var sums = data.summaries||[];
+    if (sums.length) {
+        tbody.innerHTML = sums.map(function(s) {
+            var balClass = s.Balance>=0?'text-success fw-bold':'text-danger fw-bold';
+            return '<tr><td class="fw-bold">'+s.VehicleNumber+'</td><td>'+s.OwnerName+'</td><td class="text-success">₹'+Number(s.Payment).toLocaleString('en-IN')+'</td><td class="text-danger">₹'+Number(s.Advance).toLocaleString('en-IN')+'</td><td class="text-danger">₹'+Number(s.Diesel).toLocaleString('en-IN')+'</td><td class="text-danger">₹'+Number(s.OtherDeduction).toLocaleString('en-IN')+'</td><td class="text-danger fw-bold">₹'+Number(s.TotalDeductions).toLocaleString('en-IN')+'</td><td class="'+balClass+'">₹'+Number(s.Balance).toLocaleString('en-IN')+'</td></tr>';
+        }).join('');
+    } else { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No data this month</td></tr>'; }
+}
+
+async function loadTxns() {
+    var vehicle = document.getElementById('filterVehicle').value;
+    var month = document.getElementById('selMonth').value;
+    var res = await fetch('/outside/api/transactions?vehicle='+vehicle+'&month='+month); var data = await res.json();
+    var tbody = document.getElementById('txnTable');
+    var txns = data.transactions||[];
+    if (txns.length) {
+        tbody.innerHTML = txns.map(function(t) {
+            var tc = t.Type==='Payment'?'text-success fw-bold':'text-danger fw-bold';
+            var tb = t.Type==='Payment'?'bg-success':t.Type==='Advance'?'bg-warning text-dark':t.Type==='Diesel'?'bg-info':'bg-danger';
+            var sign = t.Type==='Payment'?'+':'-';
+            return '<tr><td>'+t.Date+'</td><td>'+(t.ForMonth||'-')+'</td><td class="fw-bold">'+t.VehicleNumber+'</td><td>'+(t.OwnerName||'-')+'</td><td><span class="badge '+tb+'">'+t.Type+'</span></td><td>'+(t.Category||'-')+'</td><td>'+(t.Description||'-')+'</td><td class="'+tc+'">'+sign+'₹'+Number(t.Amount||0).toLocaleString('en-IN')+'</td><td>'+(t.PaymentMode||'-')+'</td><td class="viewer-hide"><button class="btn btn-sm btn-outline-danger" onclick="deleteTxn(\''+t.TransID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+        }).join('');
+    } else { tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No transactions</td></tr>'; }
+}
+
+function resetOVForm() { document.getElementById('ovForm').reset(); document.getElementById('ovId').value=''; document.getElementById('ovModalTitle').textContent='Add Outside Vehicle'; }
+function resetTxnForm() {
+    document.getElementById('txnForm').reset();
+    document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('txForMonth').value = document.getElementById('selMonth').value;
+}
+
+function editOV(id) {
+    var v = allOV.find(function(x){return x.OVID===id});
+    if (!v) return;
+    document.getElementById('ovId').value = v.OVID;
+    document.getElementById('ovModalTitle').textContent = 'Edit Vehicle';
+    document.getElementById('ovNumber').value = v.VehicleNumber||'';
+    document.getElementById('ovOwner').value = v.OwnerName||'';
+    document.getElementById('ovMobile').value = v.MobileNumber||'';
+    document.getElementById('ovBank').value = v.BankName||'';
+    document.getElementById('ovAccount').value = v.AccountNumber||'';
+    document.getElementById('ovIFSC').value = v.IFSCCode||'';
+    bootstrap.Modal.getOrCreateInstance(ovModalEl).show();
+}
+
+async function saveOV() {
+    var id = document.getElementById('ovId').value;
+    var payload = { VehicleNumber:document.getElementById('ovNumber').value, OwnerName:document.getElementById('ovOwner').value, MobileNumber:document.getElementById('ovMobile').value, BankName:document.getElementById('ovBank').value, AccountNumber:document.getElementById('ovAccount').value, IFSCCode:document.getElementById('ovIFSC').value };
+    if (!payload.VehicleNumber || !payload.OwnerName) { showToast('Vehicle number and owner required','danger'); return; }
+    try {
+        var res = await fetch(id?'/outside/api/vehicles/'+id:'/outside/api/vehicles/add', { method:id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) { var m=bootstrap.Modal.getInstance(ovModalEl);if(m)m.hide(); showToast(id?'Updated':'Added','success'); loadAll(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteOV(id) {
+    if (!confirm('Delete this vehicle?')) return;
+    try { var res=await fetch('/outside/api/vehicles/'+id,{method:'DELETE'}); var data=await res.json(); if(data.success){showToast('Deleted','success');loadAll();}else{showToast(data.error||'Failed','danger');} }
+    catch(err) { showToast('Network error','danger'); }
+}
+
+async function saveTxn() {
+    var payload = { Date:document.getElementById('txDate').value, ForMonth:document.getElementById('txForMonth').value, VehicleNumber:document.getElementById('txVehicle').value, Type:document.getElementById('txType').value, Amount:document.getElementById('txAmount').value, PaymentMode:document.getElementById('txPayMode').value, Category:document.getElementById('txCategory').value, Description:document.getElementById('txDesc').value };
+    if (!payload.Date || !payload.VehicleNumber || !payload.Amount || !payload.Type) { showToast('Fill required fields','danger'); return; }
+    try {
+        var res = await fetch('/outside/api/transactions/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.success) { var m=bootstrap.Modal.getInstance(txnModalEl);if(m)m.hide(); showToast('Transaction added','success'); loadSummary(); loadTxns(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteTxn(id) {
+    if (!confirm('Delete this transaction?')) return;
+    try { var res=await fetch('/outside/api/transactions/'+id,{method:'DELETE'}); var data=await res.json(); if(data.success){showToast('Deleted','success');loadSummary();loadTxns();}else{showToast(data.error||'Failed','danger');} }
+    catch(err) { showToast('Network error','danger'); }
+}
+</script>
+{% endblock %}

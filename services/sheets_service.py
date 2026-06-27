@@ -53,6 +53,16 @@ SHEET_HEADERS = {
     ],
     "Settings": ["Key", "Value", "UpdatedDate"],
     "AuditLogs": ["LogID", "Action", "Module", "EntityID", "Details", "UserEmail", "Timestamp"],
+    "OutsideVehicles": [
+        "OVID", "VehicleNumber", "OwnerName", "MobileNumber",
+        "BankName", "AccountNumber", "IFSCCode",
+        "Status", "CreatedDate", "UpdatedDate",
+    ],
+    "OutsideTransactions": [
+        "TransID", "Date", "ForMonth", "VehicleNumber", "OwnerName",
+        "Type", "Category", "Description", "Amount",
+        "PaymentMode", "CreatedDate",
+    ],
     "GSTpurchases": [
         "PurchaseID", "InvoiceDate", "InvoiceNumber", "CompanyName",
         "Amount", "SGST", "CGST", "TotalAmount", "Description",
