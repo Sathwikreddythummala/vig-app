@@ -65,6 +65,123 @@ async def list_drivers(request: Request):
     return {"drivers": drivers}
 
 
+@router.get("/api/salaries")
+async def salaries_api(request: Request, month: str = ""):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    drivers = get_all_records("Drivers")
+    expenses = get_all_records("Expenses")
+    result = []
+    for d in drivers:
+        if str(d.get("Status", "Active")).strip().lower() == "inactive":
+            continue
+        name = str(d.get("DriverName", "")).strip()
+        profile_salary = float(d.get("Salary", 0) or 0)
+        drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name]
+        if month:
+            drv_expenses = [e for e in drv_expenses if e.get("ForMonth", "") == month or str(e.get("ExpenseDate", ""))[:7] == month]
+        salary_paid = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Salary")
+        advance = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Advance")
+        meals = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Meals")
+        other = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") not in ("Salary", "Advance", "Meals"))
+        net_payable = profile_salary - advance - meals - other
+        result.append({
+            "DriverID": d.get("DriverID", ""),
+            "DriverName": name,
+            "EmployeeType": d.get("EmployeeType", "Driver"),
+            "AssignedVehicle": d.get("AssignedVehicle", ""),
+            "ProfileSalary": profile_salary,
+            "SalaryPaid": salary_paid,
+            "Advance": advance,
+            "Meals": meals,
+            "Other": other,
+            "NetPayable": net_payable,
+        })
+    result.sort(key=lambda x: x["DriverName"])
+    totals = {
+        "ProfileSalary": sum(r["ProfileSalary"] for r in result),
+        "SalaryPaid": sum(r["SalaryPaid"] for r in result),
+        "Advance": sum(r["Advance"] for r in result),
+        "Meals": sum(r["Meals"] for r in result),
+        "Other": sum(r["Other"] for r in result),
+        "NetPayable": sum(r["NetPayable"] for r in result),
+    }
+    return {"salaries": result, "totals": totals, "month": month}
+
+
+@router.get("/api/salaries/export")
+async def export_salaries_excel(request: Request, month: str = ""):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    import io
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        return JSONResponse({"error": "openpyxl not installed"}, 500)
+    data = await salaries_api(request, month)
+    salaries = data.body
+    import json
+    body = json.loads(salaries)
+    rows = body["salaries"]
+    totals = body["totals"]
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Salaries {month or 'All'}"
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="D4A017", end_color="D4A017", fill_type="solid")
+    thin_border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
+    total_font = Font(bold=True, size=11)
+    currency_fmt = '#,##0'
+    ws.merge_cells("A1:I1")
+    ws["A1"] = f"Salary Report — {month or 'All Months'}"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(horizontal="center")
+    headers = ["#", "Name", "Type", "Vehicle", "Salary", "Advance", "Meals", "Other", "Net Payable"]
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
+    for i, r in enumerate(rows):
+        row_num = i + 4
+        ws.cell(row=row_num, column=1, value=i+1).border = thin_border
+        ws.cell(row=row_num, column=2, value=r["DriverName"]).border = thin_border
+        ws.cell(row=row_num, column=3, value=r["EmployeeType"]).border = thin_border
+        ws.cell(row=row_num, column=4, value=r["AssignedVehicle"]).border = thin_border
+        for col, key in [(5, "ProfileSalary"), (6, "Advance"), (7, "Meals"), (8, "Other"), (9, "NetPayable")]:
+            cell = ws.cell(row=row_num, column=col, value=r[key])
+            cell.number_format = currency_fmt
+            cell.border = thin_border
+    total_row = len(rows) + 4
+    ws.cell(row=total_row, column=1, value="").border = thin_border
+    ws.cell(row=total_row, column=2, value="TOTAL").font = total_font
+    ws.cell(row=total_row, column=2).border = thin_border
+    ws.cell(row=total_row, column=3, value="").border = thin_border
+    ws.cell(row=total_row, column=4, value="").border = thin_border
+    for col, key in [(5, "ProfileSalary"), (6, "Advance"), (7, "Meals"), (8, "Other"), (9, "NetPayable")]:
+        cell = ws.cell(row=total_row, column=col, value=totals[key])
+        cell.number_format = currency_fmt
+        cell.font = total_font
+        cell.border = thin_border
+    ws.column_dimensions["A"].width = 5
+    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["C"].width = 12
+    ws.column_dimensions["D"].width = 16
+    for c in ["E", "F", "G", "H", "I"]:
+        ws.column_dimensions[c].width = 14
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    from fastapi.responses import StreamingResponse
+    filename = f"Salaries_{month or 'All'}.xlsx"
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @router.get("/api/{driver_id}")
 async def get_driver(request: Request, driver_id: str):
     user = get_user(request)
@@ -242,134 +359,6 @@ async def salaries_page(request: Request):
         from fastapi.responses import RedirectResponse
         return RedirectResponse("/auth/login-page")
     return templates.TemplateResponse(request=request, name="salaries.html", context={"user": user})
-
-
-@router.get("/api/salaries")
-async def salaries_api(request: Request, month: str = ""):
-    user = get_user(request)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, 401)
-    drivers = get_all_records("Drivers")
-    expenses = get_all_records("Expenses")
-    result = []
-    for d in drivers:
-        if str(d.get("Status", "Active")).strip().lower() == "inactive":
-            continue
-        name = str(d.get("DriverName", "")).strip()
-        profile_salary = float(d.get("Salary", 0) or 0)
-        drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name]
-        if month:
-            drv_expenses = [e for e in drv_expenses if e.get("ForMonth", "") == month or str(e.get("ExpenseDate", ""))[:7] == month]
-        salary_paid = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Salary")
-        advance = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Advance")
-        meals = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Meals")
-        other = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") not in ("Salary", "Advance", "Meals"))
-        net_payable = profile_salary - advance - meals - other
-        result.append({
-            "DriverID": d.get("DriverID", ""),
-            "DriverName": name,
-            "EmployeeType": d.get("EmployeeType", "Driver"),
-            "AssignedVehicle": d.get("AssignedVehicle", ""),
-            "ProfileSalary": profile_salary,
-            "SalaryPaid": salary_paid,
-            "Advance": advance,
-            "Meals": meals,
-            "Other": other,
-            "NetPayable": net_payable,
-        })
-    result.sort(key=lambda x: x["DriverName"])
-    totals = {
-        "ProfileSalary": sum(r["ProfileSalary"] for r in result),
-        "SalaryPaid": sum(r["SalaryPaid"] for r in result),
-        "Advance": sum(r["Advance"] for r in result),
-        "Meals": sum(r["Meals"] for r in result),
-        "Other": sum(r["Other"] for r in result),
-        "NetPayable": sum(r["NetPayable"] for r in result),
-    }
-    return {"salaries": result, "totals": totals, "month": month}
-
-
-@router.get("/api/salaries/export")
-async def export_salaries_excel(request: Request, month: str = ""):
-    user = get_user(request)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, 401)
-    import io
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    except ImportError:
-        return JSONResponse({"error": "openpyxl not installed"}, 500)
-    data = await salaries_api(request, month)
-    salaries = data.body
-    import json
-    body = json.loads(salaries)
-    rows = body["salaries"]
-    totals = body["totals"]
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = f"Salaries {month or 'All'}"
-
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(start_color="D4A017", end_color="D4A017", fill_type="solid")
-    thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin")
-    )
-    total_font = Font(bold=True, size=11)
-    currency_fmt = '#,##0'
-
-    ws.merge_cells("A1:I1")
-    ws["A1"] = f"Salary Report — {month or 'All Months'}"
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A1"].alignment = Alignment(horizontal="center")
-
-    headers = ["#", "Name", "Type", "Vehicle", "Salary", "Advance", "Meals", "Other", "Net Payable"]
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=3, column=col, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center")
-        cell.border = thin_border
-
-    for i, r in enumerate(rows):
-        row_num = i + 4
-        ws.cell(row=row_num, column=1, value=i+1).border = thin_border
-        ws.cell(row=row_num, column=2, value=r["DriverName"]).border = thin_border
-        ws.cell(row=row_num, column=3, value=r["EmployeeType"]).border = thin_border
-        ws.cell(row=row_num, column=4, value=r["AssignedVehicle"]).border = thin_border
-        for col, key in [(5, "ProfileSalary"), (6, "Advance"), (7, "Meals"), (8, "Other"), (9, "NetPayable")]:
-            cell = ws.cell(row=row_num, column=col, value=r[key])
-            cell.number_format = currency_fmt
-            cell.border = thin_border
-
-    total_row = len(rows) + 4
-    ws.cell(row=total_row, column=1, value="").border = thin_border
-    ws.cell(row=total_row, column=2, value="TOTAL").font = total_font
-    ws.cell(row=total_row, column=2).border = thin_border
-    ws.cell(row=total_row, column=3, value="").border = thin_border
-    ws.cell(row=total_row, column=4, value="").border = thin_border
-    for col, key in [(5, "ProfileSalary"), (6, "Advance"), (7, "Meals"), (8, "Other"), (9, "NetPayable")]:
-        cell = ws.cell(row=total_row, column=col, value=totals[key])
-        cell.number_format = currency_fmt
-        cell.font = total_font
-        cell.border = thin_border
-
-    ws.column_dimensions["A"].width = 5
-    ws.column_dimensions["B"].width = 22
-    ws.column_dimensions["C"].width = 12
-    ws.column_dimensions["D"].width = 16
-    for c in ["E", "F", "G", "H", "I"]:
-        ws.column_dimensions[c].width = 14
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    from fastapi.responses import StreamingResponse
-    filename = f"Salaries_{month or 'All'}.xlsx"
-    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.get("/details/{driver_id}")
