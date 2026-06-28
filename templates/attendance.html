@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Attendance - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Attendance{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            <input type="date" class="form-control glass-input" id="attDate" style="width:180px" onchange="loadAttendance()">
+            <button class="btn btn-outline-warning btn-sm" onclick="showSummary()"><i class="bi bi-calendar-month"></i> Monthly Summary</button>
+        </div>
+        <div class="d-flex gap-3 align-items-center">
+            <span class="badge bg-success fs-6" id="presentBadge">Present: 0</span>
+            <span class="badge bg-danger fs-6" id="absentBadge">Absent: 0</span>
+            <span class="badge bg-secondary fs-6" id="totalBadge">Total: 0</span>
+        </div>
+    </div>
+</div>
+<div class="glass-card animate-in" style="animation-delay:0.2s" id="dailyView">
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Vehicle</th><th>Status</th><th class="viewer-hide">Action</th></tr></thead>
+            <tbody id="attTable">
+                <tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="glass-card animate-in d-none" style="animation-delay:0.2s" id="summaryView">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex gap-2 align-items-center">
+            <h6 class="mb-0"><i class="bi bi-calendar-month"></i> Monthly Summary</h6>
+            <input type="month" class="form-control glass-input" id="summaryMonth" style="width:180px" onchange="loadSummary()">
+        </div>
+        <button class="btn btn-outline-warning btn-sm" onclick="hideSummary()"><i class="bi bi-arrow-left"></i> Back to Daily</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover glass-table">
+            <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Absent Days</th><th>Absent Dates</th></tr></thead>
+            <tbody id="summaryTable"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const userRole = '{{ user.role }}';
+const canEdit = userRole === 'admin' || userRole === 'editor';
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('summaryMonth').value = new Date().toISOString().slice(0,7);
+    loadAttendance();
+    loadAlerts();
+});
+
+async function loadAttendance() {
+    const date = document.getElementById('attDate').value;
+    const res = await fetch('/attendance/api/list?date=' + date);
+    const data = await res.json();
+    const rows = data.drivers || [];
+    document.getElementById('presentBadge').textContent = 'Present: ' + data.present;
+    document.getElementById('absentBadge').textContent = 'Absent: ' + data.absent;
+    document.getElementById('totalBadge').textContent = 'Total: ' + data.total;
+    const tbody = document.getElementById('attTable');
+    if (rows.length) {
+        tbody.innerHTML = rows.map((r, i) => {
+            const isAbsent = r.IsAbsent;
+            const statusBadge = isAbsent
+                ? '<span class="badge bg-danger">Absent</span>'
+                : '<span class="badge bg-success">Present</span>';
+            const actionBtn = canEdit ? (isAbsent
+                ? `<button class="btn btn-sm btn-outline-success" onclick="markPresent('${r.AttendanceID}')"><i class="bi bi-check-lg"></i> Undo</button>`
+                : `<button class="btn btn-sm btn-outline-danger" onclick="markAbsent('${r.DriverID}','${r.DriverName.replace(/'/g,"\\'")}')"><i class="bi bi-x-lg"></i> Mark Absent</button>`)
+                : '';
+            return `<tr class="${isAbsent?'table-danger':''}">
+                <td>${i+1}</td>
+                <td class="fw-bold">${r.DriverName}</td>
+                <td><span class="badge ${r.EmployeeType==='Driver'?'bg-warning text-dark':'bg-info text-dark'}">${r.EmployeeType}</span></td>
+                <td>${r.AssignedVehicle||'-'}</td>
+                <td>${statusBadge}</td>
+                <td class="viewer-hide">${actionBtn}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No employees found</td></tr>';
+    }
+}
+
+async function markAbsent(driverId, driverName) {
+    const date = document.getElementById('attDate').value;
+    const res = await fetch('/attendance/api/mark-absent', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: date, driver_id: driverId, driver_name: driverName})
+    });
+    const data = await res.json();
+    if (data.success) loadAttendance();
+    else showToast(data.error || 'Failed', 'danger');
+}
+
+async function markPresent(attendanceId) {
+    const res = await fetch('/attendance/api/mark-present', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({attendance_id: attendanceId})
+    });
+    const data = await res.json();
+    if (data.success) loadAttendance();
+    else showToast(data.error || 'Failed', 'danger');
+}
+
+function showSummary() {
+    document.getElementById('dailyView').classList.add('d-none');
+    document.getElementById('summaryView').classList.remove('d-none');
+    loadSummary();
+}
+
+function hideSummary() {
+    document.getElementById('summaryView').classList.add('d-none');
+    document.getElementById('dailyView').classList.remove('d-none');
+}
+
+async function loadSummary() {
+    const month = document.getElementById('summaryMonth').value;
+    const res = await fetch('/attendance/api/summary?month=' + month);
+    const data = await res.json();
+    const rows = data.summary || [];
+    const tbody = document.getElementById('summaryTable');
+    tbody.innerHTML = rows.map((r, i) => `<tr class="${r.AbsentDays > 0 ? 'table-warning':''}">
+        <td>${i+1}</td>
+        <td class="fw-bold">${r.DriverName}</td>
+        <td><span class="badge ${r.EmployeeType==='Driver'?'bg-warning text-dark':'bg-info text-dark'}">${r.EmployeeType}</span></td>
+        <td><span class="badge ${r.AbsentDays > 0 ? 'bg-danger':'bg-success'}">${r.AbsentDays}</span></td>
+        <td class="small">${r.AbsentDates.length ? r.AbsentDates.join(', ') : '-'}</td>
+    </tr>`).join('');
+}
+</script>
+{% endblock %}
