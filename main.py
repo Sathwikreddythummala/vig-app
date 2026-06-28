@@ -25,14 +25,35 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="TSR Enterprises Fleet Management", lifespan=lifespan)
+app = FastAPI(title="Vigneshwara Enterprises Fleet Management", lifespan=lifespan)
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse as JR
 
 
+import time as _time
+
 class ViewerGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         user = request.session.get("user") if "session" in request.scope else None
+        if user and user.get("role") not in ("driver",):
+            path = request.url.path
+            if not path.startswith(("/static", "/auth")):
+                last_check = request.session.get("_role_checked", 0)
+                if _time.time() - last_check > 300:
+                    try:
+                        from services.auth_service import get_user_role, is_email_allowed
+                        email = user.get("email", "")
+                        if not is_email_allowed(email):
+                            request.session.clear()
+                            from fastapi.responses import RedirectResponse as RR
+                            return RR("/auth/login-page")
+                        fresh_role = get_user_role(email)
+                        if fresh_role != user.get("role"):
+                            user["role"] = fresh_role
+                            request.session["user"] = user
+                        request.session["_role_checked"] = _time.time()
+                    except Exception:
+                        pass
         if user and user.get("role") == "viewer":
             if request.method in ("POST", "PUT", "DELETE"):
                 path = request.url.path

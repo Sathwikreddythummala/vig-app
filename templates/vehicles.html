@@ -1,11 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Vehicles - TSR Enterprises{% endblock %}
+{% block title %}Vehicles - Vigneshwara Enterprises{% endblock %}
 {% block page_title %}Vehicle Management{% endblock %}
 {% block content %}
 <div class="glass-card mb-3 animate-in">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <input type="text" class="form-control glass-input" id="searchVehicle" placeholder="Search vehicles..." style="width:300px" oninput="filterVehicles()">
-        <button class="btn btn-warning viewer-hide" data-bs-toggle="modal" data-bs-target="#vehicleModal" onclick="resetVehicleForm()"><i class="bi bi-plus-lg"></i> Add Vehicle</button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm viewer-hide" onclick="syncDrivers()"><i class="bi bi-arrow-repeat"></i> Sync Drivers</button>
+            <button class="btn btn-warning viewer-hide" data-bs-toggle="modal" data-bs-target="#vehicleModal" onclick="resetVehicleForm()"><i class="bi bi-plus-lg"></i> Add Vehicle</button>
+        </div>
     </div>
 </div>
 <div class="row g-3" id="vehicleCards">
@@ -160,6 +163,15 @@ function toggleLoanFields() {
 function hideModal() {
     var m = bootstrap.Modal.getInstance(vehModalEl);
     if (m) m.hide();
+}
+
+function syncDrivers() {
+    if (!confirm('Sync all driver assignments from Employees to Vehicles?')) return;
+    fetch('/vehicles/api/sync-drivers', {method:'POST'})
+        .then(r=>r.json()).then(d => {
+            if (d.success) { alert('Synced! ' + d.updated + ' vehicles updated.'); loadVehicles(); }
+            else alert(d.error || 'Sync failed');
+        }).catch(() => alert('Sync failed'));
 }
 
 function resetVehicleForm() {

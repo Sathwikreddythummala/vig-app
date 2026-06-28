@@ -36,6 +36,39 @@ async def list_vehicles(request: Request):
     return {"vehicles": vehicles}
 
 
+@router.post("/api/sync-drivers")
+async def sync_drivers_to_vehicles(request: Request):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    from services.sheets_service import SHEET_HEADERS, invalidate_cache
+    drivers = get_all_records("Drivers")
+    vehicles = get_all_records("Vehicles")
+    veh_headers = SHEET_HEADERS["Vehicles"]
+    drv_idx = veh_headers.index("DefaultDriver")
+    veh_updated_idx = veh_headers.index("UpdatedDate")
+    vehicle_driver_map = {}
+    for d in drivers:
+        veh = str(d.get("AssignedVehicle", "")).strip()
+        name = str(d.get("DriverName", "")).strip()
+        if veh and name and str(d.get("Status", "")) == "Active":
+            vehicle_driver_map[veh] = name
+    updated = 0
+    for idx, v in enumerate(vehicles):
+        vnum = str(v.get("VehicleNumber", "")).strip()
+        current_driver = str(v.get("DefaultDriver", "")).strip()
+        expected_driver = vehicle_driver_map.get(vnum, "")
+        if current_driver != expected_driver:
+            veh_row = [v.get(h, "") for h in veh_headers]
+            veh_row[drv_idx] = expected_driver
+            veh_row[veh_updated_idx] = now_str()
+            update_row("Vehicles", idx + 2, veh_row)
+            updated += 1
+    invalidate_cache("Vehicles")
+    add_audit_log("SYNC", "Vehicles", "", f"Synced drivers to {updated} vehicles", user["email"])
+    return {"success": True, "updated": updated}
+
+
 @router.get("/api/{vehicle_id}")
 async def get_vehicle(request: Request, vehicle_id: str):
     user = get_user(request)
@@ -58,9 +91,21 @@ async def add_vehicle(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
+    from services.sheets_service import invalidate_cache
+    invalidate_cache("Vehicles")
     vehicles = get_all_records("Vehicles")
+    new_vnum = str(data.get("VehicleNumber", "")).strip().upper()
     for v in vehicles:
-        if str(v.get("VehicleNumber", "")).strip().upper() == str(data.get("VehicleNumber", "")).strip().upper():
+        if str(v.get("VehicleNumber", "")).strip().upper() == new_vnum:
+            if not str(v.get("VehicleID", "")).strip():
+                veh_ws = get_worksheet("Vehicles")
+                all_vals = veh_ws.get_all_values()
+                for row_idx in range(1, len(all_vals)):
+                    if str(all_vals[row_idx][1] if len(all_vals[row_idx]) > 1 else "").strip().upper() == new_vnum and not str(all_vals[row_idx][0]).strip():
+                        veh_ws.delete_rows(row_idx + 1)
+                        invalidate_cache("Vehicles")
+                        break
+                continue
             return JSONResponse({"error": "Vehicle number already exists"}, 400)
     vid = gen_id("VEH")
     row = [

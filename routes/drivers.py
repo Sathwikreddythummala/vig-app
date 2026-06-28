@@ -115,6 +115,20 @@ async def add_driver(request: Request):
         now_str(),
     ]
     append_row("Drivers", row)
+    new_vehicle = str(data.get("AssignedVehicle", "")).strip()
+    if new_vehicle:
+        from services.sheets_service import SHEET_HEADERS
+        vehicles = get_all_records("Vehicles")
+        veh_headers = SHEET_HEADERS["Vehicles"]
+        drv_idx = veh_headers.index("DefaultDriver")
+        veh_updated_idx = veh_headers.index("UpdatedDate")
+        for idx, v in enumerate(vehicles):
+            if str(v.get("VehicleNumber", "")).strip() == new_vehicle:
+                veh_row = [v.get(h, "") for h in veh_headers]
+                veh_row[drv_idx] = data.get("DriverName", "")
+                veh_row[veh_updated_idx] = now_str()
+                update_row("Vehicles", idx + 2, veh_row)
+                break
     _sync_user_access(data.get("Email", ""), data.get("DriverName", ""), data.get("EmployeeType", "Driver"), data.get("AccessType", "viewer"))
     add_audit_log("CREATE", "Drivers", did, f"{data.get('EmployeeType','Driver')} {data.get('DriverName','')} added", user["email"])
     return {"success": True, "driver_id": did}
@@ -158,6 +172,31 @@ async def update_driver(request: Request, driver_id: str):
         now_str(),
     ]
     update_row("Drivers", row_num, row)
+    old_vehicle = str(existing.get("AssignedVehicle", "")).strip()
+    new_vehicle = str(data.get("AssignedVehicle", "")).strip()
+    driver_name = str(data.get("DriverName", "")).strip()
+    if old_vehicle != new_vehicle:
+        from services.sheets_service import SHEET_HEADERS
+        vehicles = get_all_records("Vehicles")
+        veh_headers = SHEET_HEADERS["Vehicles"]
+        drv_idx = veh_headers.index("DefaultDriver")
+        veh_updated_idx = veh_headers.index("UpdatedDate")
+        if old_vehicle:
+            for idx, v in enumerate(vehicles):
+                if str(v.get("VehicleNumber", "")).strip() == old_vehicle and str(v.get("DefaultDriver", "")).strip() == driver_name:
+                    veh_row = [v.get(h, "") for h in veh_headers]
+                    veh_row[drv_idx] = ""
+                    veh_row[veh_updated_idx] = now_str()
+                    update_row("Vehicles", idx + 2, veh_row)
+                    break
+        if new_vehicle:
+            for idx, v in enumerate(vehicles):
+                if str(v.get("VehicleNumber", "")).strip() == new_vehicle:
+                    veh_row = [v.get(h, "") for h in veh_headers]
+                    veh_row[drv_idx] = driver_name
+                    veh_row[veh_updated_idx] = now_str()
+                    update_row("Vehicles", idx + 2, veh_row)
+                    break
     _sync_user_access(data.get("Email", existing.get("Email", "")), data.get("DriverName", ""), data.get("EmployeeType", existing.get("EmployeeType", "Driver")), data.get("AccessType", "viewer"))
     add_audit_log("UPDATE", "Drivers", driver_id, f"{data.get('EmployeeType','Driver')} {data.get('DriverName','')} updated", user["email"])
     return {"success": True}
