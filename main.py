@@ -26,16 +26,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TSR Enterprises Fleet Management", lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, max_age=settings.SESSION_MAX_AGE)
-
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse as JR
 
 
 class ViewerGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        user = request.session.get("user")
+        user = request.session.get("user") if "session" in request.scope else None
         if user and user.get("role") == "viewer":
             if request.method in ("POST", "PUT", "DELETE"):
                 path = request.url.path
@@ -45,6 +42,7 @@ class ViewerGuardMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(ViewerGuardMiddleware)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, max_age=settings.SESSION_MAX_AGE)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(auth.router)
