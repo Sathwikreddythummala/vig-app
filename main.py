@@ -49,13 +49,13 @@ class RoleEnforcementMiddleware(BaseHTTPMiddleware):
 
         # Re-validate role on every non-static request (uses cached sheet data so it's fast)
         try:
-            from services.auth_service import get_user_role, is_email_allowed, get_driver_by_email
+            from services.auth_service import get_user_role, is_email_allowed, get_driver_by_email, is_driver_record
             email = user.get("email", "")
             if not is_email_allowed(email):
                 request.session.clear()
                 return RR("/auth/login-page")
             driver = get_driver_by_email(email)
-            if driver and driver.get("EmployeeType", "Driver") == "Driver":
+            if driver and is_driver_record(driver):
                 if user.get("role") != "driver":
                     user["role"] = "driver"
                     user["driver_id"] = driver.get("DriverID", "")

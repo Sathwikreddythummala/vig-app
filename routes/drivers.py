@@ -18,7 +18,8 @@ def _sync_user_access(email: str, name: str, emp_type: str, access_type: str):
     if not email or not email.strip():
         return
     email = email.strip().lower()
-    if emp_type == "Employee" and access_type:
+    emp_type_norm = str(emp_type or "").strip().lower()
+    if emp_type_norm == "employee" and access_type:
         users = get_all_records("Users")
         for idx, u in enumerate(users):
             if str(u.get("Email", "")).strip().lower() == email:
@@ -32,7 +33,7 @@ def _sync_user_access(email: str, name: str, emp_type: str, access_type: str):
                 update_row("Users", idx + 2, row_data)
                 return
         append_row("Users", [gen_id("USR"), email, name, access_type, "Active", now_str(), now_str()])
-    elif emp_type == "Driver":
+    elif emp_type_norm == "driver":
         users = get_all_records("Users")
         for idx, u in enumerate(users):
             if str(u.get("Email", "")).strip().lower() == email:

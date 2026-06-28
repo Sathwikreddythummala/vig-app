@@ -10,6 +10,6 @@ def require_editor(request: Request):
     user = request.session.get("user")
     if not user:
         return None, JSONResponse({"error": "Unauthorized"}, 401)
-    if user.get("role") == "viewer":
-        return None, JSONResponse({"error": "You have read-only access"}, 403)
+    if user.get("role") not in ("admin", "editor"):
+        return None, JSONResponse({"error": "You do not have permission to make changes"}, 403)
     return user, None
