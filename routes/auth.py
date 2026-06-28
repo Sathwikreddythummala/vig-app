@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse
-from services.auth_service import is_email_allowed, is_admin, get_driver_by_email, get_user_role
+from services.auth_service import is_email_allowed, is_admin, get_driver_by_email, get_user_role, is_driver_record
 from services.sheets_service import add_audit_log
 from utils.templates import templates
 from config import settings
@@ -59,7 +59,7 @@ async def callback(request: Request):
     if not is_email_allowed(email):
         return RedirectResponse("/auth/unauthorized")
     driver = get_driver_by_email(email)
-    if driver and driver.get("EmployeeType", "Driver") == "Driver":
+    if driver and is_driver_record(driver):
         request.session["user"] = {
             "email": email,
             "name": driver.get("DriverName", user_info.get("name", "")),
