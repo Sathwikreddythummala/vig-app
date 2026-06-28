@@ -28,7 +28,7 @@ async def list_attendance(request: Request, date: str = ""):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     drivers = get_all_records("Drivers")
-    active_drivers = [d for d in drivers if str(d.get("Status", "Active")).strip().lower() != "inactive"]
+    active_drivers = [d for d in drivers if str(d.get("Status", "Active")).strip().lower() != "inactive" and str(d.get("EmployeeType", "Driver")).strip().lower() == "driver"]
     attendance = get_all_records("Attendance")
     absents = {}
     if date:
@@ -101,7 +101,7 @@ async def attendance_summary(request: Request, month: str = ""):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     drivers = get_all_records("Drivers")
-    active_drivers = [d for d in drivers if str(d.get("Status", "Active")).strip().lower() != "inactive"]
+    active_drivers = [d for d in drivers if str(d.get("Status", "Active")).strip().lower() != "inactive" and str(d.get("EmployeeType", "Driver")).strip().lower() == "driver"]
     attendance = get_all_records("Attendance")
     if month:
         attendance = [a for a in attendance if str(a.get("Date", ""))[:7] == month]

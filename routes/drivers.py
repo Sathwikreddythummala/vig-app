@@ -76,6 +76,8 @@ async def salaries_api(request: Request, month: str = ""):
     for d in drivers:
         if str(d.get("Status", "Active")).strip().lower() == "inactive":
             continue
+        if str(d.get("EmployeeType", "Driver")).strip().lower() != "driver":
+            continue
         name = str(d.get("DriverName", "")).strip()
         profile_salary = float(d.get("Salary", 0) or 0)
         drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name]
