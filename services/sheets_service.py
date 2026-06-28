@@ -195,13 +195,11 @@ def get_all_records(sheet_name: str) -> list[dict]:
 
 
 def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
-    records = get_all_records(sheet_name)
-    id_col = SHEET_HEADERS[sheet_name][0]
-    for idx, record in enumerate(records):
-        if str(record.get(id_col, "")) == id_value:
-            return idx + 2, record
     invalidate_cache(sheet_name)
-    records = get_all_records(sheet_name)
+    ws = get_worksheet(sheet_name)
+    records = ws.get_all_records()
+    _cache[sheet_name] = {"data": records, "ts": time.time()}
+    id_col = SHEET_HEADERS[sheet_name][0]
     for idx, record in enumerate(records):
         if str(record.get(id_col, "")) == id_value:
             return idx + 2, record
