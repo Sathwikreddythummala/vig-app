@@ -8,7 +8,8 @@
             <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:160px">
             <input type="date" class="form-control glass-input" id="filterDateTo" style="width:160px">
             <select class="form-select glass-input" id="filterVehicle" style="width:180px"><option value="">All Vehicles</option></select>
-            <select class="form-select glass-input" id="filterCategory" style="width:160px"><option value="">All Categories</option></select>
+            <select class="form-select glass-input" id="filterCategory" style="width:160px" onchange="updateFilterSubCategories(); loadExpenses()"><option value="">All Categories</option></select>
+            <select class="form-select glass-input" id="filterSubCategory" style="width:160px" onchange="loadExpenses()"><option value="">All SubCategories</option></select>
             <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search..." style="width:180px">
             <button class="btn btn-warning" onclick="loadExpenses()"><i class="bi bi-funnel"></i> Filter</button>
         </div>
@@ -20,14 +21,14 @@
     </div>
 </div>
 <div class="glass-card animate-in" style="animation-delay:0.2s">
-    <div class="d-flex justify-content-between mb-2">
-        <span class="fw-bold">Total: <span id="totalAmount" class="text-warning">₹0</span></span>
-        <span class="text-muted"><span id="totalRecords">0</span> records</span>
+    <div class="d-flex flex-wrap justify-content-between mb-2 gap-2">
+        <span class="fw-bold">Sum: <span id="totalAmount" class="text-warning fs-5">₹0</span></span>
+        <span class="text-muted"><span id="totalRecords">0</span> entries</span>
     </div>
     <div class="table-responsive">
         <table class="table table-hover glass-table">
-            <thead><tr><th>Date</th><th>For</th><th>Vehicle</th><th>Driver</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Mode</th><th>Actions</th></tr></thead>
-            <tbody id="expenseTable"><tr><td colspan="10" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            <thead><tr><th>Date</th><th>For</th><th>Vehicle</th><th>Driver</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Mode</th><th>Paid By</th><th>Month</th><th>Actions</th></tr></thead>
+            <tbody id="expenseTable"><tr><td colspan="12" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
         </table>
     </div>
     <nav id="pagination" class="d-flex justify-content-center mt-3"></nav>
@@ -88,7 +89,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Paid By</label>
-                            <select class="form-select glass-input" id="expPaidBy"><option>Vigneshwara</option><option>MSR</option><option>Company</option></select>
+                            <select class="form-select glass-input" id="expPaidBy"><option>TSR</option><option>MSR</option><option>Company</option></select>
                         </div>
                     </div>
                 </form>
@@ -142,6 +143,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadAlerts();
 });
 
+function updateFilterSubCategories() {
+    const cat = document.getElementById('filterCategory').value;
+    const subSel = document.getElementById('filterSubCategory');
+    subSel.innerHTML = '<option value="">All SubCategories</option>';
+    if (cat && categories[cat]) {
+        categories[cat].forEach(s => subSel.innerHTML += `<option value="${s}">${s}</option>`);
+    }
+}
+
 function toggleVehicleFields() {
     const isVehicle = document.getElementById('expFor').value === 'Vehicle Expense';
     document.getElementById('vehicleField').style.display = isVehicle ? '' : 'none';
@@ -184,6 +194,7 @@ async function loadExpenses(page) {
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,
         category: document.getElementById('filterCategory').value,
+        subcategory: document.getElementById('filterSubCategory').value,
         search: document.getElementById('filterSearch').value,
     });
     const res = await fetch('/expenses/api/list?' + params);
@@ -196,13 +207,13 @@ async function loadExpenses(page) {
             <td>${e.ExpenseDate}</td><td>${e.ExpenseFor||'-'}</td><td>${e.VehicleNumber||'-'}</td><td>${e.DriverName||'-'}</td>
             <td><span class="badge bg-warning text-dark">${e.Category}</span></td><td>${e.SubCategory||'-'}</td>
             <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
-            <td>${e.PaymentMode||'-'}</td>
+            <td>${e.PaymentMode||'-'}</td><td>${e.PaidBy||'-'}</td><td>${e.ForMonth||'-'}</td>
             <td>
                 <button class="btn btn-sm btn-outline-warning" onclick="editExpense('${e.ExpenseID}')"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteExpense('${e.ExpenseID}')"><i class="bi bi-trash"></i></button>
             </td></tr>`).join('');
     } else {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No expenses found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No expenses found</td></tr>';
     }
     renderPagination(data.total_pages || 1, currentPage);
 }

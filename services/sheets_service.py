@@ -4,9 +4,14 @@ from config import settings
 from datetime import datetime
 import uuid
 import time
+import threading
 
 SCOPES = settings.SCOPES
 _client = None
+_spreadsheet = None
+_spreadsheet_ts = 0
+_SPREADSHEET_TTL = 300
+_ws_cache = {}
 
 
 def get_client() -> gspread.Client:
@@ -18,7 +23,13 @@ def get_client() -> gspread.Client:
 
 
 def get_spreadsheet():
-    return get_client().open_by_key(settings.SPREADSHEET_ID)
+    global _spreadsheet, _spreadsheet_ts
+    now = time.time()
+    if _spreadsheet is None or (now - _spreadsheet_ts) > _SPREADSHEET_TTL:
+        _spreadsheet = get_client().open_by_key(settings.SPREADSHEET_ID)
+        _spreadsheet_ts = now
+        _ws_cache.clear()
+    return _spreadsheet
 
 
 SHEET_HEADERS = {
@@ -142,7 +153,9 @@ def initialize_sheets():
 
 
 def get_worksheet(name: str):
-    return get_spreadsheet().worksheet(name)
+    if name not in _ws_cache:
+        _ws_cache[name] = get_spreadsheet().worksheet(name)
+    return _ws_cache[name]
 
 
 def gen_id(prefix: str) -> str:
@@ -179,9 +192,13 @@ def get_all_records(sheet_name: str) -> list[dict]:
 
 
 def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
-    ws = get_worksheet(sheet_name)
-    records = ws.get_all_records()
+    records = get_all_records(sheet_name)
     id_col = SHEET_HEADERS[sheet_name][0]
+    for idx, record in enumerate(records):
+        if str(record.get(id_col, "")) == id_value:
+            return idx + 2, record
+    invalidate_cache(sheet_name)
+    records = get_all_records(sheet_name)
     for idx, record in enumerate(records):
         if str(record.get(id_col, "")) == id_value:
             return idx + 2, record
@@ -191,23 +208,46 @@ def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
 def append_row(sheet_name: str, row_data: list):
     ws = get_worksheet(sheet_name)
     ws.append_row(row_data, value_input_option="USER_ENTERED")
-    invalidate_cache(sheet_name)
+    if sheet_name in _cache and sheet_name in SHEET_HEADERS:
+        headers = SHEET_HEADERS[sheet_name]
+        new_record = {headers[i]: row_data[i] if i < len(row_data) else "" for i in range(len(headers))}
+        _cache[sheet_name]["data"].append(new_record)
+    else:
+        invalidate_cache(sheet_name)
 
 
 def update_row(sheet_name: str, row_num: int, row_data: list):
     ws = get_worksheet(sheet_name)
     col_end = chr(64 + len(row_data)) if len(row_data) <= 26 else "Z"
     ws.update(f"A{row_num}:{col_end}{row_num}", [row_data], value_input_option="USER_ENTERED")
-    invalidate_cache(sheet_name)
+    if sheet_name in _cache and sheet_name in SHEET_HEADERS:
+        headers = SHEET_HEADERS[sheet_name]
+        idx = row_num - 2
+        if 0 <= idx < len(_cache[sheet_name]["data"]):
+            _cache[sheet_name]["data"][idx] = {headers[i]: row_data[i] if i < len(row_data) else "" for i in range(len(headers))}
+    else:
+        invalidate_cache(sheet_name)
 
 
 def delete_row(sheet_name: str, row_num: int):
     ws = get_worksheet(sheet_name)
     ws.delete_rows(row_num)
-    invalidate_cache(sheet_name)
+    if sheet_name in _cache:
+        idx = row_num - 2
+        if 0 <= idx < len(_cache[sheet_name]["data"]):
+            _cache[sheet_name]["data"].pop(idx)
+    else:
+        invalidate_cache(sheet_name)
+
+
+def _write_audit_log(row_data):
+    try:
+        ws = get_worksheet("AuditLogs")
+        ws.append_row(row_data, value_input_option="USER_ENTERED")
+    except Exception:
+        pass
 
 
 def add_audit_log(action: str, module: str, entity_id: str, details: str, user_email: str):
-    append_row("AuditLogs", [
-        gen_id("LOG"), action, module, entity_id, details, user_email, now_str()
-    ])
+    row_data = [gen_id("LOG"), action, module, entity_id, details, user_email, now_str()]
+    threading.Thread(target=_write_audit_log, args=(row_data,), daemon=True).start()

@@ -52,6 +52,7 @@ async def list_expenses(
     date_to: str = "",
     vehicle: str = "",
     category: str = "",
+    subcategory: str = "",
     search: str = "",
     page: int = 1,
     per_page: int = 25,
@@ -68,9 +69,11 @@ async def list_expenses(
         expenses = [e for e in expenses if str(e.get("VehicleNumber", "")) == vehicle]
     if category:
         expenses = [e for e in expenses if str(e.get("Category", "")) == category]
+    if subcategory:
+        expenses = [e for e in expenses if str(e.get("SubCategory", "")) == subcategory]
     if search:
         s = search.lower()
-        expenses = [e for e in expenses if s in str(e.get("Description", "")).lower() or s in str(e.get("VehicleNumber", "")).lower() or s in str(e.get("DriverName", "")).lower()]
+        expenses = [e for e in expenses if s in str(e.get("ExpenseID", "")).lower() or s in str(e.get("Description", "")).lower() or s in str(e.get("VehicleNumber", "")).lower() or s in str(e.get("DriverName", "")).lower() or s in str(e.get("Category", "")).lower()]
     expenses.sort(key=lambda x: str(x.get("ExpenseDate", "")), reverse=True)
     total = len(expenses)
     start = (page - 1) * per_page

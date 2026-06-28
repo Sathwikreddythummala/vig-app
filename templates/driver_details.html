@@ -34,6 +34,8 @@
 {% block scripts %}
 <script>
 const driverId = '{{ driver_id }}';
+let allDriverData = null;
+let selectedMonth = '';
 
 document.addEventListener('DOMContentLoaded', () => { loadDriverDetails(); loadAlerts(); });
 
@@ -41,9 +43,42 @@ async function loadDriverDetails() {
     const res = await fetch(`/drivers/api/${driverId}`);
     const data = await res.json();
     if (data.error) { document.getElementById('driverDetailsContent').innerHTML = '<div class="alert alert-danger">Driver not found</div>'; return; }
-    const d = data.driver;
-    const docs = data.documents || [];
-    const expenses = data.expenses || [];
+    allDriverData = data;
+    renderDriverDetails();
+}
+
+function getMonthOptions(expenses) {
+    const months = new Set();
+    expenses.forEach(e => {
+        const fm = e.ForMonth || '';
+        if (fm) months.add(fm);
+        const dt = (e.ExpenseDate || '').substring(0, 7);
+        if (dt) months.add(dt);
+    });
+    return Array.from(months).sort().reverse();
+}
+
+function filterByMonth(expenses, month) {
+    if (!month) return expenses;
+    return expenses.filter(e => {
+        const fm = e.ForMonth || '';
+        const dt = (e.ExpenseDate || '').substring(0, 7);
+        return fm === month || dt === month;
+    });
+}
+
+function onMonthChange() {
+    selectedMonth = document.getElementById('drvMonthFilter').value;
+    renderDriverDetails();
+}
+
+function renderDriverDetails() {
+    const d = allDriverData.driver;
+    const docs = allDriverData.documents || [];
+    const allExpenses = allDriverData.expenses || [];
+    const expenses = filterByMonth(allExpenses, selectedMonth);
+    const monthOptions = getMonthOptions(allExpenses);
+
     const totalExp = expenses.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
     const advances = expenses.filter(e => e.SubCategory === 'Advance');
     const meals = expenses.filter(e => e.SubCategory === 'Meals');
@@ -51,21 +86,45 @@ async function loadDriverDetails() {
     const totalAdvance = advances.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
     const totalMeals = meals.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
     const totalSalary = salaries.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const otherExp = expenses.filter(e => e.SubCategory !== 'Advance' && e.SubCategory !== 'Meals' && e.SubCategory !== 'Salary');
+    const totalOther = otherExp.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const netPayable = totalSalary - totalAdvance - totalMeals - totalOther;
+
+    const monthLabel = selectedMonth ? selectedMonth : 'All Time';
 
     document.getElementById('driverDetailsContent').innerHTML = `
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div><h4 class="mb-0">${d.DriverName}</h4><small class="text-muted">${d.Status||'Active'} | ${d.AssignedVehicle||'No vehicle'}</small></div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-warning" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadDrvDocModal')).show()"><i class="bi bi-upload"></i> Upload Document</button>
-            <a href="/drivers" class="btn btn-outline-warning"><i class="bi bi-arrow-left"></i> Back</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div><h4 class="mb-0">${d.DriverName}</h4><small class="text-muted">${d.EmployeeType||'Driver'} | ${d.Status||'Active'} | ${d.AssignedVehicle||'No vehicle'}</small></div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <select class="form-select glass-input" id="drvMonthFilter" style="width:180px" onchange="onMonthChange()">
+                <option value="">All Months</option>
+                ${monthOptions.map(m => `<option value="${m}" ${m===selectedMonth?'selected':''}>${m}</option>`).join('')}
+            </select>
+            <button class="btn btn-warning btn-sm" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadDrvDocModal')).show()"><i class="bi bi-upload"></i> Upload Doc</button>
+            <a href="/drivers" class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
         </div>
     </div>
     <div class="row g-3 mb-3">
-        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Expense</small><h4>₹${totalExp.toLocaleString('en-IN')}</h4></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Total Salary Paid</small><h4>₹${totalSalary.toLocaleString('en-IN')}</h4></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Total Advance</small><h4>₹${totalAdvance.toLocaleString('en-IN')}</h4></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Total Meals</small><h4>₹${totalMeals.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Salary</small><h4>₹${totalSalary.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Advance</small><h4>₹${totalAdvance.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Meals</small><h4>₹${totalMeals.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Expenses</small><h4>₹${totalExp.toLocaleString('en-IN')}</h4></div></div></div>
     </div>
+    ${selectedMonth ? `
+    <div class="glass-card mb-3 animate-in" style="animation-delay:0.35s">
+        <h6><i class="bi bi-calculator"></i> Monthly Summary — ${monthLabel}</h6><hr>
+        <div class="row g-2">
+            <div class="col-md-3"><div class="d-flex justify-content-between"><span>Salary:</span><strong class="text-success">₹${totalSalary.toLocaleString('en-IN')}</strong></div></div>
+            <div class="col-md-3"><div class="d-flex justify-content-between"><span>− Advance:</span><strong class="text-danger">₹${totalAdvance.toLocaleString('en-IN')}</strong></div></div>
+            <div class="col-md-3"><div class="d-flex justify-content-between"><span>− Meals:</span><strong class="text-danger">₹${totalMeals.toLocaleString('en-IN')}</strong></div></div>
+            <div class="col-md-3"><div class="d-flex justify-content-between"><span>− Other:</span><strong class="text-danger">₹${totalOther.toLocaleString('en-IN')}</strong></div></div>
+        </div>
+        <hr>
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Net Payable:</h5>
+            <h4 class="mb-0 ${netPayable>=0?'text-success':'text-danger'}">₹${netPayable.toLocaleString('en-IN')}</h4>
+        </div>
+    </div>` : ''}
     <div class="row g-3 mb-3">
         <div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.4s">
             <h6><i class="bi bi-person"></i> Personal Information</h6><hr>
@@ -100,19 +159,20 @@ async function loadDriverDetails() {
         <div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.7s">
             <h6><i class="bi bi-arrow-up-circle"></i> Advance History</h6>
             <div class="table-responsive"><table class="table table-sm glass-table small">
-                <thead><tr><th>Date</th><th>Amount</th><th>Description</th></tr></thead>
-                <tbody>${advances.length?advances.sort((a,b)=>b.ExpenseDate.localeCompare(a.ExpenseDate)).map(e=>`<tr><td>${e.ExpenseDate}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td><td>${e.Description||'-'}</td></tr>`).join(''):'<tr><td colspan="3" class="text-center text-muted">No advances</td></tr>'}</tbody>
+                <thead><tr><th>Date</th><th>Month</th><th>Amount</th><th>Description</th></tr></thead>
+                <tbody>${advances.length?advances.sort((a,b)=>b.ExpenseDate.localeCompare(a.ExpenseDate)).map(e=>`<tr><td>${e.ExpenseDate}</td><td>${e.ForMonth||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td><td>${e.Description||'-'}</td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">No advances</td></tr>'}</tbody>
             </table></div>
         </div></div>
     </div>
     <div class="glass-card animate-in" style="animation-delay:0.8s">
-        <h6><i class="bi bi-clock-history"></i> Full Expense History</h6>
+        <h6><i class="bi bi-clock-history"></i> Expense History ${selectedMonth ? '— '+monthLabel : ''}</h6>
         <div class="table-responsive"><table class="table table-hover glass-table small">
-            <thead><tr><th>Date</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Vehicle</th></tr></thead>
+            <thead><tr><th>Date</th><th>Category</th><th>SubCategory</th><th>Month</th><th>Description</th><th>Amount</th><th>Paid By</th><th>Vehicle</th></tr></thead>
             <tbody>${expenses.length?expenses.sort((a,b)=>b.ExpenseDate.localeCompare(a.ExpenseDate)).map(e=>`<tr>
                 <td>${e.ExpenseDate}</td><td><span class="badge bg-warning text-dark">${e.Category}</span></td><td>${e.SubCategory||'-'}</td>
-                <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td><td>${e.VehicleNumber||'-'}</td>
-            </tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted">No expenses</td></tr>'}</tbody>
+                <td>${e.ForMonth||'-'}</td><td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
+                <td>${e.PaidBy||'-'}</td><td>${e.VehicleNumber||'-'}</td>
+            </tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">No expenses</td></tr>'}</tbody>
         </table></div>
     </div>`;
 }

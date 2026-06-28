@@ -7,7 +7,7 @@ from services.sheets_service import (
 from utils.templates import templates
 
 router = APIRouter(prefix="/purse", tags=["purse"])
-HOLDERS = ["Vigneshwara", "MSR"]
+HOLDERS = ["TSR", "MSR"]
 
 
 def get_user(request: Request):
