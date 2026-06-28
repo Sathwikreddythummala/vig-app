@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadSalaries() {
     const month = document.getElementById('salaryMonth').value;
     const res = await fetch('/drivers/api/salaries?month=' + month);
+    if (!res.ok) { console.error('Salary API error', res.status); document.getElementById('salaryTable').innerHTML = '<tr><td colspan="10" class="text-center text-danger">Failed to load — check console</td></tr>'; return; }
     const data = await res.json();
     const rows = data.salaries || [];
     const t = data.totals || {};
