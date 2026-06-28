@@ -35,22 +35,31 @@ import time as _time
 class ViewerGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         user = request.session.get("user") if "session" in request.scope else None
-        if user and user.get("role") not in ("driver",):
+        if user:
             path = request.url.path
             if not path.startswith(("/static", "/auth")):
                 last_check = request.session.get("_role_checked", 0)
                 if _time.time() - last_check > 300:
                     try:
-                        from services.auth_service import get_user_role, is_email_allowed
+                        from services.auth_service import get_user_role, is_email_allowed, get_driver_by_email
                         email = user.get("email", "")
                         if not is_email_allowed(email):
                             request.session.clear()
                             from fastapi.responses import RedirectResponse as RR
                             return RR("/auth/login-page")
-                        fresh_role = get_user_role(email)
-                        if fresh_role != user.get("role"):
-                            user["role"] = fresh_role
-                            request.session["user"] = user
+                        driver = get_driver_by_email(email)
+                        if driver and driver.get("EmployeeType", "Driver") == "Driver":
+                            if user.get("role") != "driver":
+                                user["role"] = "driver"
+                                user["driver_id"] = driver.get("DriverID", "")
+                                user["driver_name"] = driver.get("DriverName", "")
+                                user["assigned_vehicle"] = driver.get("AssignedVehicle", "")
+                                request.session["user"] = user
+                        else:
+                            fresh_role = get_user_role(email)
+                            if fresh_role != user.get("role"):
+                                user["role"] = fresh_role
+                                request.session["user"] = user
                         request.session["_role_checked"] = _time.time()
                     except Exception:
                         pass
