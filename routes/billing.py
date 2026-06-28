@@ -18,8 +18,8 @@ def get_user(request: Request):
 def next_invoice_number():
     records = get_all_records("Billing")
     month = datetime.now().strftime("%y%m")
-    count = len([r for r in records if str(r.get("InvoiceNumber", "")).startswith(f"VE-{month}")]) + 1
-    return f"VE-{month}-{count:04d}"
+    count = len([r for r in records if str(r.get("InvoiceNumber", "")).startswith(f"TSR-{month}")]) + 1
+    return f"TSR-{month}-{count:04d}"
 
 
 def recalc_bill(bill_id: str):

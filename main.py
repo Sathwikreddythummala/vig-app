@@ -25,8 +25,26 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Vigneshwara Enterprises Fleet Management", lifespan=lifespan)
+app = FastAPI(title="TSR Enterprises Fleet Management", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, max_age=settings.SESSION_MAX_AGE)
+
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse as JR
+
+
+class ViewerGuardMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        user = request.session.get("user")
+        if user and user.get("role") == "viewer":
+            if request.method in ("POST", "PUT", "DELETE"):
+                path = request.url.path
+                if "/api/" in path and "/api/list" not in path and "/api/my-data" not in path and "/api/summary" not in path and "/api/stats" not in path and "/api/categories" not in path and "/api/sales" not in path and "/api/purchases" not in path and "/api/receivables" not in path:
+                    return JR({"error": "Viewers cannot make changes"}, status_code=403)
+        return await call_next(request)
+
+
+app.add_middleware(ViewerGuardMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(auth.router)
