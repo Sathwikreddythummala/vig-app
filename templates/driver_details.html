@@ -85,10 +85,13 @@ function renderDriverDetails() {
     const salaries = expenses.filter(e => e.SubCategory === 'Salary');
     const totalAdvance = advances.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
     const totalMeals = meals.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
-    const totalSalary = salaries.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const totalSalaryPaid = salaries.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
+    const profileSalary = parseFloat(d.Salary || 0);
+    const monthlySalary = selectedMonth ? profileSalary : 0;
+    const effectiveSalary = selectedMonth ? (totalSalaryPaid > 0 ? totalSalaryPaid : profileSalary) : totalSalaryPaid;
     const otherExp = expenses.filter(e => e.SubCategory !== 'Advance' && e.SubCategory !== 'Meals' && e.SubCategory !== 'Salary');
     const totalOther = otherExp.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
-    const netPayable = totalSalary - totalAdvance - totalMeals - totalOther;
+    const netPayable = effectiveSalary - totalAdvance - totalMeals - totalOther;
 
     const monthLabel = selectedMonth ? selectedMonth : 'All Time';
 
@@ -105,7 +108,7 @@ function renderDriverDetails() {
         </div>
     </div>
     <div class="row g-3 mb-3">
-        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Salary</small><h4>₹${totalSalary.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Salary (₹${profileSalary.toLocaleString('en-IN')}/mo)</small><h4>₹${effectiveSalary.toLocaleString('en-IN')}</h4></div></div></div>
         <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Advance</small><h4>₹${totalAdvance.toLocaleString('en-IN')}</h4></div></div></div>
         <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Meals</small><h4>₹${totalMeals.toLocaleString('en-IN')}</h4></div></div></div>
         <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Expenses</small><h4>₹${totalExp.toLocaleString('en-IN')}</h4></div></div></div>
@@ -114,7 +117,7 @@ function renderDriverDetails() {
     <div class="glass-card mb-3 animate-in" style="animation-delay:0.35s">
         <h6><i class="bi bi-calculator"></i> Monthly Summary — ${monthLabel}</h6><hr>
         <div class="row g-2">
-            <div class="col-md-3"><div class="d-flex justify-content-between"><span>Salary:</span><strong class="text-success">₹${totalSalary.toLocaleString('en-IN')}</strong></div></div>
+            <div class="col-md-3"><div class="d-flex justify-content-between"><span>Salary (profile):</span><strong class="text-success">₹${profileSalary.toLocaleString('en-IN')}</strong></div></div>
             <div class="col-md-3"><div class="d-flex justify-content-between"><span>− Advance:</span><strong class="text-danger">₹${totalAdvance.toLocaleString('en-IN')}</strong></div></div>
             <div class="col-md-3"><div class="d-flex justify-content-between"><span>− Meals:</span><strong class="text-danger">₹${totalMeals.toLocaleString('en-IN')}</strong></div></div>
             <div class="col-md-3"><div class="d-flex justify-content-between"><span>− Other:</span><strong class="text-danger">₹${totalOther.toLocaleString('en-IN')}</strong></div></div>
@@ -123,6 +126,10 @@ function renderDriverDetails() {
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Net Payable:</h5>
             <h4 class="mb-0 ${netPayable>=0?'text-success':'text-danger'}">₹${netPayable.toLocaleString('en-IN')}</h4>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+            <small class="text-muted">Salary Paid:</small>
+            <small class="text-muted">₹${totalSalaryPaid.toLocaleString('en-IN')}</small>
         </div>
     </div>` : ''}
     <div class="row g-3 mb-3">

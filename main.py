@@ -32,46 +32,59 @@ from fastapi.responses import JSONResponse as JR
 
 import time as _time
 
-class ViewerGuardMiddleware(BaseHTTPMiddleware):
+DRIVER_ALLOWED_PATHS = ("/driver-portal", "/auth", "/static")
+
+
+class RoleEnforcementMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         user = request.session.get("user") if "session" in request.scope else None
-        if user:
-            path = request.url.path
-            if not path.startswith(("/static", "/auth")):
-                last_check = request.session.get("_role_checked", 0)
-                if _time.time() - last_check > 300:
-                    try:
-                        from services.auth_service import get_user_role, is_email_allowed, get_driver_by_email
-                        email = user.get("email", "")
-                        if not is_email_allowed(email):
-                            request.session.clear()
-                            from fastapi.responses import RedirectResponse as RR
-                            return RR("/auth/login-page")
-                        driver = get_driver_by_email(email)
-                        if driver and driver.get("EmployeeType", "Driver") == "Driver":
-                            if user.get("role") != "driver":
-                                user["role"] = "driver"
-                                user["driver_id"] = driver.get("DriverID", "")
-                                user["driver_name"] = driver.get("DriverName", "")
-                                user["assigned_vehicle"] = driver.get("AssignedVehicle", "")
-                                request.session["user"] = user
-                        else:
-                            fresh_role = get_user_role(email)
-                            if fresh_role != user.get("role"):
-                                user["role"] = fresh_role
-                                request.session["user"] = user
-                        request.session["_role_checked"] = _time.time()
-                    except Exception:
-                        pass
-        if user and user.get("role") == "viewer":
+        if not user:
+            return await call_next(request)
+
+        path = request.url.path
+        if path.startswith(("/static", "/auth")):
+            return await call_next(request)
+
+        from fastapi.responses import RedirectResponse as RR
+
+        # Re-validate role on every non-static request (uses cached sheet data so it's fast)
+        try:
+            from services.auth_service import get_user_role, is_email_allowed, get_driver_by_email
+            email = user.get("email", "")
+            if not is_email_allowed(email):
+                request.session.clear()
+                return RR("/auth/login-page")
+            driver = get_driver_by_email(email)
+            if driver and driver.get("EmployeeType", "Driver") == "Driver":
+                if user.get("role") != "driver":
+                    user["role"] = "driver"
+                    user["driver_id"] = driver.get("DriverID", "")
+                    user["driver_name"] = driver.get("DriverName", "")
+                    user["assigned_vehicle"] = driver.get("AssignedVehicle", "")
+                    request.session["user"] = user
+            else:
+                fresh_role = get_user_role(email)
+                if fresh_role != user.get("role"):
+                    user["role"] = fresh_role
+                    request.session["user"] = user
+        except Exception:
+            pass
+
+        # Drivers can ONLY access driver-portal routes
+        if user.get("role") == "driver":
+            if not any(path.startswith(p) for p in DRIVER_ALLOWED_PATHS):
+                return RR("/driver-portal")
+
+        # Viewers cannot make changes
+        if user.get("role") == "viewer":
             if request.method in ("POST", "PUT", "DELETE"):
-                path = request.url.path
                 if "/api/" in path and "/api/list" not in path and "/api/my-data" not in path and "/api/summary" not in path and "/api/stats" not in path and "/api/categories" not in path and "/api/sales" not in path and "/api/purchases" not in path and "/api/receivables" not in path:
                     return JR({"error": "Viewers cannot make changes"}, status_code=403)
+
         return await call_next(request)
 
 
-app.add_middleware(ViewerGuardMiddleware)
+app.add_middleware(RoleEnforcementMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, max_age=settings.SESSION_MAX_AGE)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
