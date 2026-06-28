@@ -46,6 +46,7 @@
                                 </div>
                                 <div class="col-md-4"><label class="form-label">Assigned Vehicle</label><select class="form-select glass-input" id="drvVehicle"><option value="">-- None --</option></select></div>
                                 <div class="col-md-4"><label class="form-label">Joining Date</label><input type="date" class="form-control glass-input" id="drvJoining"></div>
+                                <div class="col-md-4"><label class="form-label">Exit Date</label><input type="date" class="form-control glass-input" id="drvExitDate" onchange="if(this.value){document.getElementById('drvStatus').value='Inactive'}"></div>
                             </div>
                         </div>
                         <div class="tab-pane fade" id="drvLicense">
@@ -214,6 +215,7 @@ function editDriver(did) {
     document.getElementById('drvIFSC').value = d.IFSCCode||'';
     document.getElementById('drvSalary').value = d.Salary||'';
     document.getElementById('drvJoining').value = d.JoiningDate||'';
+    document.getElementById('drvExitDate').value = d.ExitDate||'';
     document.getElementById('drvStatus').value = d.Status||'Active';
     document.getElementById('drvVehicle').value = d.AssignedVehicle||'';
     bootstrap.Modal.getOrCreateInstance(drvModalEl).show();
@@ -249,6 +251,7 @@ async function saveDriver() {
         IFSCCode: document.getElementById('drvIFSC').value.trim().toUpperCase(),
         Salary: document.getElementById('drvSalary').value,
         JoiningDate: document.getElementById('drvJoining').value,
+        ExitDate: document.getElementById('drvExitDate').value,
         Status: document.getElementById('drvStatus').value,
         AssignedVehicle: document.getElementById('drvVehicle').value,
     };

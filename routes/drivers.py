@@ -228,6 +228,7 @@ async def add_driver(request: Request):
         data.get("Salary", ""),
         data.get("JoiningDate", ""),
         data.get("Status", "Active"),
+        data.get("ExitDate", ""),
         data.get("AssignedVehicle", ""),
         now_str(),
         now_str(),
@@ -285,10 +286,14 @@ async def update_driver(request: Request, driver_id: str):
         data.get("Salary", ""),
         data.get("JoiningDate", ""),
         data.get("Status", data.get("Status", "Active")),
+        data.get("ExitDate", existing.get("ExitDate", "")),
         data.get("AssignedVehicle", ""),
         existing.get("CreatedDate", now_str()),
         now_str(),
     ]
+    exit_date = str(data.get("ExitDate", "")).strip()
+    if exit_date:
+        row[15] = "Inactive"
     update_row("Drivers", row_num, row)
     old_vehicle = str(existing.get("AssignedVehicle", "")).strip()
     new_vehicle = str(data.get("AssignedVehicle", "")).strip()

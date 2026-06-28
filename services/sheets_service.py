@@ -50,7 +50,7 @@ SHEET_HEADERS = {
         "DrivingLicenseNumber", "LicenseExpiryDate",
         "BankName", "AccountNumber", "IFSCCode",
         "Salary", "JoiningDate",
-        "Status", "AssignedVehicle",
+        "Status", "ExitDate", "AssignedVehicle",
         "CreatedDate", "UpdatedDate",
     ],
     "Expenses": [
