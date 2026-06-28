@@ -8,9 +8,10 @@
             <input type="text" class="form-control glass-input" id="searchDriver" placeholder="Search..." style="width:200px" oninput="filterAll()">
             <select class="form-select glass-input" id="filterType" style="width:150px" onchange="filterAll()"><option value="">All Types</option><option>Driver</option><option>Employee</option></select>
         </div>
-        <div class="d-flex gap-2 viewer-hide">
-            <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#driverModal" onclick="resetDriverForm()"><i class="bi bi-plus-lg"></i> Add Driver</button>
-            <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#employeeModal" onclick="resetEmployeeForm()"><i class="bi bi-plus-lg"></i> Add Employee</button>
+        <div class="d-flex gap-2">
+            <a href="/drivers/salaries" class="btn btn-outline-warning"><i class="bi bi-wallet2"></i> Salaries</a>
+            <button class="btn btn-warning viewer-hide" data-bs-toggle="modal" data-bs-target="#driverModal" onclick="resetDriverForm()"><i class="bi bi-plus-lg"></i> Add Driver</button>
+            <button class="btn btn-outline-warning viewer-hide" data-bs-toggle="modal" data-bs-target="#employeeModal" onclick="resetEmployeeForm()"><i class="bi bi-plus-lg"></i> Add Employee</button>
         </div>
     </div>
 </div>
