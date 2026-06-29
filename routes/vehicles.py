@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from services.sheets_service import (
     get_all_records, find_row_by_id, append_row, update_row, delete_row,
-    gen_id, now_str, add_audit_log, get_worksheet,
+    gen_id, now_str, add_audit_log,
 )
 from services.drive_service import upload_file
 from utils.templates import templates
@@ -97,15 +97,6 @@ async def add_vehicle(request: Request):
     new_vnum = str(data.get("VehicleNumber", "")).strip().upper()
     for v in vehicles:
         if str(v.get("VehicleNumber", "")).strip().upper() == new_vnum:
-            if not str(v.get("VehicleID", "")).strip():
-                veh_ws = get_worksheet("Vehicles")
-                all_vals = veh_ws.get_all_values()
-                for row_idx in range(1, len(all_vals)):
-                    if str(all_vals[row_idx][1] if len(all_vals[row_idx]) > 1 else "").strip().upper() == new_vnum and not str(all_vals[row_idx][0]).strip():
-                        veh_ws.delete_rows(row_idx + 1)
-                        invalidate_cache("Vehicles")
-                        break
-                continue
             return JSONResponse({"error": "Vehicle number already exists"}, 400)
     vid = gen_id("VEH")
     from services.sheets_service import build_row

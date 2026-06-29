@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from services.sheets_service import (
-    get_all_records, append_row, delete_row, get_worksheet,
+    get_all_records, append_row, delete_row,
     gen_id, now_str, add_audit_log, invalidate_cache,
 )
 from utils.templates import templates
