@@ -223,9 +223,6 @@ def delete_row(sheet_name: str, row_num: int):
     ws = get_worksheet(sheet_name)
     ws.delete_rows(row_num)
     invalidate_cache(sheet_name)
-            _cache[sheet_name]["data"].pop(idx)
-    else:
-        invalidate_cache(sheet_name)
 
 
 def _write_audit_log(row_data):
