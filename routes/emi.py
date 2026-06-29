@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from services.sheets_service import (
     get_all_records, find_row_by_id, append_row, update_row, delete_row,
-    gen_id, now_str, add_audit_log,
+    gen_id, now_str, add_audit_log, SHEET_HEADERS,
 )
 from utils.templates import templates
 from datetime import datetime
@@ -196,4 +196,44 @@ async def delete_other_emi(request: Request, emi_id: str):
     row_num, record = result
     delete_row("OtherEMIs", row_num)
     add_audit_log("DELETE", "OtherEMIs", emi_id, f"Other EMI '{record.get('EMIName','')}' deleted", user["email"])
+    return {"success": True}
+
+
+@router.put("/api/vehicle-emi/{vehicle_id}")
+async def update_vehicle_emi(request: Request, vehicle_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    result = find_row_by_id("Vehicles", vehicle_id)
+    if not result:
+        return JSONResponse({"error": "Vehicle not found"}, 404)
+    row_num, existing = result
+    headers = SHEET_HEADERS["Vehicles"]
+    row_data = [existing.get(h, "") for h in headers]
+    for field in ["BankName", "LoanAccountNumber", "EMIAmount", "EMIDate", "LoanStartDate", "LoanEndDate", "LoanAvailable"]:
+        if field in data:
+            row_data[headers.index(field)] = data[field]
+    row_data[headers.index("UpdatedDate")] = now_str()
+    update_row("Vehicles", row_num, row_data)
+    add_audit_log("UPDATE", "Vehicles", vehicle_id, f"Vehicle EMI updated for {existing.get('VehicleNumber','')}", user["email"])
+    return {"success": True}
+
+
+@router.delete("/api/vehicle-emi/{vehicle_id}")
+async def remove_vehicle_emi(request: Request, vehicle_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    result = find_row_by_id("Vehicles", vehicle_id)
+    if not result:
+        return JSONResponse({"error": "Vehicle not found"}, 404)
+    row_num, existing = result
+    headers = SHEET_HEADERS["Vehicles"]
+    row_data = [existing.get(h, "") for h in headers]
+    for field in ["LoanAvailable", "BankName", "LoanAccountNumber", "EMIAmount", "EMIDate", "LoanStartDate", "LoanEndDate"]:
+        row_data[headers.index(field)] = ""
+    row_data[headers.index("UpdatedDate")] = now_str()
+    update_row("Vehicles", row_num, row_data)
+    add_audit_log("DELETE", "Vehicles", vehicle_id, f"Loan removed from {existing.get('VehicleNumber','')}", user["email"])
     return {"success": True}

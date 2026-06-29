@@ -129,6 +129,32 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="vehicleEmiModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title">Edit Vehicle EMI</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="vehicleEmiForm">
+                    <input type="hidden" id="veVehicleId">
+                    <div class="mb-2"><label class="form-label fw-bold" id="veVehicleLabel"></label></div>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Bank Name</label><input type="text" class="form-control glass-input" id="veBankName"></div>
+                        <div class="col-md-6"><label class="form-label">Account Number</label><input type="text" class="form-control glass-input" id="veAccountNo"></div>
+                        <div class="col-md-4"><label class="form-label">EMI Amount</label><input type="number" class="form-control glass-input" id="veEmiAmount" min="0"></div>
+                        <div class="col-md-4"><label class="form-label">EMI Day</label><input type="number" class="form-control glass-input" id="veEmiDay" min="1" max="31"></div>
+                        <div class="col-md-4"><label class="form-label">Loan Available</label><select class="form-select glass-input" id="veLoanAvailable"><option>Yes</option><option>No</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Start Date</label><input type="date" class="form-control glass-input" id="veStartDate"></div>
+                        <div class="col-md-6"><label class="form-label">End Date</label><input type="date" class="form-control glass-input" id="veEndDate"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveVehicleEmi()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -159,7 +185,7 @@ async function loadEMIs() {
                 var statusClass = e.Status==='Active'?'bg-success':'bg-secondary';
                 var daysClass=''; var daysText='-';
                 if (e.DaysLeft!==null && e.Status==='Active') { daysText=e.DaysLeft+' days'; if(e.DaysLeft<=3)daysClass='text-danger fw-bold'; else if(e.DaysLeft<=7)daysClass='text-warning fw-bold'; }
-                return '<tr><td class="fw-bold">'+e.VehicleNumber+'</td><td>'+(e.VehicleType||'-')+'</td><td>'+(e.BankName||'-')+'</td><td>'+(e.LoanAccountNumber||'-')+'</td><td class="fw-bold">₹'+Number(e.EMIAmount).toLocaleString('en-IN')+'</td><td>Day '+(e.EMIDate||'-')+'</td><td>'+(e.LoanStartDate||'-')+' to '+(e.LoanEndDate||'-')+'</td><td>'+(e.NextDue||'-')+'</td><td class="'+daysClass+'">'+daysText+'</td><td><span class="badge '+statusClass+'">'+e.Status+'</span></td><td><a href="/vehicles/details/'+e.VehicleID+'" class="btn btn-sm btn-outline-warning"><i class="bi bi-eye"></i></a></td></tr>';
+                return '<tr><td class="fw-bold">'+e.VehicleNumber+'</td><td>'+(e.VehicleType||'-')+'</td><td>'+(e.BankName||'-')+'</td><td>'+(e.LoanAccountNumber||'-')+'</td><td class="fw-bold">₹'+Number(e.EMIAmount).toLocaleString('en-IN')+'</td><td>Day '+(e.EMIDate||'-')+'</td><td>'+(e.LoanStartDate||'-')+' to '+(e.LoanEndDate||'-')+'</td><td>'+(e.NextDue||'-')+'</td><td class="'+daysClass+'">'+daysText+'</td><td><span class="badge '+statusClass+'">'+e.Status+'</span></td><td><button class="btn btn-sm btn-outline-warning viewer-hide" onclick=\'editVehicleEmi('+JSON.stringify(e)+')\'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger viewer-hide" onclick="deleteVehicleEmi(\''+e.VehicleID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
             }).join('');
         } else {
             vBody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No vehicle EMIs found</td></tr>';
@@ -264,6 +290,52 @@ async function deleteOtherEmi(id) {
         var res = await fetch('/emi/api/other/'+id, { method:'DELETE' });
         var data = await res.json();
         if (data.success) { showToast('EMI deleted','success'); loadEMIs(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+function editVehicleEmi(e) {
+    document.getElementById('veVehicleId').value = e.VehicleID;
+    document.getElementById('veVehicleLabel').textContent = e.VehicleNumber + ' — ' + (e.VehicleType||'');
+    document.getElementById('veBankName').value = e.BankName||'';
+    document.getElementById('veAccountNo').value = e.LoanAccountNumber||'';
+    document.getElementById('veEmiAmount').value = e.EMIAmount||'';
+    document.getElementById('veEmiDay').value = e.EMIDate||'';
+    document.getElementById('veLoanAvailable').value = 'Yes';
+    document.getElementById('veStartDate').value = e.LoanStartDate||'';
+    document.getElementById('veEndDate').value = e.LoanEndDate||'';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('vehicleEmiModal')).show();
+}
+
+async function saveVehicleEmi() {
+    var vid = document.getElementById('veVehicleId').value;
+    try {
+        var res = await fetch('/emi/api/vehicle-emi/'+vid, {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                BankName: document.getElementById('veBankName').value,
+                LoanAccountNumber: document.getElementById('veAccountNo').value,
+                EMIAmount: document.getElementById('veEmiAmount').value,
+                EMIDate: document.getElementById('veEmiDay').value,
+                LoanAvailable: document.getElementById('veLoanAvailable').value,
+                LoanStartDate: document.getElementById('veStartDate').value,
+                LoanEndDate: document.getElementById('veEndDate').value,
+            })
+        });
+        var data = await res.json();
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('vehicleEmiModal')).hide();
+            showToast('Vehicle EMI updated','success'); loadEMIs();
+        } else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+async function deleteVehicleEmi(vid) {
+    if (!confirm('Remove loan/EMI from this vehicle?')) return;
+    try {
+        var res = await fetch('/emi/api/vehicle-emi/'+vid, { method:'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('Loan removed','success'); loadEMIs(); }
         else { showToast(data.error||'Failed','danger'); }
     } catch(err) { showToast('Network error','danger'); }
 }
