@@ -59,6 +59,7 @@ async def list_emis(request: Request):
                 pass
             next_due, days_left = calc_next_due(emi_day) if status == "Active" else ("", None)
             vehicle_emis.append({
+                "VehicleID": v.get("VehicleID", ""),
                 "VehicleNumber": v.get("VehicleNumber", ""),
                 "VehicleType": v.get("VehicleType", ""),
                 "BankName": v.get("BankName", ""),

@@ -209,33 +209,20 @@ def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
 def append_row(sheet_name: str, row_data: list):
     ws = get_worksheet(sheet_name)
     ws.append_row(row_data, value_input_option="USER_ENTERED")
-    if sheet_name in _cache and sheet_name in SHEET_HEADERS:
-        headers = SHEET_HEADERS[sheet_name]
-        new_record = {headers[i]: row_data[i] if i < len(row_data) else "" for i in range(len(headers))}
-        _cache[sheet_name]["data"].append(new_record)
-    else:
-        invalidate_cache(sheet_name)
+    invalidate_cache(sheet_name)
 
 
 def update_row(sheet_name: str, row_num: int, row_data: list):
     ws = get_worksheet(sheet_name)
     col_end = chr(64 + len(row_data)) if len(row_data) <= 26 else "Z"
     ws.update(f"A{row_num}:{col_end}{row_num}", [row_data], value_input_option="USER_ENTERED")
-    if sheet_name in _cache and sheet_name in SHEET_HEADERS:
-        headers = SHEET_HEADERS[sheet_name]
-        idx = row_num - 2
-        if 0 <= idx < len(_cache[sheet_name]["data"]):
-            _cache[sheet_name]["data"][idx] = {headers[i]: row_data[i] if i < len(row_data) else "" for i in range(len(headers))}
-    else:
-        invalidate_cache(sheet_name)
+    invalidate_cache(sheet_name)
 
 
 def delete_row(sheet_name: str, row_num: int):
     ws = get_worksheet(sheet_name)
     ws.delete_rows(row_num)
-    if sheet_name in _cache:
-        idx = row_num - 2
-        if 0 <= idx < len(_cache[sheet_name]["data"]):
+    invalidate_cache(sheet_name)
             _cache[sheet_name]["data"].pop(idx)
     else:
         invalidate_cache(sheet_name)

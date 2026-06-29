@@ -20,8 +20,8 @@
     <h6 class="mb-3"><i class="bi bi-truck"></i> Vehicle EMIs</h6>
     <div class="table-responsive">
         <table class="table table-hover glass-table">
-            <thead><tr><th>Vehicle</th><th>Type</th><th>Bank</th><th>Account No</th><th>EMI Amount</th><th>EMI Day</th><th>Loan Period</th><th>Next Due</th><th>Days Left</th><th>Status</th></tr></thead>
-            <tbody id="vehicleEmiTable"><tr><td colspan="10" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            <thead><tr><th>Vehicle</th><th>Type</th><th>Bank</th><th>Account No</th><th>EMI Amount</th><th>EMI Day</th><th>Loan Period</th><th>Next Due</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="vehicleEmiTable"><tr><td colspan="11" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
         </table>
     </div>
 </div>
@@ -159,10 +159,10 @@ async function loadEMIs() {
                 var statusClass = e.Status==='Active'?'bg-success':'bg-secondary';
                 var daysClass=''; var daysText='-';
                 if (e.DaysLeft!==null && e.Status==='Active') { daysText=e.DaysLeft+' days'; if(e.DaysLeft<=3)daysClass='text-danger fw-bold'; else if(e.DaysLeft<=7)daysClass='text-warning fw-bold'; }
-                return '<tr><td class="fw-bold">'+e.VehicleNumber+'</td><td>'+(e.VehicleType||'-')+'</td><td>'+(e.BankName||'-')+'</td><td>'+(e.LoanAccountNumber||'-')+'</td><td class="fw-bold">₹'+Number(e.EMIAmount).toLocaleString('en-IN')+'</td><td>Day '+(e.EMIDate||'-')+'</td><td>'+(e.LoanStartDate||'-')+' to '+(e.LoanEndDate||'-')+'</td><td>'+(e.NextDue||'-')+'</td><td class="'+daysClass+'">'+daysText+'</td><td><span class="badge '+statusClass+'">'+e.Status+'</span></td></tr>';
+                return '<tr><td class="fw-bold">'+e.VehicleNumber+'</td><td>'+(e.VehicleType||'-')+'</td><td>'+(e.BankName||'-')+'</td><td>'+(e.LoanAccountNumber||'-')+'</td><td class="fw-bold">₹'+Number(e.EMIAmount).toLocaleString('en-IN')+'</td><td>Day '+(e.EMIDate||'-')+'</td><td>'+(e.LoanStartDate||'-')+' to '+(e.LoanEndDate||'-')+'</td><td>'+(e.NextDue||'-')+'</td><td class="'+daysClass+'">'+daysText+'</td><td><span class="badge '+statusClass+'">'+e.Status+'</span></td><td><a href="/vehicles/details/'+e.VehicleID+'" class="btn btn-sm btn-outline-warning"><i class="bi bi-eye"></i></a></td></tr>';
             }).join('');
         } else {
-            vBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No vehicle EMIs found</td></tr>';
+            vBody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No vehicle EMIs found</td></tr>';
         }
 
         allOtherEmis = data.other_emis || [];
