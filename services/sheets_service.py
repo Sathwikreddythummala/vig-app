@@ -197,12 +197,15 @@ def get_all_records(sheet_name: str) -> list[dict]:
 def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
     invalidate_cache(sheet_name)
     ws = get_worksheet(sheet_name)
-    records = ws.get_all_records()
-    _cache[sheet_name] = {"data": records, "ts": time.time()}
-    id_col = SHEET_HEADERS[sheet_name][0]
-    for idx, record in enumerate(records):
-        if str(record.get(id_col, "")) == id_value:
-            return idx + 2, record
+    all_values = ws.get_all_values()
+    if len(all_values) < 2:
+        return None
+    headers = SHEET_HEADERS[sheet_name]
+    for row_idx in range(1, len(all_values)):
+        row = all_values[row_idx]
+        if row and str(row[0]).strip() == str(id_value).strip():
+            record = {headers[i]: (row[i] if i < len(row) else "") for i in range(len(headers))}
+            return row_idx + 1, record
     return None
 
 
