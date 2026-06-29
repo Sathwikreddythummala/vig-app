@@ -29,6 +29,7 @@ class Settings:
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     SESSION_MAX_AGE: int = 86400
 
 

@@ -17,11 +17,14 @@ from services.drive_service import initialize_drive_folders
 async def lifespan(app: FastAPI):
     try:
         initialize_sheets()
-        initialize_drive_folders()
-        print("Google Sheets and Drive initialized successfully")
+        print("PostgreSQL database initialized successfully")
     except Exception as e:
-        print(f"Initialization warning: {e}")
-        print("Ensure credentials.json is present and SPREADSHEET_ID is set")
+        print(f"DB initialization warning: {e}")
+    try:
+        initialize_drive_folders()
+        print("Google Drive initialized successfully")
+    except Exception as e:
+        print(f"Drive initialization warning: {e}")
     yield
 
 

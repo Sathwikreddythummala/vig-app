@@ -1,35 +1,9 @@
-import gspread
-from google.oauth2.service_account import Credentials
 from config import settings
 from datetime import datetime
 import uuid
 import time
 import threading
-
-SCOPES = settings.SCOPES
-_client = None
-_spreadsheet = None
-_spreadsheet_ts = 0
-_SPREADSHEET_TTL = 300
-_ws_cache = {}
-
-
-def get_client() -> gspread.Client:
-    global _client
-    if _client is None:
-        creds = Credentials.from_service_account_file(settings.SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-        _client = gspread.authorize(creds)
-    return _client
-
-
-def get_spreadsheet():
-    global _spreadsheet, _spreadsheet_ts
-    now = time.time()
-    if _spreadsheet is None or (now - _spreadsheet_ts) > _SPREADSHEET_TTL:
-        _spreadsheet = get_client().open_by_key(settings.SPREADSHEET_ID)
-        _spreadsheet_ts = now
-        _ws_cache.clear()
-    return _spreadsheet
+from services.db import execute, initialize_db
 
 
 SHEET_HEADERS = {
@@ -128,37 +102,7 @@ SHEET_HEADERS = {
 
 
 def initialize_sheets():
-    ss = get_spreadsheet()
-    existing = [ws.title for ws in ss.worksheets()]
-    for sheet_name, headers in SHEET_HEADERS.items():
-        if sheet_name not in existing:
-            ws = ss.add_worksheet(title=sheet_name, rows=1000, cols=len(headers))
-            ws.update("A1", [headers])
-            ws.format("A1:{}1".format(chr(64 + len(headers))), {"textFormat": {"bold": True}})
-        else:
-            ws = ss.worksheet(sheet_name)
-            row1 = ws.row_values(1)
-            if row1 != headers:
-                if not row1:
-                    ws.update("A1", [headers])
-                else:
-                    records = ws.get_all_records()
-                    ws.clear()
-                    ws.update("A1", [headers])
-                    for record in records:
-                        row_data = [str(record.get(h, "")) for h in headers]
-                        ws.append_row(row_data, value_input_option="USER_ENTERED")
-                    try:
-                        ws.format("A1:{}1".format(chr(64 + min(len(headers), 26))), {"textFormat": {"bold": True}})
-                    except Exception:
-                        pass
-                    print(f"Updated headers for {sheet_name}")
-
-
-def get_worksheet(name: str):
-    if name not in _ws_cache:
-        _ws_cache[name] = get_spreadsheet().worksheet(name)
-    return _ws_cache[name]
+    initialize_db(SHEET_HEADERS)
 
 
 def gen_id(prefix: str) -> str:
@@ -174,7 +118,7 @@ def today_str() -> str:
 
 
 _cache = {}
-CACHE_TTL = 30
+CACHE_TTL = 5
 
 
 def invalidate_cache(sheet_name: str = ""):
@@ -187,26 +131,33 @@ def invalidate_cache(sheet_name: str = ""):
 def get_all_records(sheet_name: str) -> list[dict]:
     now = time.time()
     if sheet_name in _cache and (now - _cache[sheet_name]["ts"]) < CACHE_TTL:
-        return _cache[sheet_name]["data"]
-    ws = get_worksheet(sheet_name)
-    data = ws.get_all_records()
-    _cache[sheet_name] = {"data": data, "ts": now}
-    return data
-
-
-def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
-    invalidate_cache(sheet_name)
-    ws = get_worksheet(sheet_name)
-    all_values = ws.get_all_values()
-    if len(all_values) < 2:
-        return None
+        return list(_cache[sheet_name]["data"])
     headers = SHEET_HEADERS[sheet_name]
-    for row_idx in range(1, len(all_values)):
-        row = all_values[row_idx]
-        if row and str(row[0]).strip() == str(id_value).strip():
-            record = {headers[i]: (row[i] if i < len(row) else "") for i in range(len(headers))}
-            return row_idx + 1, record
-    return None
+    cols = ", ".join(f'"{h}"' for h in headers)
+    rows = execute(f'SELECT {cols} FROM "{sheet_name}"', fetch=True)
+    result = []
+    for row in rows:
+        record = {}
+        for h in headers:
+            val = row.get(h, "") or ""
+            record[h] = val
+        result.append(record)
+    _cache[sheet_name] = {"data": result, "ts": now}
+    return list(result)
+
+
+def find_row_by_id(sheet_name: str, id_value: str) -> tuple[str, dict] | None:
+    invalidate_cache(sheet_name)
+    headers = SHEET_HEADERS[sheet_name]
+    id_col = headers[0]
+    cols = ", ".join(f'"{h}"' for h in headers)
+    rows = execute(f'SELECT {cols} FROM "{sheet_name}" WHERE "{id_col}" = %s', (str(id_value).strip(),), fetch=True)
+    if not rows:
+        return None
+    record = {}
+    for h in headers:
+        record[h] = rows[0].get(h, "") or ""
+    return id_value, record
 
 
 def build_row(sheet_name: str, vals: dict) -> list:
@@ -214,28 +165,39 @@ def build_row(sheet_name: str, vals: dict) -> list:
 
 
 def append_row(sheet_name: str, row_data: list):
-    ws = get_worksheet(sheet_name)
-    ws.append_row(row_data, value_input_option="USER_ENTERED")
+    headers = SHEET_HEADERS[sheet_name]
+    cols = ", ".join(f'"{h}"' for h in headers)
+    placeholders = ", ".join(["%s"] * len(headers))
+    values = [str(row_data[i]) if i < len(row_data) else "" for i in range(len(headers))]
+    execute(f'INSERT INTO "{sheet_name}" ({cols}) VALUES ({placeholders})', values)
     invalidate_cache(sheet_name)
 
 
-def update_row(sheet_name: str, row_num: int, row_data: list):
-    ws = get_worksheet(sheet_name)
-    col_end = chr(64 + len(row_data)) if len(row_data) <= 26 else "Z"
-    ws.update(f"A{row_num}:{col_end}{row_num}", [row_data], value_input_option="USER_ENTERED")
+def update_row(sheet_name: str, row_id, row_data: list):
+    headers = SHEET_HEADERS[sheet_name]
+    id_col = headers[0]
+    entity_id = str(row_id) if isinstance(row_id, str) else str(row_data[0])
+    set_clause = ", ".join(f'"{h}" = %s' for h in headers)
+    values = [str(row_data[i]) if i < len(row_data) else "" for i in range(len(headers))]
+    values.append(entity_id)
+    execute(f'UPDATE "{sheet_name}" SET {set_clause} WHERE "{id_col}" = %s', values)
     invalidate_cache(sheet_name)
 
 
-def delete_row(sheet_name: str, row_num: int):
-    ws = get_worksheet(sheet_name)
-    ws.delete_rows(row_num)
+def delete_row(sheet_name: str, row_id):
+    headers = SHEET_HEADERS[sheet_name]
+    id_col = headers[0]
+    execute(f'DELETE FROM "{sheet_name}" WHERE "{id_col}" = %s', (str(row_id),))
     invalidate_cache(sheet_name)
 
 
 def _write_audit_log(row_data):
     try:
-        ws = get_worksheet("AuditLogs")
-        ws.append_row(row_data, value_input_option="USER_ENTERED")
+        headers = SHEET_HEADERS["AuditLogs"]
+        cols = ", ".join(f'"{h}"' for h in headers)
+        placeholders = ", ".join(["%s"] * len(headers))
+        values = [str(row_data[i]) if i < len(row_data) else "" for i in range(len(headers))]
+        execute(f'INSERT INTO "AuditLogs" ({cols}) VALUES ({placeholders})', values)
     except Exception:
         pass
 
