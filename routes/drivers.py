@@ -213,28 +213,31 @@ async def add_driver(request: Request):
             if str(d.get("DrivingLicenseNumber", "")).strip().upper() == lic:
                 return JSONResponse({"error": "Driving license number already exists"}, 400)
     did = gen_id("DRV")
-    row = [
-        did,
-        data.get("EmployeeType", "Driver"),
-        data.get("DriverName", ""),
-        data.get("Email", ""),
-        data.get("MobileNumber", ""),
-        data.get("EmergencyContact", ""),
-        data.get("Address", ""),
-        data.get("AadhaarNumber", ""),
-        data.get("DrivingLicenseNumber", ""),
-        data.get("LicenseExpiryDate", ""),
-        data.get("BankName", ""),
-        data.get("AccountNumber", ""),
-        data.get("IFSCCode", ""),
-        data.get("Salary", ""),
-        data.get("JoiningDate", ""),
-        data.get("Status", "Active"),
-        data.get("ExitDate", ""),
-        data.get("AssignedVehicle", ""),
-        now_str(),
-        now_str(),
-    ]
+    from services.sheets_service import SHEET_HEADERS
+    headers = SHEET_HEADERS["Drivers"]
+    vals = {
+        "DriverID": did,
+        "EmployeeType": data.get("EmployeeType", "Driver"),
+        "DriverName": data.get("DriverName", ""),
+        "Email": data.get("Email", ""),
+        "MobileNumber": data.get("MobileNumber", ""),
+        "EmergencyContact": data.get("EmergencyContact", ""),
+        "Address": data.get("Address", ""),
+        "AadhaarNumber": data.get("AadhaarNumber", ""),
+        "DrivingLicenseNumber": data.get("DrivingLicenseNumber", ""),
+        "LicenseExpiryDate": data.get("LicenseExpiryDate", ""),
+        "BankName": data.get("BankName", ""),
+        "AccountNumber": data.get("AccountNumber", ""),
+        "IFSCCode": data.get("IFSCCode", ""),
+        "Salary": data.get("Salary", ""),
+        "JoiningDate": data.get("JoiningDate", ""),
+        "Status": data.get("Status", "Active"),
+        "ExitDate": data.get("ExitDate", ""),
+        "AssignedVehicle": data.get("AssignedVehicle", ""),
+        "CreatedDate": now_str(),
+        "UpdatedDate": now_str(),
+    }
+    row = [vals.get(h, "") for h in headers]
     append_row("Drivers", row)
     new_vehicle = str(data.get("AssignedVehicle", "")).strip()
     if new_vehicle:
@@ -271,31 +274,33 @@ async def update_driver(request: Request, driver_id: str):
         for d in drivers:
             if str(d.get("DrivingLicenseNumber", "")).strip().upper() == lic and str(d.get("DriverID", "")) != driver_id:
                 return JSONResponse({"error": "Driving license number already exists"}, 400)
-    row = [
-        driver_id,
-        data.get("EmployeeType", existing.get("EmployeeType", "Driver")),
-        data.get("DriverName", ""),
-        data.get("Email", existing.get("Email", "")),
-        data.get("MobileNumber", ""),
-        data.get("EmergencyContact", ""),
-        data.get("Address", ""),
-        data.get("AadhaarNumber", ""),
-        data.get("DrivingLicenseNumber", ""),
-        data.get("LicenseExpiryDate", ""),
-        data.get("BankName", ""),
-        data.get("AccountNumber", ""),
-        data.get("IFSCCode", ""),
-        data.get("Salary", ""),
-        data.get("JoiningDate", ""),
-        data.get("Status", data.get("Status", "Active")),
-        data.get("ExitDate", existing.get("ExitDate", "")),
-        data.get("AssignedVehicle", ""),
-        existing.get("CreatedDate", now_str()),
-        now_str(),
-    ]
-    exit_date = str(data.get("ExitDate", "")).strip()
-    if exit_date:
-        row[15] = "Inactive"
+    from services.sheets_service import SHEET_HEADERS
+    headers = SHEET_HEADERS["Drivers"]
+    exit_date = str(data.get("ExitDate", existing.get("ExitDate", ""))).strip()
+    status = "Inactive" if exit_date else data.get("Status", existing.get("Status", "Active"))
+    vals = {
+        "DriverID": driver_id,
+        "EmployeeType": data.get("EmployeeType", existing.get("EmployeeType", "Driver")),
+        "DriverName": data.get("DriverName", ""),
+        "Email": data.get("Email", existing.get("Email", "")),
+        "MobileNumber": data.get("MobileNumber", ""),
+        "EmergencyContact": data.get("EmergencyContact", ""),
+        "Address": data.get("Address", ""),
+        "AadhaarNumber": data.get("AadhaarNumber", ""),
+        "DrivingLicenseNumber": data.get("DrivingLicenseNumber", ""),
+        "LicenseExpiryDate": data.get("LicenseExpiryDate", ""),
+        "BankName": data.get("BankName", ""),
+        "AccountNumber": data.get("AccountNumber", ""),
+        "IFSCCode": data.get("IFSCCode", ""),
+        "Salary": data.get("Salary", ""),
+        "JoiningDate": data.get("JoiningDate", ""),
+        "Status": status,
+        "ExitDate": exit_date,
+        "AssignedVehicle": data.get("AssignedVehicle", ""),
+        "CreatedDate": existing.get("CreatedDate", now_str()),
+        "UpdatedDate": now_str(),
+    }
+    row = [vals.get(h, "") for h in headers]
     update_row("Drivers", row_num, row)
     old_vehicle = str(existing.get("AssignedVehicle", "")).strip()
     new_vehicle = str(data.get("AssignedVehicle", "")).strip()
