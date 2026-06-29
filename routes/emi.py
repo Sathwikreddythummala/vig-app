@@ -127,25 +127,9 @@ async def add_other_emi(request: Request):
     }):
         return JSONResponse({"error": "Duplicate EMI already exists"}, 400)
     eid = gen_id("EMI")
-    row = [
-        eid,
-        data.get("EMIName", ""),
-        data.get("Category", ""),
-        data.get("Description", ""),
-        data.get("VehicleNumber", ""),
-        data.get("LenderName", ""),
-        data.get("TotalAmount", ""),
-        data.get("DownPayment", "0"),
-        data.get("EMIAmount", ""),
-        data.get("EMIDate", ""),
-        data.get("StartDate", ""),
-        data.get("EndDate", ""),
-        data.get("TotalInstallments", ""),
-        data.get("PaidInstallments", "0"),
-        data.get("Status", "Active"),
-        now_str(),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "EMIID": eid, "DownPayment": data.get("DownPayment", "0"), "PaidInstallments": data.get("PaidInstallments", "0"), "Status": data.get("Status", "Active"), "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    row = build_row("OtherEMIs", vals)
     append_row("OtherEMIs", row)
     add_audit_log("CREATE", "OtherEMIs", eid, f"Other EMI '{data.get('EMIName','')}' added", user["email"])
     return {"success": True, "emi_id": eid}
@@ -161,25 +145,9 @@ async def update_other_emi(request: Request, emi_id: str):
     if not result:
         return JSONResponse({"error": "EMI not found"}, 404)
     row_num, existing = result
-    row = [
-        emi_id,
-        data.get("EMIName", ""),
-        data.get("Category", ""),
-        data.get("Description", ""),
-        data.get("VehicleNumber", ""),
-        data.get("LenderName", ""),
-        data.get("TotalAmount", ""),
-        data.get("DownPayment", existing.get("DownPayment", "0")),
-        data.get("EMIAmount", ""),
-        data.get("EMIDate", ""),
-        data.get("StartDate", ""),
-        data.get("EndDate", ""),
-        data.get("TotalInstallments", ""),
-        data.get("PaidInstallments", data.get("PaidInstallments", "0")),
-        data.get("Status", "Active"),
-        existing.get("CreatedDate", now_str()),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "EMIID": emi_id, "Status": data.get("Status", existing.get("Status", "Active")), "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    row = build_row("OtherEMIs", vals)
     update_row("OtherEMIs", row_num, row)
     add_audit_log("UPDATE", "OtherEMIs", emi_id, f"Other EMI '{data.get('EMIName','')}' updated", user["email"])
     return {"success": True}

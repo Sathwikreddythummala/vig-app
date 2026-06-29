@@ -106,18 +106,9 @@ async def add_purse(request: Request):
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
     pid = gen_id("PRS")
-    row = [
-        pid,
-        data.get("Date", ""),
-        data.get("Holder", ""),
-        data.get("Type", "Credit"),
-        data.get("Amount", 0),
-        data.get("Description", ""),
-        data.get("VehicleNumber", ""),
-        data.get("Category", ""),
-        "",
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "PurseID": pid, "Type": data.get("Type", "Credit"), "ReferenceID": "", "CreatedDate": now_str()}
+    row = build_row("Purse", vals)
     append_row("Purse", row)
     add_audit_log("CREATE", "Purse", pid, f"{data.get('Type','')} ₹{data.get('Amount',0)} to {data.get('Holder','')}", user["email"])
     return {"success": True}

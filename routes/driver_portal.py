@@ -102,19 +102,9 @@ async def add_diesel(request: Request):
     }):
         return JSONResponse({"error": "Duplicate entry already exists"}, 400)
     fid = gen_id("FUEL")
-    row = [
-        fid,
-        data.get("Date", datetime.now().strftime("%Y-%m-%d")),
-        vehicle,
-        user.get("driver_name", ""),
-        data.get("FuelType", "Diesel"),
-        data.get("Litres", ""),
-        data.get("Amount", 0),
-        data.get("Kilometre", ""),
-        data.get("FuelStation", ""),
-        data.get("PaymentMode", "Cash"),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {"FuelID": fid, "EntryDate": data.get("Date", datetime.now().strftime("%Y-%m-%d")), "VehicleNumber": vehicle, "DriverName": user.get("driver_name", ""), "FuelType": data.get("FuelType", "Diesel"), "Litres": data.get("Litres", ""), "Amount": data.get("Amount", 0), "Kilometre": data.get("Kilometre", ""), "FuelStation": data.get("FuelStation", ""), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
+    row = build_row("FuelEntries", vals)
     append_row("FuelEntries", row)
     add_audit_log("CREATE", "FuelEntries", fid,
                   f"Fuel ₹{data.get('Amount',0)} by driver {user.get('driver_name','')}",

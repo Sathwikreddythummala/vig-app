@@ -109,21 +109,9 @@ async def add_expense(request: Request):
     for_month = data.get("ForMonth", "")
     if not for_month:
         for_month = str(data.get("ExpenseDate", ""))[:7]
-    row = [
-        eid,
-        data.get("ExpenseDate", ""),
-        for_month,
-        data.get("ExpenseFor", "Vehicle Expense"),
-        data.get("VehicleNumber", ""),
-        data.get("DriverName", ""),
-        data.get("Category", ""),
-        data.get("SubCategory", ""),
-        data.get("Description", ""),
-        data.get("Amount", 0),
-        data.get("PaymentMode", "Cash"),
-        data.get("PaidBy", ""),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "ExpenseID": eid, "ForMonth": for_month, "ExpenseFor": data.get("ExpenseFor", "Vehicle Expense"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
+    row = build_row("Expenses", vals)
     append_row("Expenses", row)
     add_audit_log("CREATE", "Expenses", eid, f"Expense ₹{data.get('Amount',0)} added for {data.get('VehicleNumber','')}", user["email"])
     return {"success": True, "expense_id": eid}
@@ -142,21 +130,9 @@ async def update_expense(request: Request, expense_id: str):
     for_month = data.get("ForMonth", "")
     if not for_month:
         for_month = existing.get("ForMonth", str(data.get("ExpenseDate", ""))[:7])
-    row = [
-        expense_id,
-        data.get("ExpenseDate", ""),
-        for_month,
-        data.get("ExpenseFor", "Vehicle Expense"),
-        data.get("VehicleNumber", ""),
-        data.get("DriverName", ""),
-        data.get("Category", ""),
-        data.get("SubCategory", ""),
-        data.get("Description", ""),
-        data.get("Amount", 0),
-        data.get("PaymentMode", "Cash"),
-        data.get("PaidBy", ""),
-        existing.get("CreatedDate", now_str()),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "ExpenseID": expense_id, "ForMonth": for_month, "ExpenseFor": data.get("ExpenseFor", "Vehicle Expense"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": existing.get("CreatedDate", now_str())}
+    row = build_row("Expenses", vals)
     update_row("Expenses", row_num, row)
     add_audit_log("UPDATE", "Expenses", expense_id, f"Expense updated to ₹{data.get('Amount',0)}", user["email"])
     return {"success": True}

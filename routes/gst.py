@@ -117,15 +117,9 @@ async def add_purchase(request: Request):
         cgst = float(data["CGST"])
     total = round(amt + sgst + cgst, 2)
     pid = gen_id("GST")
-    row = [
-        pid,
-        data.get("InvoiceDate", ""),
-        data.get("InvoiceNumber", ""),
-        data.get("CompanyName", ""),
-        amt, sgst, cgst, total,
-        data.get("Description", ""),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "PurchaseID": pid, "Amount": amt, "SGST": sgst, "CGST": cgst, "TotalAmount": total, "CreatedDate": now_str()}
+    row = build_row("GSTpurchases", vals)
     append_row("GSTpurchases", row)
     add_audit_log("CREATE", "GSTpurchases", pid, f"GST Purchase ₹{total} from {data.get('CompanyName','')}", user["email"])
     return {"success": True, "purchase_id": pid}
@@ -149,15 +143,9 @@ async def update_purchase(request: Request, purchase_id: str):
     if data.get("CGST"):
         cgst = float(data["CGST"])
     total = round(amt + sgst + cgst, 2)
-    row = [
-        purchase_id,
-        data.get("InvoiceDate", ""),
-        data.get("InvoiceNumber", ""),
-        data.get("CompanyName", ""),
-        amt, sgst, cgst, total,
-        data.get("Description", ""),
-        existing.get("CreatedDate", now_str()),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "PurchaseID": purchase_id, "Amount": amt, "SGST": sgst, "CGST": cgst, "TotalAmount": total, "CreatedDate": existing.get("CreatedDate", now_str())}
+    row = build_row("GSTpurchases", vals)
     update_row("GSTpurchases", row_num, row)
     add_audit_log("UPDATE", "GSTpurchases", purchase_id, f"GST Purchase updated ₹{total}", user["email"])
     return {"success": True}

@@ -111,14 +111,9 @@ async def add_bill(request: Request):
     total = round(sub_total + sgst + cgst - tds, 2)
     inv_num = data.get("InvoiceNumber", "") or next_invoice_number()
     bid = gen_id("BILL")
-    row = [
-        bid, inv_num, data.get("InvoiceDate", ""),
-        data.get("VehicleNumber", ""), data.get("VendorName", ""),
-        fixed, variable, challan, tolls,
-        sub_total, sgst, cgst, tds, total,
-        "Pending", 0, total,
-        data.get("Description", ""), now_str(), now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "BillID": bid, "InvoiceNumber": inv_num, "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": "Pending", "PaidAmount": 0, "BalanceAmount": total, "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    row = build_row("Billing", vals)
     append_row("Billing", row)
     add_audit_log("CREATE", "Billing", bid, f"Bill {inv_num} ₹{total} for {data.get('VendorName','')}", user["email"])
     return {"success": True, "bill_id": bid, "invoice_number": inv_num}
@@ -146,15 +141,9 @@ async def update_bill(request: Request, bill_id: str):
     paid = float(existing.get("PaidAmount", 0) or 0)
     balance = total - paid
     status = "Paid" if balance <= 0 else "Partial" if paid > 0 else "Pending"
-    row = [
-        bill_id, data.get("InvoiceNumber", existing.get("InvoiceNumber", "")),
-        data.get("InvoiceDate", ""),
-        data.get("VehicleNumber", ""), data.get("VendorName", ""),
-        fixed, variable, challan, tolls,
-        sub_total, sgst, cgst, tds, total,
-        status, paid, balance,
-        data.get("Description", ""), existing.get("CreatedDate", now_str()), now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "BillID": bill_id, "InvoiceNumber": data.get("InvoiceNumber", existing.get("InvoiceNumber", "")), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    row = build_row("Billing", vals)
     update_row("Billing", row_num, row)
     add_audit_log("UPDATE", "Billing", bill_id, f"Bill updated ₹{total}", user["email"])
     return {"success": True}
@@ -195,12 +184,9 @@ async def add_receivable(request: Request):
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
     rid = gen_id("RCV")
-    row = [
-        rid, data.get("ReceiveDate", ""), data.get("BillID", ""),
-        data.get("VendorName", ""), data.get("Amount", 0),
-        data.get("PaymentMode", "Bank Transfer"), data.get("ReferenceNumber", ""),
-        data.get("Description", ""), now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "ReceivableID": rid, "PaymentMode": data.get("PaymentMode", "Bank Transfer"), "CreatedDate": now_str()}
+    row = build_row("Receivables", vals)
     append_row("Receivables", row)
     add_audit_log("CREATE", "Receivables", rid, f"Received ₹{data.get('Amount',0)} from {data.get('VendorName','')}", user["email"])
     if data.get("BillID"):

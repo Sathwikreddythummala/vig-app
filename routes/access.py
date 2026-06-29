@@ -48,12 +48,9 @@ async def add_user(request: Request):
         if str(u.get("Email", "")).strip().lower() == email:
             return JSONResponse({"error": "User already exists"}, 400)
     uid = gen_id("USR")
-    row = [
-        uid, email, data.get("Name", ""),
-        data.get("Role", "viewer"),
-        data.get("Status", "Active"),
-        now_str(), now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {"UserID": uid, "Email": email, "Name": data.get("Name", ""), "Role": data.get("Role", "viewer"), "Status": data.get("Status", "Active"), "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    row = build_row("Users", vals)
     append_row("Users", row)
     add_audit_log("CREATE", "Users", uid, f"User {email} added as {data.get('Role','viewer')}", user["email"])
     return {"success": True, "user_id": uid}
@@ -69,15 +66,9 @@ async def update_user(request: Request, user_id: str):
     if not result:
         return JSONResponse({"error": "User not found"}, 404)
     row_num, existing = result
-    row = [
-        user_id,
-        data.get("Email", existing.get("Email", "")),
-        data.get("Name", existing.get("Name", "")),
-        data.get("Role", existing.get("Role", "viewer")),
-        data.get("Status", existing.get("Status", "Active")),
-        existing.get("CreatedDate", now_str()),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "UserID": user_id, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    row = build_row("Users", vals)
     update_row("Users", row_num, row)
     add_audit_log("UPDATE", "Users", user_id, f"User {data.get('Email','')} role changed to {data.get('Role','')}", user["email"])
     return {"success": True}

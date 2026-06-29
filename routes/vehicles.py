@@ -108,33 +108,9 @@ async def add_vehicle(request: Request):
                 continue
             return JSONResponse({"error": "Vehicle number already exists"}, 400)
     vid = gen_id("VEH")
-    row = [
-        vid,
-        str(data.get("VehicleNumber", "")).strip().upper(),
-        data.get("VehicleType", ""),
-        data.get("DefaultDriver", ""),
-        data.get("DefaultVendor", ""),
-        data.get("VehicleStatus", "Active"),
-        data.get("RCNumber", ""),
-        data.get("RCExpiry", ""),
-        data.get("InsurancePolicyNumber", ""),
-        data.get("InsuranceCompany", ""),
-        data.get("InsuranceStartDate", ""),
-        data.get("InsuranceExpiryDate", ""),
-        data.get("PermitNumber", ""),
-        data.get("PermitExpiryDate", ""),
-        data.get("FitnessExpiryDate", ""),
-        data.get("PUCExpiryDate", ""),
-        data.get("LoanAvailable", "No"),
-        data.get("BankName", ""),
-        data.get("LoanAccountNumber", ""),
-        data.get("EMIAmount", ""),
-        data.get("EMIDate", ""),
-        data.get("LoanStartDate", ""),
-        data.get("LoanEndDate", ""),
-        now_str(),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "VehicleID": vid, "VehicleNumber": str(data.get("VehicleNumber", "")).strip().upper(), "VehicleStatus": data.get("VehicleStatus", "Active"), "LoanAvailable": data.get("LoanAvailable", "No"), "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    row = build_row("Vehicles", vals)
     append_row("Vehicles", row)
     add_audit_log("CREATE", "Vehicles", vid, f"Vehicle {data.get('VehicleNumber','')} added", user["email"])
     return {"success": True, "vehicle_id": vid}
@@ -155,33 +131,9 @@ async def update_vehicle(request: Request, vehicle_id: str):
     for v in vehicles:
         if str(v.get("VehicleNumber", "")).strip().upper() == new_num and str(v.get("VehicleID", "")) != vehicle_id:
             return JSONResponse({"error": "Vehicle number already exists"}, 400)
-    row = [
-        vehicle_id,
-        new_num,
-        data.get("VehicleType", ""),
-        data.get("DefaultDriver", ""),
-        data.get("DefaultVendor", ""),
-        data.get("VehicleStatus", existing.get("VehicleStatus", "Active")),
-        data.get("RCNumber", ""),
-        data.get("RCExpiry", ""),
-        data.get("InsurancePolicyNumber", ""),
-        data.get("InsuranceCompany", ""),
-        data.get("InsuranceStartDate", ""),
-        data.get("InsuranceExpiryDate", ""),
-        data.get("PermitNumber", ""),
-        data.get("PermitExpiryDate", ""),
-        data.get("FitnessExpiryDate", ""),
-        data.get("PUCExpiryDate", ""),
-        data.get("LoanAvailable", "No"),
-        data.get("BankName", ""),
-        data.get("LoanAccountNumber", ""),
-        data.get("EMIAmount", ""),
-        data.get("EMIDate", ""),
-        data.get("LoanStartDate", ""),
-        data.get("LoanEndDate", ""),
-        existing.get("CreatedDate", now_str()),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "VehicleID": vehicle_id, "VehicleNumber": new_num, "VehicleStatus": data.get("VehicleStatus", existing.get("VehicleStatus", "Active")), "LoanAvailable": data.get("LoanAvailable", existing.get("LoanAvailable", "No")), "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    row = build_row("Vehicles", vals)
     update_row("Vehicles", row_num, row)
     add_audit_log("UPDATE", "Vehicles", vehicle_id, f"Vehicle {new_num} updated", user["email"])
     return {"success": True}

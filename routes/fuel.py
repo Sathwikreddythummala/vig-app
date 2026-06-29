@@ -119,19 +119,9 @@ async def add_fuel(request: Request):
     }):
         return JSONResponse({"error": "Duplicate entry already exists"}, 400)
     fid = gen_id("FUEL")
-    row = [
-        fid,
-        data.get("EntryDate", ""),
-        data.get("VehicleNumber", ""),
-        data.get("DriverName", ""),
-        data.get("FuelType", "Diesel"),
-        data.get("Litres", ""),
-        data.get("Amount", 0),
-        data.get("Kilometre", ""),
-        data.get("FuelStation", ""),
-        data.get("PaymentMode", "Cash"),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "FuelID": fid, "FuelType": data.get("FuelType", "Diesel"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
+    row = build_row("FuelEntries", vals)
     append_row("FuelEntries", row)
     add_audit_log("CREATE", "FuelEntries", fid, f"Fuel ₹{data.get('Amount',0)} for {data.get('VehicleNumber','')}", user["email"])
     return {"success": True, "fuel_id": fid}
@@ -147,19 +137,9 @@ async def update_fuel(request: Request, fuel_id: str):
     if not result:
         return JSONResponse({"error": "Entry not found"}, 404)
     row_num, existing = result
-    row = [
-        fuel_id,
-        data.get("EntryDate", ""),
-        data.get("VehicleNumber", ""),
-        data.get("DriverName", ""),
-        data.get("FuelType", "Diesel"),
-        data.get("Litres", ""),
-        data.get("Amount", 0),
-        data.get("Kilometre", ""),
-        data.get("FuelStation", ""),
-        data.get("PaymentMode", "Cash"),
-        existing.get("CreatedDate", now_str()),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "FuelID": fuel_id, "FuelType": data.get("FuelType", "Diesel"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": existing.get("CreatedDate", now_str())}
+    row = build_row("FuelEntries", vals)
     update_row("FuelEntries", row_num, row)
     add_audit_log("UPDATE", "FuelEntries", fuel_id, f"Fuel entry updated ₹{data.get('Amount',0)}", user["email"])
     return {"success": True}

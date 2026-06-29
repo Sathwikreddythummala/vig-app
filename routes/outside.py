@@ -47,9 +47,9 @@ async def add_outside_vehicle(request: Request):
         if str(v.get("VehicleNumber", "")).strip().upper() == vnum:
             return JSONResponse({"error": "Vehicle already exists"}, 400)
     vid = gen_id("OV")
-    row = [vid, vnum, data.get("OwnerName", ""), data.get("MobileNumber", ""),
-           data.get("BankName", ""), data.get("AccountNumber", ""), data.get("IFSCCode", ""),
-           data.get("Status", "Active"), now_str(), now_str()]
+    from services.sheets_service import build_row
+    vals = {**data, "OVID": vid, "VehicleNumber": vnum, "Status": data.get("Status", "Active"), "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    row = build_row("OutsideVehicles", vals)
     append_row("OutsideVehicles", row)
     add_audit_log("CREATE", "OutsideVehicles", vid, f"Outside vehicle {vnum} added", user["email"])
     return {"success": True, "ov_id": vid}
@@ -65,10 +65,9 @@ async def update_outside_vehicle(request: Request, ov_id: str):
     if not result:
         return JSONResponse({"error": "Not found"}, 404)
     row_num, existing = result
-    row = [ov_id, str(data.get("VehicleNumber", "")).strip().upper(),
-           data.get("OwnerName", ""), data.get("MobileNumber", ""),
-           data.get("BankName", ""), data.get("AccountNumber", ""), data.get("IFSCCode", ""),
-           data.get("Status", "Active"), existing.get("CreatedDate", now_str()), now_str()]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "OVID": ov_id, "VehicleNumber": str(data.get("VehicleNumber", "")).strip().upper(), "Status": data.get("Status", existing.get("Status", "Active")), "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    row = build_row("OutsideVehicles", vals)
     update_row("OutsideVehicles", row_num, row)
     add_audit_log("UPDATE", "OutsideVehicles", ov_id, f"Outside vehicle updated", user["email"])
     return {"success": True}
@@ -164,11 +163,9 @@ async def add_transaction(request: Request):
     if not for_month:
         for_month = str(data.get("Date", ""))[:7]
     tid = gen_id("OTX")
-    row = [tid, data.get("Date", ""), for_month,
-           data.get("VehicleNumber", ""), owner,
-           data.get("Type", ""), data.get("Category", ""),
-           data.get("Description", ""), data.get("Amount", 0),
-           data.get("PaymentMode", "Cash"), now_str()]
+    from services.sheets_service import build_row
+    vals = {**data, "TransID": tid, "ForMonth": for_month, "OwnerName": owner, "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
+    row = build_row("OutsideTransactions", vals)
     append_row("OutsideTransactions", row)
     add_audit_log("CREATE", "OutsideTransactions", tid,
                   f"{data.get('Type','')} ₹{data.get('Amount',0)} for {data.get('VehicleNumber','')}", user["email"])

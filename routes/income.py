@@ -132,25 +132,9 @@ async def add_income(request: Request):
         rate = float(data.get("Rate", 0) or 0)
         if qty and rate:
             amount = qty * rate
-    row = [
-        iid,
-        data.get("IncomeDate", ""),
-        data.get("VehicleNumber", ""),
-        data.get("DriverName", ""),
-        data.get("VendorName", ""),
-        data.get("TripFrom", ""),
-        data.get("TripTo", ""),
-        data.get("Material", ""),
-        data.get("Quantity", ""),
-        data.get("Unit", ""),
-        data.get("Rate", ""),
-        amount,
-        data.get("InvoiceNumber", ""),
-        data.get("PaymentStatus", "Pending"),
-        data.get("PaymentDate", ""),
-        data.get("Description", ""),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "IncomeID": iid, "Amount": amount, "PaymentStatus": data.get("PaymentStatus", "Pending"), "CreatedDate": now_str()}
+    row = build_row("Income", vals)
     append_row("Income", row)
     add_audit_log("CREATE", "Income", iid, f"Income ₹{amount} from {data.get('VendorName','')}", user["email"])
     return {"success": True, "income_id": iid}
@@ -172,25 +156,9 @@ async def update_income(request: Request, income_id: str):
         rate = float(data.get("Rate", 0) or 0)
         if qty and rate:
             amount = qty * rate
-    row = [
-        income_id,
-        data.get("IncomeDate", ""),
-        data.get("VehicleNumber", ""),
-        data.get("DriverName", ""),
-        data.get("VendorName", ""),
-        data.get("TripFrom", ""),
-        data.get("TripTo", ""),
-        data.get("Material", ""),
-        data.get("Quantity", ""),
-        data.get("Unit", ""),
-        data.get("Rate", ""),
-        amount,
-        data.get("InvoiceNumber", ""),
-        data.get("PaymentStatus", "Pending"),
-        data.get("PaymentDate", ""),
-        data.get("Description", ""),
-        existing.get("CreatedDate", now_str()),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "IncomeID": income_id, "Amount": amount, "PaymentStatus": data.get("PaymentStatus", existing.get("PaymentStatus", "Pending")), "CreatedDate": existing.get("CreatedDate", now_str())}
+    row = build_row("Income", vals)
     update_row("Income", row_num, row)
     add_audit_log("UPDATE", "Income", income_id, f"Income updated to ₹{amount}", user["email"])
     return {"success": True}

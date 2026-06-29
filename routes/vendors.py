@@ -44,17 +44,9 @@ async def add_vendor(request: Request):
         if str(v.get("VendorName", "")).strip().lower() == name.lower():
             return JSONResponse({"error": "Vendor already exists"}, 400)
     vid = gen_id("VND")
-    row = [
-        vid, name,
-        data.get("ContactPerson", ""),
-        data.get("MobileNumber", ""),
-        data.get("Email", ""),
-        data.get("Address", ""),
-        data.get("GSTNumber", ""),
-        data.get("PaymentTerms", ""),
-        data.get("Status", "Active"),
-        now_str(), now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**data, "VendorID": vid, "VendorName": name, "Status": data.get("Status", "Active"), "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    row = build_row("Vendors", vals)
     append_row("Vendors", row)
     add_audit_log("CREATE", "Vendors", vid, f"Vendor '{name}' added", user["email"])
     return {"success": True, "vendor_id": vid}
@@ -70,19 +62,9 @@ async def update_vendor(request: Request, vendor_id: str):
     if not result:
         return JSONResponse({"error": "Vendor not found"}, 404)
     row_num, existing = result
-    row = [
-        vendor_id,
-        data.get("VendorName", ""),
-        data.get("ContactPerson", ""),
-        data.get("MobileNumber", ""),
-        data.get("Email", ""),
-        data.get("Address", ""),
-        data.get("GSTNumber", ""),
-        data.get("PaymentTerms", ""),
-        data.get("Status", "Active"),
-        existing.get("CreatedDate", now_str()),
-        now_str(),
-    ]
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "VendorID": vendor_id, "Status": data.get("Status", existing.get("Status", "Active")), "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    row = build_row("Vendors", vals)
     update_row("Vendors", row_num, row)
     add_audit_log("UPDATE", "Vendors", vendor_id, f"Vendor '{data.get('VendorName','')}' updated", user["email"])
     return {"success": True}

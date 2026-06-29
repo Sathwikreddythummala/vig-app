@@ -209,6 +209,10 @@ def find_row_by_id(sheet_name: str, id_value: str) -> tuple[int, dict] | None:
     return None
 
 
+def build_row(sheet_name: str, vals: dict) -> list:
+    return [str(vals.get(h, "")) for h in SHEET_HEADERS[sheet_name]]
+
+
 def append_row(sheet_name: str, row_data: list):
     ws = get_worksheet(sheet_name)
     ws.append_row(row_data, value_input_option="USER_ENTERED")
