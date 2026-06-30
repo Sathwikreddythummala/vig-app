@@ -2,48 +2,80 @@
 {% block title %}Dashboard - Vigneshwara Enterprises{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block content %}
-<div class="row g-3 mb-4">
+<!-- Month Selector -->
+<div class="glass-card mb-4 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="changeMonth(-1)"><i class="bi bi-chevron-left"></i></button>
+            <input type="month" class="form-control glass-input" id="dashMonth" style="width:180px" onchange="loadAll()">
+            <button class="btn btn-outline-warning btn-sm" onclick="changeMonth(1)"><i class="bi bi-chevron-right"></i></button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="goToday()"><i class="bi bi-calendar-check"></i> This Month</button>
+        </div>
+        <span id="monthLabel" class="fw-bold text-warning fs-5"></span>
+    </div>
+</div>
+
+<!-- Row 1: Billing Stats -->
+<div class="row g-3 mb-3">
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.05s">
+            <div class="stat-icon" style="background:#28a745"><i class="bi bi-receipt"></i></div>
+            <div class="stat-info"><small>Total Billed</small><h3 id="statBilled">₹0</h3></div>
+        </div>
+    </div>
     <div class="col-xl-3 col-md-6">
         <div class="glass-card stat-card animate-in" style="animation-delay:0.1s">
-            <div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div>
-            <div class="stat-info">
-                <small>Today's Expense</small>
-                <h3 id="statToday">₹0</h3>
-            </div>
+            <div class="stat-icon" style="background:#17a2b8"><i class="bi bi-cash-coin"></i></div>
+            <div class="stat-info"><small>Amount Received</small><h3 id="statReceived">₹0</h3></div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.15s">
+            <div class="stat-icon" style="background:#dc3545"><i class="bi bi-hourglass-split"></i></div>
+            <div class="stat-info"><small>Outstanding</small><h3 id="statOutstanding">₹0</h3></div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6">
         <div class="glass-card stat-card animate-in" style="animation-delay:0.2s">
-            <div class="stat-icon bg-month"><i class="bi bi-calendar-check"></i></div>
-            <div class="stat-info">
-                <small>This Month</small>
-                <h3 id="statMonth">₹0</h3>
-            </div>
+            <div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div>
+            <div class="stat-info"><small>Total Expenses</small><h3 id="statExpense">₹0</h3></div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Operational Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.25s">
+            <div class="stat-icon bg-driver"><i class="bi bi-fuel-pump"></i></div>
+            <div class="stat-info"><small>Fuel (Litres)</small><h3 id="statFuelLitres">0 L</h3></div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6">
         <div class="glass-card stat-card animate-in" style="animation-delay:0.3s">
+            <div class="stat-icon bg-month"><i class="bi bi-currency-rupee"></i></div>
+            <div class="stat-info"><small>Fuel Amount</small><h3 id="statFuelAmt">₹0</h3></div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.35s">
             <div class="stat-icon bg-vehicle"><i class="bi bi-truck"></i></div>
-            <div class="stat-info">
-                <small>Total Vehicles</small>
-                <h3 id="statVehicles">0</h3>
-            </div>
+            <div class="stat-info"><small>Active Vehicles</small><h3 id="statVehicles">0</h3></div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6">
         <div class="glass-card stat-card animate-in" style="animation-delay:0.4s">
             <div class="stat-icon bg-driver"><i class="bi bi-person-badge"></i></div>
-            <div class="stat-info">
-                <small>Active Drivers</small>
-                <h3 id="statDrivers">0</h3>
-            </div>
+            <div class="stat-info"><small>Active Drivers</small><h3 id="statDrivers">0</h3></div>
         </div>
     </div>
 </div>
+
+<!-- Charts Row -->
 <div class="row g-3 mb-4">
     <div class="col-lg-6">
         <div class="glass-card chart-card animate-in" style="animation-delay:0.5s">
-            <h6><i class="bi bi-bar-chart"></i> Vehicle Wise Expense (This Month)</h6>
+            <h6><i class="bi bi-bar-chart"></i> Vehicle Wise Expense</h6>
             <div id="vehicleChart"></div>
         </div>
     </div>
@@ -57,15 +89,17 @@
 <div class="row g-3 mb-4">
     <div class="col-12">
         <div class="glass-card chart-card animate-in" style="animation-delay:0.7s">
-            <h6><i class="bi bi-graph-up"></i> Monthly Expense Trend</h6>
+            <h6><i class="bi bi-graph-up"></i> 12-Month Trend — Expense vs Billing</h6>
             <div id="trendChart"></div>
         </div>
     </div>
 </div>
+
+<!-- Recent Expenses -->
 <div class="row g-3">
     <div class="col-12">
         <div class="glass-card animate-in" style="animation-delay:0.8s">
-            <h6 class="mb-3"><i class="bi bi-clock-history"></i> Recent Expenses</h6>
+            <h6 class="mb-3"><i class="bi bi-clock-history"></i> Recent Expenses <span id="recentMonthLabel" class="text-muted fw-normal fs-6"></span></h6>
             <div class="table-responsive">
                 <table class="table table-hover glass-table">
                     <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Category</th><th>Description</th><th>Amount</th><th>Mode</th></tr></thead>
@@ -78,66 +112,137 @@
 {% endblock %}
 {% block scripts %}
 <script>
+let vehicleChartInst, categoryChartInst, trendChartInst;
+
 document.addEventListener('DOMContentLoaded', () => {
-    loadDashboard();
+    const now = new Date();
+    document.getElementById('dashMonth').value = now.toISOString().slice(0, 7);
+    updateMonthLabel();
+    loadAll();
     loadAlerts();
 });
-async function loadDashboard() {
+
+function monthStr(y, m) {
+    return y + '-' + String(m).padStart(2, '0');
+}
+
+function changeMonth(delta) {
+    const input = document.getElementById('dashMonth');
+    const [y, m] = input.value.split('-').map(Number);
+    let nm = m + delta, ny = y;
+    if (nm > 12) { nm = 1; ny++; }
+    if (nm < 1) { nm = 12; ny--; }
+    input.value = monthStr(ny, nm);
+    updateMonthLabel();
+    loadAll();
+}
+
+function goToday() {
+    const now = new Date();
+    document.getElementById('dashMonth').value = monthStr(now.getFullYear(), now.getMonth() + 1);
+    updateMonthLabel();
+    loadAll();
+}
+
+function updateMonthLabel() {
+    const val = document.getElementById('dashMonth').value;
+    if (!val) return;
+    const [y, m] = val.split('-').map(Number);
+    const label = new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    document.getElementById('monthLabel').textContent = label;
+    document.getElementById('recentMonthLabel').textContent = '— ' + label;
+}
+
+function fmt(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
+
+async function loadAll() {
+    const month = document.getElementById('dashMonth').value;
+    updateMonthLabel();
     try {
         const [stats, charts, recent] = await Promise.all([
-            fetch('/api/dashboard/stats').then(r => r.json()),
-            fetch('/api/dashboard/charts').then(r => r.json()),
-            fetch('/api/dashboard/recent-expenses').then(r => r.json())
+            fetch('/api/dashboard/stats?month=' + month).then(r => r.json()),
+            fetch('/api/dashboard/charts?month=' + month).then(r => r.json()),
+            fetch('/api/dashboard/recent-expenses?month=' + month).then(r => r.json()),
         ]);
-        document.getElementById('statToday').textContent = '₹' + Number(stats.total_today).toLocaleString('en-IN');
-        document.getElementById('statMonth').textContent = '₹' + Number(stats.total_month).toLocaleString('en-IN');
-        document.getElementById('statVehicles').textContent = stats.total_vehicles;
+
+        // Stats
+        document.getElementById('statBilled').textContent = fmt(stats.total_billed);
+        document.getElementById('statReceived').textContent = fmt(stats.total_received);
+        document.getElementById('statOutstanding').textContent = fmt(stats.total_outstanding);
+        document.getElementById('statExpense').textContent = fmt(stats.total_expense);
+        document.getElementById('statFuelLitres').textContent = Number(stats.total_fuel_litres || 0).toLocaleString('en-IN', { maximumFractionDigits: 1 }) + ' L';
+        document.getElementById('statFuelAmt').textContent = fmt(stats.total_fuel_amount);
+        document.getElementById('statVehicles').textContent = stats.active_vehicles;
         document.getElementById('statDrivers').textContent = stats.total_drivers;
+
+        // Vehicle Chart
+        if (vehicleChartInst) { vehicleChartInst.destroy(); vehicleChartInst = null; }
+        document.getElementById('vehicleChart').innerHTML = '';
         if (charts.vehicle_wise && charts.vehicle_wise.labels.length) {
-            new ApexCharts(document.getElementById('vehicleChart'), {
+            vehicleChartInst = new ApexCharts(document.getElementById('vehicleChart'), {
                 chart: { type: 'bar', height: 300, background: 'transparent', toolbar: { show: false } },
                 series: [{ name: 'Expense', data: charts.vehicle_wise.values }],
                 xaxis: { categories: charts.vehicle_wise.labels },
                 colors: ['#FFD54F'],
                 plotOptions: { bar: { borderRadius: 8, columnWidth: '50%' } },
-                theme: { mode: 'light' }
-            }).render();
+                theme: { mode: 'light' }, dataLabels: { enabled: false }
+            });
+            vehicleChartInst.render();
         } else {
-            document.getElementById('vehicleChart').innerHTML = '<p class="text-muted text-center py-5">No data</p>';
+            document.getElementById('vehicleChart').innerHTML = '<p class="text-muted text-center py-5">No data for this month</p>';
         }
+
+        // Category Chart
+        if (categoryChartInst) { categoryChartInst.destroy(); categoryChartInst = null; }
+        document.getElementById('categoryChart').innerHTML = '';
         if (charts.category_wise && charts.category_wise.labels.length) {
-            new ApexCharts(document.getElementById('categoryChart'), {
+            categoryChartInst = new ApexCharts(document.getElementById('categoryChart'), {
                 chart: { type: 'donut', height: 300, background: 'transparent' },
                 series: charts.category_wise.values,
                 labels: charts.category_wise.labels,
                 colors: ['#FFD54F','#FFC107','#FFB300','#FFA000','#FF8F00','#FF6F00','#F9A825','#F57F17','#FFE082','#FFCA28','#FFAB00','#FFD740','#FFECB3'],
                 legend: { position: 'bottom' }
-            }).render();
+            });
+            categoryChartInst.render();
         } else {
-            document.getElementById('categoryChart').innerHTML = '<p class="text-muted text-center py-5">No data</p>';
+            document.getElementById('categoryChart').innerHTML = '<p class="text-muted text-center py-5">No data for this month</p>';
         }
+
+        // Trend Chart
+        if (trendChartInst) { trendChartInst.destroy(); trendChartInst = null; }
+        document.getElementById('trendChart').innerHTML = '';
         if (charts.monthly_trend && charts.monthly_trend.labels.length) {
-            new ApexCharts(document.getElementById('trendChart'), {
+            trendChartInst = new ApexCharts(document.getElementById('trendChart'), {
                 chart: { type: 'area', height: 300, background: 'transparent', toolbar: { show: false } },
-                series: [{ name: 'Expense', data: charts.monthly_trend.values }],
+                series: [
+                    { name: 'Expense', data: charts.monthly_trend.expense },
+                    { name: 'Billing', data: charts.monthly_trend.billing },
+                ],
                 xaxis: { categories: charts.monthly_trend.labels },
-                colors: ['#FFD54F'],
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.1 } },
+                colors: ['#FFD54F', '#28a745'],
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05 } },
                 stroke: { curve: 'smooth', width: 3 },
-                dataLabels: { enabled: false }
-            }).render();
+                dataLabels: { enabled: false },
+                legend: { position: 'top' },
+                tooltip: { y: { formatter: v => '₹' + Number(v).toLocaleString('en-IN') } }
+            });
+            trendChartInst.render();
         } else {
-            document.getElementById('trendChart').innerHTML = '<p class="text-muted text-center py-5">No data</p>';
+            document.getElementById('trendChart').innerHTML = '<p class="text-muted text-center py-5">No trend data</p>';
         }
-        let tbody = document.getElementById('recentExpenses');
+
+        // Recent Expenses
+        const tbody = document.getElementById('recentExpenses');
         if (recent.expenses && recent.expenses.length) {
             tbody.innerHTML = recent.expenses.map(e => `<tr>
                 <td>${e.ExpenseDate}</td><td>${e.VehicleNumber||'-'}</td><td>${e.DriverName||'-'}</td>
                 <td><span class="badge bg-warning text-dark">${e.Category}</span></td>
-                <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
-                <td>${e.PaymentMode||'-'}</td></tr>`).join('');
+                <td>${e.Description||'-'}</td>
+                <td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
+                <td>${e.PaymentMode||'-'}</td>
+            </tr>`).join('');
         } else {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No expenses found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No expenses for this month</td></tr>';
         }
     } catch (err) {
         console.error('Dashboard error:', err);

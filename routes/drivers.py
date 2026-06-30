@@ -72,12 +72,14 @@ async def salaries_api(request: Request, month: str = ""):
         return JSONResponse({"error": "Unauthorized"}, 401)
     drivers = get_all_records("Drivers")
     expenses = get_all_records("Expenses")
+    incentives = get_all_records("Incentives")
     result = []
     for d in drivers:
         if str(d.get("Status", "Active")).strip().lower() == "inactive":
             continue
         if str(d.get("EmployeeType", "Driver")).strip().lower() != "driver":
             continue
+        did = d.get("DriverID", "")
         name = str(d.get("DriverName", "")).strip()
         profile_salary = float(d.get("Salary", 0) or 0)
         drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name]
@@ -87,9 +89,13 @@ async def salaries_api(request: Request, month: str = ""):
         advance = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Advance")
         meals = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Meals")
         other = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") not in ("Salary", "Advance", "Meals"))
-        net_payable = profile_salary - advance - meals - other
+        incentive_row = None
+        if month:
+            incentive_row = next((i for i in incentives if str(i.get("DriverID", "")) == did and str(i.get("ForMonth", "")) == month), None)
+        incentive = float(incentive_row.get("Amount", 0) or 0) if incentive_row else 0.0
+        net_payable = profile_salary + incentive - advance - meals - other
         result.append({
-            "DriverID": d.get("DriverID", ""),
+            "DriverID": did,
             "DriverName": name,
             "EmployeeType": d.get("EmployeeType", "Driver"),
             "AssignedVehicle": d.get("AssignedVehicle", ""),
@@ -98,6 +104,8 @@ async def salaries_api(request: Request, month: str = ""):
             "Advance": advance,
             "Meals": meals,
             "Other": other,
+            "Incentive": incentive,
+            "IncentiveID": incentive_row.get("IncentiveID", "") if incentive_row else "",
             "NetPayable": net_payable,
         })
     result.sort(key=lambda x: x["DriverName"])
@@ -107,9 +115,50 @@ async def salaries_api(request: Request, month: str = ""):
         "Advance": sum(r["Advance"] for r in result),
         "Meals": sum(r["Meals"] for r in result),
         "Other": sum(r["Other"] for r in result),
+        "Incentive": sum(r["Incentive"] for r in result),
         "NetPayable": sum(r["NetPayable"] for r in result),
     }
     return {"salaries": result, "totals": totals, "month": month}
+
+
+@router.post("/api/incentive")
+async def set_incentive(request: Request):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    driver_id = str(data.get("DriverID", "")).strip()
+    for_month = str(data.get("ForMonth", "")).strip()
+    amount = data.get("Amount", 0)
+    if not driver_id or not for_month:
+        return JSONResponse({"error": "DriverID and ForMonth required"}, 400)
+    drivers = get_all_records("Drivers")
+    driver = next((d for d in drivers if str(d.get("DriverID", "")) == driver_id), None)
+    driver_name = driver.get("DriverName", "") if driver else ""
+    incentives = get_all_records("Incentives")
+    existing = None
+    for idx, i in enumerate(incentives):
+        if str(i.get("DriverID", "")) == driver_id and str(i.get("ForMonth", "")) == for_month:
+            existing = (idx, i)
+            break
+    from services.sheets_service import SHEET_HEADERS
+    headers = SHEET_HEADERS["Incentives"]
+    if existing:
+        idx, i = existing
+        row_data = [str(i.get(h, "")) for h in headers]
+        row_data[headers.index("Amount")] = str(amount)
+        row_data[headers.index("Description")] = data.get("Description", i.get("Description", ""))
+        row_data[headers.index("EnteredBy")] = user.get("email", "")
+        row_data[headers.index("UpdatedDate")] = now_str()
+        update_row("Incentives", idx + 2, row_data)
+        iid = i.get("IncentiveID", "")
+    else:
+        iid = gen_id("INC")
+        row = [iid, driver_id, driver_name, for_month, amount,
+               data.get("Description", ""), user.get("email", ""), now_str(), now_str()]
+        append_row("Incentives", row)
+    add_audit_log("UPDATE", "Incentives", iid, f"Incentive ₹{amount} set for {driver_name} ({for_month})", user["email"])
+    return {"success": True, "incentive_id": iid}
 
 
 @router.get("/api/salaries/export")
@@ -137,11 +186,11 @@ async def export_salaries_excel(request: Request, month: str = ""):
     thin_border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
     total_font = Font(bold=True, size=11)
     currency_fmt = '#,##0'
-    ws.merge_cells("A1:I1")
+    ws.merge_cells("A1:J1")
     ws["A1"] = f"Salary Report — {month or 'All Months'}"
     ws["A1"].font = Font(bold=True, size=14)
     ws["A1"].alignment = Alignment(horizontal="center")
-    headers = ["#", "Name", "Type", "Vehicle", "Salary", "Advance", "Meals", "Other", "Net Payable"]
+    headers = ["#", "Name", "Type", "Vehicle", "Salary", "Incentive", "Advance", "Meals", "Other", "Net Payable"]
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col, value=h)
         cell.font = header_font
@@ -154,7 +203,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
         ws.cell(row=row_num, column=2, value=r["DriverName"]).border = thin_border
         ws.cell(row=row_num, column=3, value=r["EmployeeType"]).border = thin_border
         ws.cell(row=row_num, column=4, value=r["AssignedVehicle"]).border = thin_border
-        for col, key in [(5, "ProfileSalary"), (6, "Advance"), (7, "Meals"), (8, "Other"), (9, "NetPayable")]:
+        for col, key in [(5, "ProfileSalary"), (6, "Incentive"), (7, "Advance"), (8, "Meals"), (9, "Other"), (10, "NetPayable")]:
             cell = ws.cell(row=row_num, column=col, value=r[key])
             cell.number_format = currency_fmt
             cell.border = thin_border
@@ -164,7 +213,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
     ws.cell(row=total_row, column=2).border = thin_border
     ws.cell(row=total_row, column=3, value="").border = thin_border
     ws.cell(row=total_row, column=4, value="").border = thin_border
-    for col, key in [(5, "ProfileSalary"), (6, "Advance"), (7, "Meals"), (8, "Other"), (9, "NetPayable")]:
+    for col, key in [(5, "ProfileSalary"), (6, "Incentive"), (7, "Advance"), (8, "Meals"), (9, "Other"), (10, "NetPayable")]:
         cell = ws.cell(row=total_row, column=col, value=totals[key])
         cell.number_format = currency_fmt
         cell.font = total_font
@@ -173,7 +222,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
     ws.column_dimensions["B"].width = 22
     ws.column_dimensions["C"].width = 12
     ws.column_dimensions["D"].width = 16
-    for c in ["E", "F", "G", "H", "I"]:
+    for c in ["E", "F", "G", "H", "I", "J"]:
         ws.column_dimensions[c].width = 14
     buf = io.BytesIO()
     wb.save(buf)

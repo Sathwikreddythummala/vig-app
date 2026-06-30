@@ -25,33 +25,55 @@ async def test_page(request: Request):
 
 
 @router.get("/api/dashboard/stats")
-async def dashboard_stats(request: Request):
+async def dashboard_stats(request: Request, month: str = ""):
     user = get_user(request)
     if not user:
         return {"error": "Unauthorized"}
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
     expenses = get_all_records("Expenses")
     vehicles = get_all_records("Vehicles")
     drivers = get_all_records("Drivers")
+    billing = get_all_records("Billing")
+    fuel = get_all_records("FuelEntries")
     today = datetime.now().strftime("%Y-%m-%d")
-    month_start = datetime.now().strftime("%Y-%m-01")
+    month_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
+    total_expense = sum(float(e.get("Amount", 0) or 0) for e in month_expenses)
     total_today = sum(float(e.get("Amount", 0) or 0) for e in expenses if str(e.get("ExpenseDate", "")) == today)
-    total_month = sum(float(e.get("Amount", 0) or 0) for e in expenses if str(e.get("ExpenseDate", "")) >= month_start)
+    month_billing = [b for b in billing if str(b.get("InvoiceDate", ""))[:7] == month]
+    total_billed = sum(float(b.get("TotalAmount", 0) or 0) for b in month_billing)
+    total_received = sum(float(b.get("PaidAmount", 0) or 0) for b in month_billing)
+    total_outstanding = total_billed - total_received
+    month_fuel = [f for f in fuel if str(f.get("EntryDate", ""))[:7] == month]
+    total_fuel_litres = sum(float(f.get("Litres", 0) or 0) for f in month_fuel)
+    total_fuel_amount = sum(float(f.get("Amount", 0) or 0) for f in month_fuel)
+    active_drivers = len([d for d in drivers if str(d.get("Status", "")).lower() == "active" and str(d.get("EmployeeType", "Driver")) == "Driver"])
+    active_vehicles = len([v for v in vehicles if str(v.get("VehicleStatus", "")).lower() == "active"])
     return {
+        "month": month,
         "total_today": total_today,
-        "total_month": total_month,
+        "total_expense": total_expense,
+        "total_billed": total_billed,
+        "total_received": total_received,
+        "total_outstanding": total_outstanding,
+        "total_fuel_litres": total_fuel_litres,
+        "total_fuel_amount": total_fuel_amount,
         "total_vehicles": len(vehicles),
-        "total_drivers": len([d for d in drivers if str(d.get("Status", "")).lower() == "active" and str(d.get("EmployeeType", "Driver")) == "Driver"]),
+        "active_vehicles": active_vehicles,
+        "total_drivers": active_drivers,
     }
 
 
 @router.get("/api/dashboard/charts")
-async def dashboard_charts(request: Request):
+async def dashboard_charts(request: Request, month: str = ""):
     user = get_user(request)
     if not user:
         return {"error": "Unauthorized"}
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
     expenses = get_all_records("Expenses")
-    month_start = datetime.now().strftime("%Y-%m-01")
-    monthly_expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= month_start]
+    billing = get_all_records("Billing")
+    monthly_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     vehicle_wise = defaultdict(float)
     category_wise = defaultdict(float)
     for e in monthly_expenses:
@@ -59,24 +81,35 @@ async def dashboard_charts(request: Request):
         vehicle_wise[vn] += float(e.get("Amount", 0) or 0)
         category_wise[str(e.get("Category", "Other"))] += float(e.get("Amount", 0) or 0)
     monthly_trend = defaultdict(float)
+    billing_trend = defaultdict(float)
     for e in expenses:
         d = str(e.get("ExpenseDate", ""))
         if len(d) >= 7:
             monthly_trend[d[:7]] += float(e.get("Amount", 0) or 0)
-    sorted_months = sorted(monthly_trend.keys())[-12:]
+    for b in billing:
+        d = str(b.get("InvoiceDate", ""))
+        if len(d) >= 7:
+            billing_trend[d[:7]] += float(b.get("TotalAmount", 0) or 0)
+    all_months = sorted(set(list(monthly_trend.keys()) + list(billing_trend.keys())))[-12:]
     return {
         "vehicle_wise": {"labels": list(vehicle_wise.keys()), "values": list(vehicle_wise.values())},
         "category_wise": {"labels": list(category_wise.keys()), "values": list(category_wise.values())},
-        "monthly_trend": {"labels": sorted_months, "values": [monthly_trend[m] for m in sorted_months]},
+        "monthly_trend": {
+            "labels": all_months,
+            "expense": [monthly_trend.get(m, 0) for m in all_months],
+            "billing": [billing_trend.get(m, 0) for m in all_months],
+        },
     }
 
 
 @router.get("/api/dashboard/recent-expenses")
-async def recent_expenses(request: Request):
+async def recent_expenses(request: Request, month: str = ""):
     user = get_user(request)
     if not user:
         return {"error": "Unauthorized"}
     expenses = get_all_records("Expenses")
+    if month:
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     expenses.sort(key=lambda x: str(x.get("ExpenseDate", "")), reverse=True)
     return {"expenses": expenses[:20]}
 

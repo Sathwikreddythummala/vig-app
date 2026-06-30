@@ -98,6 +98,10 @@ SHEET_HEADERS = {
     "Attendance": [
         "AttendanceID", "Date", "DriverID", "DriverName", "Status", "MarkedBy", "CreatedDate",
     ],
+    "Incentives": [
+        "IncentiveID", "DriverID", "DriverName", "ForMonth", "Amount",
+        "Description", "EnteredBy", "CreatedDate", "UpdatedDate",
+    ],
 }
 
 
