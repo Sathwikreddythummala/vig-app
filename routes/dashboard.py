@@ -35,20 +35,29 @@ async def dashboard_stats(request: Request, month: str = ""):
     vehicles = get_all_records("Vehicles")
     drivers = get_all_records("Drivers")
     billing = get_all_records("Billing")
+    receivables = get_all_records("Receivables")
     fuel = get_all_records("FuelEntries")
+    purse = get_all_records("Purse")
     today = datetime.now().strftime("%Y-%m-%d")
     month_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     total_expense = sum(float(e.get("Amount", 0) or 0) for e in month_expenses)
     total_today = sum(float(e.get("Amount", 0) or 0) for e in expenses if str(e.get("ExpenseDate", "")) == today)
-    month_billing = [b for b in billing if str(b.get("InvoiceDate", ""))[:7] == month]
+    # Billing: filter by PaymentMonth (month when payment is expected/received)
+    month_billing = [b for b in billing if (str(b.get("PaymentMonth", "")) or str(b.get("InvoiceDate", ""))[:7]) == month]
     total_billed = sum(float(b.get("TotalAmount", 0) or 0) for b in month_billing)
-    total_received = sum(float(b.get("PaidAmount", 0) or 0) for b in month_billing)
-    total_outstanding = total_billed - total_received
+    # Received: sum receivables whose PaymentMonth matches selected month
+    month_received = [r for r in receivables if (str(r.get("PaymentMonth", "")) or str(r.get("ReceiveDate", ""))[:7]) == month]
+    total_received = sum(float(r.get("Amount", 0) or 0) for r in month_received)
+    total_outstanding = sum(float(b.get("BalanceAmount", 0) or 0) for b in month_billing)
     month_fuel = [f for f in fuel if str(f.get("EntryDate", ""))[:7] == month]
     total_fuel_litres = sum(float(f.get("Litres", 0) or 0) for f in month_fuel)
     total_fuel_amount = sum(float(f.get("Amount", 0) or 0) for f in month_fuel)
     active_drivers = len([d for d in drivers if str(d.get("Status", "")).lower() == "active" and str(d.get("EmployeeType", "Driver")) == "Driver"])
     active_vehicles = len([v for v in vehicles if str(v.get("VehicleStatus", "")).lower() == "active"])
+    # Purse: upcoming income and expenses from today onwards
+    upcoming_purse = [p for p in purse if str(p.get("Date", "")) >= today]
+    purse_income = sum(float(p.get("Amount", 0) or 0) for p in upcoming_purse if str(p.get("Type", "")).lower() == "income")
+    purse_expense = sum(float(p.get("Amount", 0) or 0) for p in upcoming_purse if str(p.get("Type", "")).lower() == "expense")
     return {
         "month": month,
         "total_today": total_today,
@@ -61,6 +70,9 @@ async def dashboard_stats(request: Request, month: str = ""):
         "total_vehicles": len(vehicles),
         "active_vehicles": active_vehicles,
         "total_drivers": active_drivers,
+        "purse_income": purse_income,
+        "purse_expense": purse_expense,
+        "purse_upcoming_count": len(upcoming_purse),
     }
 
 
@@ -87,7 +99,7 @@ async def dashboard_charts(request: Request, month: str = ""):
         if len(d) >= 7:
             monthly_trend[d[:7]] += float(e.get("Amount", 0) or 0)
     for b in billing:
-        d = str(b.get("InvoiceDate", ""))
+        d = str(b.get("PaymentMonth", "")) or str(b.get("InvoiceDate", ""))[:7]
         if len(d) >= 7:
             billing_trend[d[:7]] += float(b.get("TotalAmount", 0) or 0)
     all_months = sorted(set(list(monthly_trend.keys()) + list(billing_trend.keys())))[-12:]

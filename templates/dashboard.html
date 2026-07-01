@@ -71,6 +71,29 @@
     </div>
 </div>
 
+<!-- Purse Row (upcoming from today) -->
+<div class="row g-3 mb-4">
+    <div class="col-12"><small class="text-muted fw-semibold text-uppercase" style="letter-spacing:0.08em"><i class="bi bi-wallet2 me-1"></i>Purse — Upcoming from Today</small></div>
+    <div class="col-xl-4 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.45s">
+            <div class="stat-icon" style="background:rgba(40,167,69,0.15)"><i class="bi bi-arrow-down-circle text-success"></i></div>
+            <div class="stat-info"><small>Upcoming Income</small><h3 id="statPurseIncome" class="text-success">₹0</h3></div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.5s">
+            <div class="stat-icon" style="background:rgba(220,53,69,0.15)"><i class="bi bi-arrow-up-circle text-danger"></i></div>
+            <div class="stat-info"><small>Upcoming Expense</small><h3 id="statPurseExpense" class="text-danger">₹0</h3></div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-md-6">
+        <div class="glass-card stat-card animate-in" style="animation-delay:0.55s">
+            <div class="stat-icon" style="background:rgba(13,110,253,0.15)"><i class="bi bi-calendar-event text-primary"></i></div>
+            <div class="stat-info"><small>Upcoming Entries</small><h3 id="statPurseCount" class="text-primary">0</h3></div>
+        </div>
+    </div>
+</div>
+
 <!-- Charts Row -->
 <div class="row g-3 mb-4">
     <div class="col-lg-6">
@@ -174,6 +197,9 @@ async function loadAll() {
         document.getElementById('statFuelAmt').textContent = fmt(stats.total_fuel_amount);
         document.getElementById('statVehicles').textContent = stats.active_vehicles;
         document.getElementById('statDrivers').textContent = stats.total_drivers;
+        document.getElementById('statPurseIncome').textContent = fmt(stats.purse_income);
+        document.getElementById('statPurseExpense').textContent = fmt(stats.purse_expense);
+        document.getElementById('statPurseCount').textContent = stats.purse_upcoming_count || 0;
 
         // Vehicle Chart
         if (vehicleChartInst) { vehicleChartInst.destroy(); vehicleChartInst = null; }
