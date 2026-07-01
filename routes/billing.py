@@ -31,7 +31,7 @@ def recalc_bill(bill_id: str):
     paid = sum(float(r.get("Amount", 0) or 0) for r in receivables if str(r.get("BillID", "")) == bill_id)
     total = float(bill.get("TotalAmount", 0) or 0)
     balance = total - paid
-    status = "Paid" if balance <= 0 else "Partial" if paid > 0 else "Pending"
+    status = "Paid" if (paid > 0 and balance <= 0) else "Partial" if paid > 0 else "Pending"
     from services.sheets_service import SHEET_HEADERS
     headers = SHEET_HEADERS["Billing"]
     row_data = [str(bill.get(h, "")) for h in headers]
@@ -161,9 +161,9 @@ async def update_bill(request: Request, bill_id: str):
     total = round(sub_total + sgst + cgst - tds, 2)
     paid = float(existing.get("PaidAmount", 0) or 0)
     balance = total - paid
-    status = "Paid" if balance <= 0 else "Partial" if paid > 0 else "Pending"
+    status = data.get("_statusOverride") or ("Paid" if (paid > 0 and balance <= 0) else "Partial" if paid > 0 else "Pending")
     from services.sheets_service import build_row
-    vals = {**existing, **data, "BillID": bill_id, "InvoiceNumber": data.get("InvoiceNumber", existing.get("InvoiceNumber", "")), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    vals = {**existing, **{k: v for k, v in data.items() if not k.startswith("_")}, "BillID": bill_id, "InvoiceNumber": data.get("InvoiceNumber", existing.get("InvoiceNumber", "")), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
     row = build_row("Billing", vals)
     update_row("Billing", row_num, row)
     add_audit_log("UPDATE", "Billing", bill_id, f"Bill updated ₹{total}", user["email"])
