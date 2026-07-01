@@ -30,14 +30,24 @@ def initialize_db(sheet_headers: dict):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
+            # Get existing columns for all tables in one query
+            cur.execute("""
+                SELECT table_name, column_name FROM information_schema.columns
+                WHERE table_schema = 'public'
+            """)
+            existing = {}
+            for row in cur.fetchall():
+                existing.setdefault(row["table_name"], set()).add(row["column_name"])
+
             for table, cols in sheet_headers.items():
                 col_defs = ", ".join(f'"{c}" TEXT' for c in cols)
                 pk = cols[0]
-                sql = f'CREATE TABLE IF NOT EXISTS "{table}" ({col_defs}, PRIMARY KEY ("{pk}"))'
-                cur.execute(sql)
-                # migrate: add any new columns added to SHEET_HEADERS
+                cur.execute(f'CREATE TABLE IF NOT EXISTS "{table}" ({col_defs}, PRIMARY KEY ("{pk}"))')
+                # Only ALTER for columns not yet in DB
+                table_cols = existing.get(table, set())
                 for col in cols[1:]:
-                    cur.execute(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{col}" TEXT')
+                    if col not in table_cols:
+                        cur.execute(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{col}" TEXT')
         conn.commit()
         print("PostgreSQL tables initialized")
     except Exception as e:
