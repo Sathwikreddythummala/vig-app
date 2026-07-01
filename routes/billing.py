@@ -143,6 +143,13 @@ async def update_bill(request: Request, bill_id: str):
     if not result:
         return JSONResponse({"error": "Bill not found"}, 404)
     row_num, existing = result
+    # Partial update (e.g. just PaymentMonth from inline edit)
+    if data.get("_partial"):
+        from services.sheets_service import build_row
+        vals = {**existing, **{k: v for k, v in data.items() if k != "_partial"}, "UpdatedDate": now_str()}
+        row = build_row("Billing", vals)
+        update_row("Billing", row_num, row)
+        return {"success": True}
     fixed = float(data.get("FixedAmount", 0) or 0)
     variable = float(data.get("VariableAmount", 0) or 0)
     challan = float(data.get("TrafficChallan", 0) or 0)

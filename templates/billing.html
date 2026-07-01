@@ -212,20 +212,25 @@ async function loadBills(page){
     renderBillSummary(allBills);
 }
 
-function payMonthCell(recv, billId){
-    if(!recv||!recv.length) return '<td class="text-muted">—</td>';
-    var cells = recv.map(function(r){
-        var pm = r.PaymentMonth||'';
-        if(canEdit){
-            return '<div class="d-flex align-items-center gap-1 mb-1">'+
-                '<input type="month" class="form-control form-control-sm glass-input" style="width:140px;font-size:0.78rem" value="'+pm+'" onchange="savePayMonth(\''+r.ReceivableID+'\',this)">'+
-                '<small class="text-muted">'+fmt(r.Amount)+'</small>'+
-                '</div>';
-        } else {
-            return '<div><span class="badge bg-info text-dark">'+pm+'</span> <small>'+fmt(r.Amount)+'</small></div>';
-        }
-    }).join('');
-    return '<td>'+cells+'</td>';
+function payMonthCell(b){
+    var pm = b.PaymentMonth||'';
+    if(canEdit){
+        return '<td><input type="month" class="form-control form-control-sm glass-input" style="width:145px" value="'+pm+'" onchange="saveBillPayMonth(\''+b.BillID+'\',this)"></td>';
+    } else {
+        return '<td>'+(pm?'<span class="badge bg-info text-dark">'+pm+'</span>':'<span class="text-muted">—</span>')+'</td>';
+    }
+}
+
+async function saveBillPayMonth(billId, input){
+    var orig=input.defaultValue;
+    input.disabled=true;
+    try{
+        var res=await fetch('/billing/api/'+billId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({PaymentMonth:input.value,_partial:true})});
+        var data=await res.json();
+        if(data.success){input.defaultValue=input.value;showToast('Payment month updated','success');}
+        else{showToast(data.error||'Failed','danger');input.value=orig;}
+    }catch(e){showToast('Network error','danger');input.value=orig;}
+    finally{input.disabled=false;}
 }
 
 async function savePayMonth(recvId, input){
@@ -268,7 +273,7 @@ function renderBillTable(bills){
             '<td class="fw-bold">'+fmt(b.TotalAmount)+'</td>'+
             '<td class="text-success">'+fmt(b.PaidAmount)+'</td>'+
             '<td class="text-danger fw-bold">'+fmt(b.BalanceAmount)+'</td>'+
-            payMonthCell(b._receivables, b.BillID)+
+            payMonthCell(b)+
             '<td><span class="badge '+sc+'">'+b.PaymentStatus+'</span></td>'+
             '<td class="viewer-hide"><button class="btn btn-sm btn-outline-warning me-1" onclick="editBill(\''+b.BillID+'\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteBill(\''+b.BillID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
         if(i===bills.length-1){
