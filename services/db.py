@@ -35,6 +35,9 @@ def initialize_db(sheet_headers: dict):
                 pk = cols[0]
                 sql = f'CREATE TABLE IF NOT EXISTS "{table}" ({col_defs}, PRIMARY KEY ("{pk}"))'
                 cur.execute(sql)
+                # migrate: add any new columns added to SHEET_HEADERS
+                for col in cols[1:]:
+                    cur.execute(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{col}" TEXT')
         conn.commit()
         print("PostgreSQL tables initialized")
     except Exception as e:

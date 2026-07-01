@@ -164,7 +164,7 @@ async def delete_bill(request: Request, bill_id: str):
 
 
 @router.get("/api/receivables")
-async def list_receivables(request: Request, bill_id: str = "", vendor: str = ""):
+async def list_receivables(request: Request, bill_id: str = "", vendor: str = "", payment_month: str = ""):
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
@@ -173,8 +173,11 @@ async def list_receivables(request: Request, bill_id: str = "", vendor: str = ""
         records = [r for r in records if str(r.get("BillID", "")) == bill_id]
     if vendor:
         records = [r for r in records if str(r.get("VendorName", "")) == vendor]
+    if payment_month:
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("ReceiveDate", ""))[:7]) == payment_month]
     records.sort(key=lambda x: str(x.get("ReceiveDate", "")), reverse=True)
-    return {"receivables": records}
+    total_received = sum(float(r.get("Amount", 0) or 0) for r in records)
+    return {"receivables": records, "total_received": total_received}
 
 
 @router.post("/api/receivables/add")
@@ -184,8 +187,9 @@ async def add_receivable(request: Request):
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
     rid = gen_id("RCV")
+    payment_month = data.get("PaymentMonth", "") or str(data.get("ReceiveDate", ""))[:7]
     from services.sheets_service import build_row
-    vals = {**data, "ReceivableID": rid, "PaymentMode": data.get("PaymentMode", "Bank Transfer"), "CreatedDate": now_str()}
+    vals = {**data, "ReceivableID": rid, "PaymentMonth": payment_month, "PaymentMode": data.get("PaymentMode", "Bank Transfer"), "CreatedDate": now_str()}
     row = build_row("Receivables", vals)
     append_row("Receivables", row)
     add_audit_log("CREATE", "Receivables", rid, f"Received ₹{data.get('Amount',0)} from {data.get('VendorName','')}", user["email"])

@@ -80,7 +80,7 @@ SHEET_HEADERS = {
         "Description", "CreatedDate", "UpdatedDate",
     ],
     "Receivables": [
-        "ReceivableID", "ReceiveDate", "BillID", "VendorName",
+        "ReceivableID", "ReceiveDate", "PaymentMonth", "BillID", "VendorName",
         "Amount", "PaymentMode", "ReferenceNumber", "Description",
         "CreatedDate",
     ],
