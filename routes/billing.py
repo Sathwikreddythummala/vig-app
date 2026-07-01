@@ -209,15 +209,44 @@ async def add_receivable(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
-    rid = gen_id("RCV")
     payment_month = data.get("PaymentMonth", "") or str(data.get("ReceiveDate", ""))[:7]
     from services.sheets_service import build_row
+    bill_id = data.get("BillID", "")
+
+    # Invoice-level payment: split proportionally across all bills under this invoice
+    if str(bill_id).startswith("INV:"):
+        inv_num = bill_id[4:]
+        all_bills = get_all_records("Billing")
+        inv_bills = [b for b in all_bills if b.get("InvoiceNumber") == inv_num and b.get("PaymentStatus") != "Paid"]
+        if not inv_bills:
+            return JSONResponse({"error": "No unpaid bills found for this invoice"}, 400)
+        total_balance = sum(float(b.get("BalanceAmount", 0) or 0) for b in inv_bills)
+        total_payment = float(data.get("Amount", 0) or 0)
+        created = []
+        for b in inv_bills:
+            bill_balance = float(b.get("BalanceAmount", 0) or 0)
+            proportion = (bill_balance / total_balance) if total_balance > 0 else (1 / len(inv_bills))
+            split_amount = round(total_payment * proportion, 2)
+            rid = gen_id("RCV")
+            vals = {**data, "ReceivableID": rid, "BillID": b["BillID"], "Amount": split_amount,
+                    "PaymentMonth": payment_month, "PaymentMode": data.get("PaymentMode", "Bank Transfer"),
+                    "Description": (data.get("Description", "") + f" [{inv_num}]").strip(),
+                    "CreatedDate": now_str()}
+            row = build_row("Receivables", vals)
+            append_row("Receivables", row)
+            recalc_bill(b["BillID"])
+            created.append(rid)
+        add_audit_log("CREATE", "Receivables", inv_num, f"Invoice payment ₹{total_payment} split across {len(inv_bills)} bills", user["email"])
+        return {"success": True, "receivable_ids": created, "split_count": len(created)}
+
+    # Single bill payment
+    rid = gen_id("RCV")
     vals = {**data, "ReceivableID": rid, "PaymentMonth": payment_month, "PaymentMode": data.get("PaymentMode", "Bank Transfer"), "CreatedDate": now_str()}
     row = build_row("Receivables", vals)
     append_row("Receivables", row)
     add_audit_log("CREATE", "Receivables", rid, f"Received ₹{data.get('Amount',0)} from {data.get('VendorName','')}", user["email"])
-    if data.get("BillID"):
-        recalc_bill(data["BillID"])
+    if bill_id:
+        recalc_bill(bill_id)
     return {"success": True, "receivable_id": rid}
 
 

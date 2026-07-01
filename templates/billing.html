@@ -333,7 +333,7 @@ function loadVendorBills(){
     var vendor=document.getElementById('rVendor').value;
     var sel=document.getElementById('rBillID');
     sel.innerHTML='<option value="">-- General Payment --</option>';
-    // Group unpaid bills by invoice number
+    // One option per invoice number (unpaid/partial only)
     var invGroups={}, invOrder=[];
     allBills.filter(b=>b.VendorName===vendor && b.PaymentStatus!=='Paid').forEach(b=>{
         var inv=b.InvoiceNumber||'Unknown';
@@ -343,15 +343,10 @@ function loadVendorBills(){
     invOrder.forEach(function(inv){
         var bills=invGroups[inv];
         var totalBal=bills.reduce((s,b)=>s+parseFloat(b.BalanceAmount||0),0);
-        var grp=document.createElement('optgroup');
-        grp.label=inv+' — ₹'+totalBal.toLocaleString('en-IN')+' pending';
-        bills.forEach(function(b){
-            var opt=document.createElement('option');
-            opt.value=b.BillID;
-            opt.textContent=b.VehicleNumber+' | ₹'+Number(b.BalanceAmount||0).toLocaleString('en-IN')+' pending';
-            grp.appendChild(opt);
-        });
-        sel.appendChild(grp);
+        var opt=document.createElement('option');
+        opt.value='INV:'+inv;
+        opt.textContent=inv+' | ₹'+totalBal.toLocaleString('en-IN')+' pending ('+bills.length+' vehicle'+(bills.length>1?'s':'')+')';
+        sel.appendChild(opt);
     });
 }
 
