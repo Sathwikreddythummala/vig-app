@@ -242,10 +242,10 @@ async function savePayMonth(recvId, input){
 function renderBillTable(bills){
     var tbody=document.getElementById('billTable');
     if(!bills.length){tbody.innerHTML='<tr><td colspan="17" class="text-center text-muted">No bills yet</td></tr>';return;}
-    bills.sort((a,b)=>String(a.InvoiceNumber||'').localeCompare(String(b.InvoiceNumber||'')));
+    bills.sort((a,b)=>String(a.InvoiceNumber||'').toUpperCase().localeCompare(String(b.InvoiceNumber||'').toUpperCase()));
     var html='', lastInv='', grpTotal=0, grpPaid=0, grpBal=0, grpCount=0;
     bills.forEach(function(b,i){
-        var inv=b.InvoiceNumber||'';
+        var inv=(b.InvoiceNumber||'').toUpperCase();
         var sc=b.PaymentStatus==='Paid'?'bg-success':b.PaymentStatus==='Partial'?'bg-warning text-dark':'bg-danger';
         if(inv!==lastInv){
             if(lastInv!==''){

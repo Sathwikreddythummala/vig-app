@@ -123,7 +123,7 @@ async def add_bill(request: Request):
     cgst = round(sub_total * 0.09, 2)
     tds = float(data.get("TDS", 0) or 0)
     total = round(sub_total + sgst + cgst - tds, 2)
-    inv_num = data.get("InvoiceNumber", "") or next_invoice_number()
+    inv_num = (data.get("InvoiceNumber", "") or next_invoice_number()).strip().upper()
     bid = gen_id("BILL")
     from services.sheets_service import build_row
     vals = {**data, "BillID": bid, "InvoiceNumber": inv_num, "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": "Pending", "PaidAmount": 0, "BalanceAmount": total, "CreatedDate": now_str(), "UpdatedDate": now_str()}
@@ -163,7 +163,7 @@ async def update_bill(request: Request, bill_id: str):
     balance = total - paid
     status = data.get("_statusOverride") or ("Paid" if (paid > 0 and balance <= 0) else "Partial" if paid > 0 else "Pending")
     from services.sheets_service import build_row
-    vals = {**existing, **{k: v for k, v in data.items() if not k.startswith("_")}, "BillID": bill_id, "InvoiceNumber": data.get("InvoiceNumber", existing.get("InvoiceNumber", "")), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
+    vals = {**existing, **{k: v for k, v in data.items() if not k.startswith("_")}, "BillID": bill_id, "InvoiceNumber": (data.get("InvoiceNumber", existing.get("InvoiceNumber", "")) or "").strip().upper(), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
     row = build_row("Billing", vals)
     update_row("Billing", row_num, row)
     add_audit_log("UPDATE", "Billing", bill_id, f"Bill updated ₹{total}", user["email"])
@@ -222,9 +222,9 @@ async def add_receivable(request: Request):
 
     # Invoice-level payment: split proportionally across all bills under this invoice
     if str(bill_id).startswith("INV:"):
-        inv_num = bill_id[4:]
+        inv_num = bill_id[4:].strip().upper()
         all_bills = get_all_records("Billing")
-        inv_bills = [b for b in all_bills if b.get("InvoiceNumber") == inv_num and b.get("PaymentStatus") != "Paid"]
+        inv_bills = [b for b in all_bills if str(b.get("InvoiceNumber", "")).upper() == inv_num and b.get("PaymentStatus") != "Paid"]
         if not inv_bills:
             return JSONResponse({"error": "No unpaid bills found for this invoice"}, 400)
         total_balance = sum(float(b.get("BalanceAmount", 0) or 0) for b in inv_bills)
