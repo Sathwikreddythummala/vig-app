@@ -74,7 +74,7 @@ async def list_expenses(
     if search:
         s = search.lower()
         expenses = [e for e in expenses if s in str(e.get("ExpenseID", "")).lower() or s in str(e.get("Description", "")).lower() or s in str(e.get("VehicleNumber", "")).lower() or s in str(e.get("DriverName", "")).lower() or s in str(e.get("Category", "")).lower()]
-    expenses.sort(key=lambda x: str(x.get("ExpenseDate", "")), reverse=True)
+    expenses.sort(key=lambda x: str(x.get("CreatedDate", "")), reverse=True)
     total = len(expenses)
     start = (page - 1) * per_page
     paginated = expenses[start:start + per_page]

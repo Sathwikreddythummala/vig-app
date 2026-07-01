@@ -38,7 +38,7 @@
     <div class="col-xl-3 col-md-6">
         <div class="glass-card stat-card animate-in" style="animation-delay:0.2s">
             <div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div>
-            <div class="stat-info"><small>Total Expenses</small><h3 id="statExpense">₹0</h3></div>
+            <div class="stat-info"><small>Total Expenses</small><h3 id="statExpenseTop">₹0</h3></div>
         </div>
     </div>
 </div>
@@ -177,7 +177,7 @@ async function loadAll() {
         document.getElementById('statBilled').textContent = fmt(stats.total_billed);
         document.getElementById('statReceived').textContent = fmt(stats.total_received);
         document.getElementById('statOutstanding').textContent = fmt(stats.total_outstanding);
-        document.getElementById('statExpense').textContent = fmt(stats.total_expense);
+        document.getElementById('statExpenseTop').textContent = fmt(stats.total_expense);
         document.getElementById('statFuelLitres').textContent = Number(stats.total_fuel_litres || 0).toLocaleString('en-IN', { maximumFractionDigits: 1 }) + ' L';
         document.getElementById('statFuelAmt').textContent = fmt(stats.total_fuel_amount);
         document.getElementById('statVehicles').textContent = stats.active_vehicles;
