@@ -239,27 +239,74 @@ async function savePayMonth(recvId, input){
     finally{input.disabled=false;}
 }
 
+function invDescRow(inv, desc, color){
+    var safeDesc=(desc||'').replace(/"/g,'&quot;');
+    return '<tr style="background:rgba(0,0,0,0.02);border-left:4px solid '+color+'44;border-bottom:2px solid '+color+'">'
+        +'<td colspan="14" class="py-1 px-3">'
+        +'<div class="d-flex align-items-center gap-2">'
+        +'<i class="bi bi-sticky text-muted" style="font-size:0.8em"></i>'
+        +'<input type="text" class="form-control form-control-sm" style="font-size:0.82em;max-width:520px" '
+        +'id="invDesc_'+inv+'" placeholder="Invoice note / description…" value="'+safeDesc+'">'
+        +'<button class="btn btn-sm btn-outline-secondary viewer-hide" style="font-size:0.78em;white-space:nowrap" '
+        +'onclick="saveInvoiceDesc(\''+inv+'\')"><i class="bi bi-save me-1"></i>Save</button>'
+        +'</div>'
+        +'</td><td colspan="3"></td></tr>'
+        +'<tr><td colspan="17" style="height:8px;padding:0;background:transparent;border:none"></td></tr>';
+}
+
+function saveInvoiceDesc(inv){
+    var val=document.getElementById('invDesc_'+inv).value;
+    fetch('/billing/api/invoice/'+encodeURIComponent(inv)+'/description',{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({InvoiceDescription:val})
+    }).then(r=>r.json()).then(function(d){
+        if(d.success){
+            var btn=document.querySelector('#invDesc_'+inv).nextElementSibling;
+            btn.innerHTML='<i class="bi bi-check-lg me-1"></i>Saved';
+            btn.classList.replace('btn-outline-secondary','btn-success');
+            setTimeout(function(){btn.innerHTML='<i class="bi bi-save me-1"></i>Save';btn.classList.replace('btn-success','btn-outline-secondary');},2000);
+        }
+    });
+}
+
 function renderBillTable(bills){
     var tbody=document.getElementById('billTable');
     if(!bills.length){tbody.innerHTML='<tr><td colspan="17" class="text-center text-muted">No bills yet</td></tr>';return;}
     bills.sort((a,b)=>String(a.InvoiceNumber||'').toUpperCase().localeCompare(String(b.InvoiceNumber||'').toUpperCase()));
-    var html='', lastInv='', grpTotal=0, grpPaid=0, grpBal=0, grpCount=0;
+    var html='', lastInv='', grpTotal=0, grpPaid=0, grpBal=0, grpCount=0, grpDesc='';
+    // border colours per group (cycle)
+    var palette=['#FFB300','#29B6F6','#66BB6A','#EF5350','#AB47BC','#26C6DA','#FF7043','#8D6E63'];
+    var palIdx=0;
+    var curColor='';
     bills.forEach(function(b,i){
         var inv=(b.InvoiceNumber||'').toUpperCase();
         var sc=b.PaymentStatus==='Paid'?'bg-success':b.PaymentStatus==='Partial'?'bg-warning text-dark':'bg-danger';
         if(inv!==lastInv){
             if(lastInv!==''){
-                html+='<tr style="background:rgba(255,213,79,0.08);font-size:0.82em"><td colspan="11" class="text-end text-muted fst-italic pe-2">Subtotal — '+lastInv+' ('+grpCount+' line'+(grpCount>1?'s':'')+')</td><td class="fw-bold">'+fmt(grpTotal)+'</td><td class="text-success fw-bold">'+fmt(grpPaid)+'</td><td class="text-danger fw-bold">'+fmt(grpBal)+'</td><td colspan="3"></td></tr>';
+                // subtotal row — close group
+                html+='<tr style="background:rgba(255,213,79,0.1)">'
+                    +'<td colspan="11" class="text-end text-muted fst-italic pe-2" style="font-size:0.82em">Subtotal — '+lastInv+' &nbsp;('+grpCount+' vehicle'+(grpCount>1?'s':'')+')</td>'
+                    +'<td class="fw-bold" style="font-size:0.85em">'+fmt(grpTotal)+'</td>'
+                    +'<td class="text-success fw-bold" style="font-size:0.85em">'+fmt(grpPaid)+'</td>'
+                    +'<td class="text-danger fw-bold" style="font-size:0.85em">'+fmt(grpBal)+'</td>'
+                    +'<td colspan="3"></td></tr>'
+                    +invDescRow(lastInv, grpDesc, curColor);
             }
-            html+='<tr style="background:rgba(255,193,7,0.15)"><td colspan="17" class="py-1 px-3"><i class="bi bi-receipt me-1 text-warning"></i><strong>Invoice: '+inv+'</strong></td></tr>';
-            lastInv=inv; grpTotal=0; grpPaid=0; grpBal=0; grpCount=0;
+            curColor = palette[palIdx % palette.length]; palIdx++;
+            html+='<tr style="background:linear-gradient(90deg,'+curColor+'22,transparent);border-left:4px solid '+curColor+';border-top:1px solid '+curColor+'44">'
+                +'<td colspan="17" class="py-2 px-3">'
+                +'<i class="bi bi-receipt me-1" style="color:'+curColor+'"></i>'
+                +'<strong style="color:'+curColor+'">'+inv+'</strong>'
+                +'</td></tr>';
+            lastInv=inv; grpTotal=0; grpPaid=0; grpBal=0; grpCount=0; grpDesc='';
         }
         grpTotal+=parseFloat(b.TotalAmount||0);
         grpPaid+=parseFloat(b.PaidAmount||0);
         grpBal+=parseFloat(b.BalanceAmount||0);
         grpCount++;
-        html+='<tr>'+
-            '<td class="ps-4 text-muted">'+inv+'</td>'+
+        if(!grpDesc && b.InvoiceDescription) grpDesc=b.InvoiceDescription;
+        html+='<tr style="border-left:4px solid '+curColor+'44">'+
+            '<td class="ps-3 text-muted" style="font-size:0.85em">'+inv+'</td>'+
             '<td>'+b.InvoiceDate+'</td><td>'+b.VehicleNumber+'</td><td>'+b.VendorName+'</td>'+
             '<td>'+fmt(b.FixedAmount)+'</td><td>'+fmt(b.VariableAmount)+'</td>'+
             '<td>'+fmt(b.TrafficChallan)+'</td><td>'+fmt(b.Tollgates)+'</td>'+
@@ -271,7 +318,13 @@ function renderBillTable(bills){
             '<td><span class="badge '+sc+'">'+b.PaymentStatus+'</span></td>'+
             '<td class="viewer-hide"><button class="btn btn-sm btn-outline-warning me-1" onclick="editBill(\''+b.BillID+'\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteBill(\''+b.BillID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
         if(i===bills.length-1){
-            html+='<tr style="background:rgba(255,213,79,0.08);font-size:0.82em"><td colspan="11" class="text-end text-muted fst-italic pe-2">Subtotal — '+inv+' ('+grpCount+' line'+(grpCount>1?'s':'')+')</td><td class="fw-bold">'+fmt(grpTotal)+'</td><td class="text-success fw-bold">'+fmt(grpPaid)+'</td><td class="text-danger fw-bold">'+fmt(grpBal)+'</td><td colspan="3"></td></tr>';
+            html+='<tr style="background:rgba(255,213,79,0.1)">'
+                +'<td colspan="11" class="text-end text-muted fst-italic pe-2" style="font-size:0.82em">Subtotal — '+inv+' &nbsp;('+grpCount+' vehicle'+(grpCount>1?'s':'')+')</td>'
+                +'<td class="fw-bold" style="font-size:0.85em">'+fmt(grpTotal)+'</td>'
+                +'<td class="text-success fw-bold" style="font-size:0.85em">'+fmt(grpPaid)+'</td>'
+                +'<td class="text-danger fw-bold" style="font-size:0.85em">'+fmt(grpBal)+'</td>'
+                +'<td colspan="3"></td></tr>'
+                +invDescRow(inv, grpDesc, curColor);
         }
     });
     tbody.innerHTML=html;

@@ -77,7 +77,7 @@ SHEET_HEADERS = {
         "FixedAmount", "VariableAmount", "TrafficChallan", "Tollgates",
         "SubTotal", "SGST", "CGST", "TDS", "TotalAmount",
         "PaymentStatus", "PaidAmount", "BalanceAmount",
-        "Description", "CreatedDate", "UpdatedDate",
+        "Description", "InvoiceDescription", "CreatedDate", "UpdatedDate",
     ],
     "Receivables": [
         "ReceivableID", "ReceiveDate", "PaymentMonth", "BillID", "VendorName",

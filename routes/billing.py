@@ -170,6 +170,30 @@ async def update_bill(request: Request, bill_id: str):
     return {"success": True}
 
 
+@router.put("/api/invoice/{inv_num}/description")
+async def update_invoice_description(request: Request, inv_num: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    desc = data.get("InvoiceDescription", "")
+    inv_num = inv_num.strip().upper()
+    all_bills = get_all_records("Billing")
+    from services.sheets_service import build_row
+    updated = 0
+    for bill in all_bills:
+        if str(bill.get("InvoiceNumber", "")).upper() == inv_num:
+            result = find_row_by_id("Billing", bill["BillID"])
+            if result:
+                row_num, existing = result
+                vals = {**existing, "InvoiceDescription": desc, "UpdatedDate": now_str()}
+                row = build_row("Billing", vals)
+                update_row("Billing", row_num, row)
+                updated += 1
+    add_audit_log("UPDATE", "Billing", inv_num, f"Invoice description updated for {inv_num}", user["email"])
+    return {"success": True, "updated": updated}
+
+
 @router.delete("/api/{bill_id}")
 async def delete_bill(request: Request, bill_id: str):
     user = get_user(request)
