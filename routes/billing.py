@@ -67,16 +67,16 @@ async def list_bills(
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = get_all_records("Billing")
     if date_from:
-        records = [r for r in records if str(r.get("InvoiceDate", "")) >= date_from]
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) >= date_from[:7]]
     if date_to:
-        records = [r for r in records if str(r.get("InvoiceDate", "")) <= date_to]
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) <= date_to[:7]]
     if vehicle:
         records = [r for r in records if str(r.get("VehicleNumber", "")) == vehicle]
     if vendor:
         records = [r for r in records if str(r.get("VendorName", "")) == vendor]
     if status:
         records = [r for r in records if str(r.get("PaymentStatus", "")) == status]
-    records.sort(key=lambda x: str(x.get("InvoiceDate", "")), reverse=True)
+    records.sort(key=lambda x: (str(x.get("PaymentMonth", "")) or str(x.get("InvoiceDate", ""))[:7]), reverse=True)
     total = len(records)
     total_amount = sum(float(r.get("TotalAmount", 0) or 0) for r in records)
     total_paid = sum(float(r.get("PaidAmount", 0) or 0) for r in records)

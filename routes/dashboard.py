@@ -35,19 +35,16 @@ async def dashboard_stats(request: Request, month: str = ""):
     vehicles = get_all_records("Vehicles")
     drivers = get_all_records("Drivers")
     billing = get_all_records("Billing")
-    receivables = get_all_records("Receivables")
     fuel = get_all_records("FuelEntries")
     purse = get_all_records("Purse")
     today = datetime.now().strftime("%Y-%m-%d")
     month_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     total_expense = sum(float(e.get("Amount", 0) or 0) for e in month_expenses)
     total_today = sum(float(e.get("Amount", 0) or 0) for e in expenses if str(e.get("ExpenseDate", "")) == today)
-    # Billing: filter by PaymentMonth (month when payment is expected/received)
+    # Billing: filter by PaymentMonth — amounts based on bills attributed to this month
     month_billing = [b for b in billing if (str(b.get("PaymentMonth", "")) or str(b.get("InvoiceDate", ""))[:7]) == month]
     total_billed = sum(float(b.get("TotalAmount", 0) or 0) for b in month_billing)
-    # Received: sum receivables whose PaymentMonth matches selected month
-    month_received = [r for r in receivables if (str(r.get("PaymentMonth", "")) or str(r.get("ReceiveDate", ""))[:7]) == month]
-    total_received = sum(float(r.get("Amount", 0) or 0) for r in month_received)
+    total_received = sum(float(b.get("PaidAmount", 0) or 0) for b in month_billing)
     total_outstanding = sum(float(b.get("BalanceAmount", 0) or 0) for b in month_billing)
     month_fuel = [f for f in fuel if str(f.get("EntryDate", ""))[:7] == month]
     total_fuel_litres = sum(float(f.get("Litres", 0) or 0) for f in month_fuel)
@@ -84,7 +81,6 @@ async def dashboard_charts(request: Request, month: str = ""):
     if not month:
         month = datetime.now().strftime("%Y-%m")
     expenses = get_all_records("Expenses")
-    billing = get_all_records("Billing")
     monthly_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     vehicle_wise = defaultdict(float)
     category_wise = defaultdict(float)
@@ -92,25 +88,9 @@ async def dashboard_charts(request: Request, month: str = ""):
         vn = str(e.get("VehicleNumber", "")) or "Company"
         vehicle_wise[vn] += float(e.get("Amount", 0) or 0)
         category_wise[str(e.get("Category", "Other"))] += float(e.get("Amount", 0) or 0)
-    monthly_trend = defaultdict(float)
-    billing_trend = defaultdict(float)
-    for e in expenses:
-        d = str(e.get("ExpenseDate", ""))
-        if len(d) >= 7:
-            monthly_trend[d[:7]] += float(e.get("Amount", 0) or 0)
-    for b in billing:
-        d = str(b.get("PaymentMonth", "")) or str(b.get("InvoiceDate", ""))[:7]
-        if len(d) >= 7:
-            billing_trend[d[:7]] += float(b.get("TotalAmount", 0) or 0)
-    all_months = sorted(set(list(monthly_trend.keys()) + list(billing_trend.keys())))[-12:]
     return {
         "vehicle_wise": {"labels": list(vehicle_wise.keys()), "values": list(vehicle_wise.values())},
         "category_wise": {"labels": list(category_wise.keys()), "values": list(category_wise.values())},
-        "monthly_trend": {
-            "labels": all_months,
-            "expense": [monthly_trend.get(m, 0) for m in all_months],
-            "billing": [billing_trend.get(m, 0) for m in all_months],
-        },
     }
 
 

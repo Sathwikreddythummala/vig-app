@@ -53,12 +53,27 @@ async def get_sales(request: Request, month: str = ""):
     bills = get_all_records("Billing")
     if month:
         bills = [b for b in bills if str(b.get("InvoiceDate", ""))[:7] == month]
-    total_amount = sum(float(b.get("SubTotal", 0) or 0) for b in bills)
-    total_sgst = sum(float(b.get("SGST", 0) or 0) for b in bills)
-    total_cgst = sum(float(b.get("CGST", 0) or 0) for b in bills)
-    total = sum(float(b.get("TotalAmount", 0) or 0) for b in bills)
+    # Group by InvoiceNumber — one row per invoice
+    from collections import defaultdict
+    inv_groups = defaultdict(lambda: {"SubTotal": 0, "SGST": 0, "CGST": 0, "TotalAmount": 0, "VendorName": "", "InvoiceDate": "", "InvoiceNumber": "", "VehicleCount": 0})
+    for b in bills:
+        inv = str(b.get("InvoiceNumber", "")).upper()
+        g = inv_groups[inv]
+        g["InvoiceNumber"] = inv
+        g["InvoiceDate"] = g["InvoiceDate"] or b.get("InvoiceDate", "")
+        g["VendorName"] = g["VendorName"] or b.get("VendorName", "")
+        g["SubTotal"] += float(b.get("SubTotal", 0) or 0)
+        g["SGST"] += float(b.get("SGST", 0) or 0)
+        g["CGST"] += float(b.get("CGST", 0) or 0)
+        g["TotalAmount"] += float(b.get("TotalAmount", 0) or 0)
+        g["VehicleCount"] += 1
+    grouped = sorted(inv_groups.values(), key=lambda x: x["InvoiceDate"], reverse=True)
+    total_amount = sum(g["SubTotal"] for g in grouped)
+    total_sgst = sum(g["SGST"] for g in grouped)
+    total_cgst = sum(g["CGST"] for g in grouped)
+    total = sum(g["TotalAmount"] for g in grouped)
     return {
-        "sales": bills,
+        "sales": grouped,
         "total_amount": total_amount,
         "total_sgst": total_sgst,
         "total_cgst": total_cgst,

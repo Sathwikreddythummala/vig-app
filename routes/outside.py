@@ -112,7 +112,7 @@ async def outside_summary(request: Request, month: str = ""):
     bills = get_all_records("Billing")
     ov_numbers = [str(v.get("VehicleNumber", "")).upper() for v in vehicles]
     month_txns = [t for t in transactions if str(t.get("ForMonth", "")) == month]
-    month_bills = [b for b in bills if str(b.get("InvoiceDate", ""))[:7] == month]
+    month_bills = [b for b in bills if (str(b.get("PaymentMonth", "")) or str(b.get("InvoiceDate", ""))[:7]) == month]
     summaries = []
     for v in vehicles:
         if v.get("Status", "") != "Active":
