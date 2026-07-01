@@ -214,23 +214,7 @@ async function loadBills(page){
 
 function payMonthCell(b){
     var pm = b.PaymentMonth||'';
-    if(canEdit){
-        return '<td><input type="month" class="form-control form-control-sm glass-input" style="width:145px" value="'+pm+'" onchange="saveBillPayMonth(\''+b.BillID+'\',this)"></td>';
-    } else {
-        return '<td>'+(pm?'<span class="badge bg-info text-dark">'+pm+'</span>':'<span class="text-muted">—</span>')+'</td>';
-    }
-}
-
-async function saveBillPayMonth(billId, input){
-    var orig=input.defaultValue;
-    input.disabled=true;
-    try{
-        var res=await fetch('/billing/api/'+billId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({PaymentMonth:input.value,_partial:true})});
-        var data=await res.json();
-        if(data.success){input.defaultValue=input.value;showToast('Payment month updated','success');}
-        else{showToast(data.error||'Failed','danger');input.value=orig;}
-    }catch(e){showToast('Network error','danger');input.value=orig;}
-    finally{input.disabled=false;}
+    return '<td>'+(pm?'<span class="badge bg-info text-dark">'+pm+'</span>':'<span class="text-muted">—</span>')+'</td>';
 }
 
 async function savePayMonth(recvId, input){
