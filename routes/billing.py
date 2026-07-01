@@ -81,8 +81,22 @@ async def list_bills(
     total_amount = sum(float(r.get("TotalAmount", 0) or 0) for r in records)
     total_paid = sum(float(r.get("PaidAmount", 0) or 0) for r in records)
     total_balance = sum(float(r.get("BalanceAmount", 0) or 0) for r in records)
+    # attach receivables to each bill
+    all_recv = get_all_records("Receivables")
+    recv_by_bill = {}
+    for r in all_recv:
+        bid = r.get("BillID", "")
+        if bid:
+            recv_by_bill.setdefault(bid, []).append({
+                "ReceivableID": r.get("ReceivableID", ""),
+                "ReceiveDate": r.get("ReceiveDate", ""),
+                "PaymentMonth": r.get("PaymentMonth", "") or str(r.get("ReceiveDate", ""))[:7],
+                "Amount": r.get("Amount", "0"),
+            })
     start = (page - 1) * per_page
     paginated = records[start:start + per_page]
+    for b in paginated:
+        b["_receivables"] = recv_by_bill.get(b.get("BillID", ""), [])
     return {
         "bills": paginated,
         "total": total,
@@ -175,7 +189,16 @@ async def list_receivables(request: Request, bill_id: str = "", vendor: str = ""
         records = [r for r in records if str(r.get("VendorName", "")) == vendor]
     if payment_month:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("ReceiveDate", ""))[:7]) == payment_month]
-    records.sort(key=lambda x: str(x.get("ReceiveDate", "")), reverse=True)
+    # enrich with InvoiceNumber from Billing
+    bills = get_all_records("Billing")
+    bill_map = {b.get("BillID", ""): b for b in bills}
+    for r in records:
+        bid = r.get("BillID", "")
+        bill = bill_map.get(bid, {})
+        r["InvoiceNumber"] = bill.get("InvoiceNumber", "")
+        r["VehicleNumber"] = bill.get("VehicleNumber", r.get("VehicleNumber", ""))
+        r["PaymentMonth"] = r.get("PaymentMonth", "") or str(r.get("ReceiveDate", ""))[:7]
+    records.sort(key=lambda x: (str(x.get("InvoiceNumber", "")), str(x.get("ReceiveDate", ""))))
     total_received = sum(float(r.get("Amount", 0) or 0) for r in records)
     return {"receivables": records, "total_received": total_received}
 
@@ -196,6 +219,24 @@ async def add_receivable(request: Request):
     if data.get("BillID"):
         recalc_bill(data["BillID"])
     return {"success": True, "receivable_id": rid}
+
+
+@router.put("/api/receivables/{recv_id}")
+async def update_receivable(request: Request, recv_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    result = find_row_by_id("Receivables", recv_id)
+    if not result:
+        return JSONResponse({"error": "Not found"}, 404)
+    row_num, existing = result
+    from services.sheets_service import build_row
+    vals = {**existing, **data, "ReceivableID": recv_id}
+    row = build_row("Receivables", vals)
+    update_row("Receivables", row_num, row)
+    add_audit_log("UPDATE", "Receivables", recv_id, f"Receivable updated", user["email"])
+    return {"success": True}
 
 
 @router.delete("/api/receivables/{recv_id}")
