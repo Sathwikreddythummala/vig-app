@@ -1,5 +1,7 @@
 from config import settings
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 import uuid
 import time
 import threading
@@ -114,7 +116,7 @@ def gen_id(prefix: str) -> str:
 
 
 def now_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(_IST).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def today_str() -> str:

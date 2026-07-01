@@ -86,7 +86,7 @@
                         <div class="col-md-2"><label class="form-label">Sub Total</label><input type="text" class="form-control glass-input" id="bSubTotal" readonly style="font-weight:700;background:rgba(255,213,79,0.15)!important"></div>
                         <div class="col-md-2"><label class="form-label">SGST (9%)</label><input type="text" class="form-control glass-input" id="bSGST" readonly style="background:rgba(255,213,79,0.15)!important"></div>
                         <div class="col-md-2"><label class="form-label">CGST (9%)</label><input type="text" class="form-control glass-input" id="bCGST" readonly style="background:rgba(255,213,79,0.15)!important"></div>
-                        <div class="col-md-2"><label class="form-label">TDS (₹)</label><input type="number" class="form-control glass-input" id="bTDS" min="0" step="0.01" value="0" oninput="calcBill()"></div>
+                        <div class="col-md-2"><label class="form-label">TDS (2%)</label><input type="number" class="form-control glass-input" id="bTDS" min="0" step="0.01" value="0" oninput="this.dataset.userEdited='1';calcBill()"></div>
                         <div class="col-md-4"><label class="form-label">Total Amount</label><input type="text" class="form-control glass-input" id="bTotal" readonly style="font-weight:700;font-size:1.1rem;background:rgba(76,175,80,0.15)!important;color:#2E7D32"></div>
                         <div class="col-md-8"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="bDesc"></div>
                         <div class="col-md-4" id="bStatusRow" style="display:none"><label class="form-label">Override Status</label>
@@ -188,9 +188,11 @@ function calcBill(){
     var variable=parseFloat(document.getElementById('bVariable').value)||0;
     var challan=parseFloat(document.getElementById('bChallan').value)||0;
     var tolls=parseFloat(document.getElementById('bTolls').value)||0;
-    var sub=fixed+variable-challan-tolls;
+    var sub=fixed+variable+tolls+challan;
     var sgst=Math.round(sub*0.09*100)/100, cgst=Math.round(sub*0.09*100)/100;
-    var tds=parseFloat(document.getElementById('bTDS').value)||0;
+    var tdsEl=document.getElementById('bTDS');
+    if(!tdsEl.dataset.userEdited) tdsEl.value=Math.round(sub*0.02*100)/100;
+    var tds=parseFloat(tdsEl.value)||0;
     var total=Math.round((sub+sgst+cgst-tds)*100)/100;
     document.getElementById('bSubTotal').value='₹'+sub.toLocaleString('en-IN');
     document.getElementById('bSGST').value='₹'+sgst.toLocaleString('en-IN');
@@ -206,6 +208,7 @@ function resetBillForm(){
     document.getElementById('bStatusRow').style.display='none';
     document.getElementById('bStatus').value='';
     ['bFixed','bVariable','bChallan','bTolls','bTDS'].forEach(id=>document.getElementById(id).value='0');
+    delete document.getElementById('bTDS').dataset.userEdited;
     calcBill();
 }
 
@@ -360,7 +363,9 @@ function editBill(bid){
     document.getElementById('bVariable').value=b.VariableAmount||0;
     document.getElementById('bChallan').value=b.TrafficChallan||0;
     document.getElementById('bTolls').value=b.Tollgates||0;
-    document.getElementById('bTDS').value=b.TDS||0;
+    var tdsFld=document.getElementById('bTDS');
+    tdsFld.value=b.TDS||0;
+    tdsFld.dataset.userEdited='1';
     document.getElementById('bDesc').value=b.Description||'';
     calcBill();
     bootstrap.Modal.getOrCreateInstance(billModalEl).show();

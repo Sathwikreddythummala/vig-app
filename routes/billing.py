@@ -7,6 +7,8 @@ from services.sheets_service import (
 from utils.templates import templates
 from utils.duplicate_check import is_duplicate
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -17,7 +19,7 @@ def get_user(request: Request):
 
 def next_invoice_number():
     records = get_all_records("Billing")
-    month = datetime.now().strftime("%y%m")
+    month = datetime.now(_IST).strftime("%y%m")
     count = len([r for r in records if str(r.get("InvoiceNumber", "")).startswith(f"VE-{month}")]) + 1
     return f"VE-{month}-{count:04d}"
 
@@ -118,7 +120,7 @@ async def add_bill(request: Request):
     variable = float(data.get("VariableAmount", 0) or 0)
     challan = float(data.get("TrafficChallan", 0) or 0)
     tolls = float(data.get("Tollgates", 0) or 0)
-    sub_total = fixed + variable - challan - tolls
+    sub_total = fixed + variable + tolls + challan
     sgst = round(sub_total * 0.09, 2)
     cgst = round(sub_total * 0.09, 2)
     tds = float(data.get("TDS", 0) or 0)
@@ -154,7 +156,7 @@ async def update_bill(request: Request, bill_id: str):
     variable = float(data.get("VariableAmount", 0) or 0)
     challan = float(data.get("TrafficChallan", 0) or 0)
     tolls = float(data.get("Tollgates", 0) or 0)
-    sub_total = fixed + variable - challan - tolls
+    sub_total = fixed + variable + tolls + challan
     sgst = round(sub_total * 0.09, 2)
     cgst = round(sub_total * 0.09, 2)
     tds = float(data.get("TDS", 0) or 0)

@@ -2,7 +2,13 @@ from fastapi import APIRouter, Request
 from services.sheets_service import get_all_records
 from utils.templates import templates
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from collections import defaultdict
+
+IST = ZoneInfo("Asia/Kolkata")
+
+def now_ist():
+    return datetime.now(IST)
 
 router = APIRouter(tags=["dashboard"])
 
@@ -30,14 +36,14 @@ async def dashboard_stats(request: Request, month: str = ""):
     if not user:
         return {"error": "Unauthorized"}
     if not month:
-        month = datetime.now().strftime("%Y-%m")
+        month = now_ist().strftime("%Y-%m")
     expenses = get_all_records("Expenses")
     vehicles = get_all_records("Vehicles")
     drivers = get_all_records("Drivers")
     billing = get_all_records("Billing")
     fuel = get_all_records("FuelEntries")
     purse = get_all_records("Purse")
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_ist().strftime("%Y-%m-%d")
     month_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     total_expense = sum(float(e.get("Amount", 0) or 0) for e in month_expenses)
     total_today = sum(float(e.get("Amount", 0) or 0) for e in expenses if str(e.get("ExpenseDate", "")) == today)
@@ -79,7 +85,7 @@ async def dashboard_charts(request: Request, month: str = ""):
     if not user:
         return {"error": "Unauthorized"}
     if not month:
-        month = datetime.now().strftime("%Y-%m")
+        month = now_ist().strftime("%Y-%m")
     expenses = get_all_records("Expenses")
     monthly_expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     vehicle_wise = defaultdict(float)
@@ -112,7 +118,7 @@ async def dashboard_alerts(request: Request):
     if not user:
         return {"error": "Unauthorized"}
     alerts = []
-    today = datetime.now().date()
+    today = now_ist().date()
     threshold = today + timedelta(days=30)
     vehicles = get_all_records("Vehicles")
     drivers = get_all_records("Drivers")
