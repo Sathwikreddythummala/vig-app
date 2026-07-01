@@ -73,7 +73,8 @@
                 <form id="billForm">
                     <input type="hidden" id="billId">
                     <div class="row g-3">
-                        <div class="col-md-3"><label class="form-label">Invoice Date *</label><input type="date" class="form-control glass-input" id="bDate" required></div>
+                        <div class="col-md-3"><label class="form-label">Invoice Date *</label><input type="date" class="form-control glass-input" id="bDate" required oninput="syncBillPayMonth()"></div>
+                        <div class="col-md-3"><label class="form-label">Payment Month *<small class="text-muted ms-1">(expected payment)</small></label><input type="month" class="form-control glass-input" id="bPayMonth" required></div>
                         <div class="col-md-3"><label class="form-label">Invoice Number</label><input type="text" class="form-control glass-input" id="bInvNum" placeholder="Auto-generated"></div>
                         <div class="col-md-3"><label class="form-label">Vehicle *</label><select class="form-select glass-input" id="bVehicle" required onchange="autoFillVendor()"><option value="">-- Select --</option></select></div>
                         <div class="col-md-3"><label class="form-label">Vendor *</label><select class="form-select glass-input" id="bVendor" required><option value="">-- Select --</option></select></div>
@@ -166,6 +167,10 @@ function syncPayMonth(){
     var date=document.getElementById('rDate').value;
     if(date) document.getElementById('rPayMonth').value=date.slice(0,7);
 }
+function syncBillPayMonth(){
+    var date=document.getElementById('bDate').value;
+    if(date) document.getElementById('bPayMonth').value=date.slice(0,7);
+}
 function autoFillVendor(){
     var sel=document.getElementById('bVehicle'),opt=sel.options[sel.selectedIndex];
     if(opt&&opt.dataset.vendor) document.getElementById('bVendor').value=opt.dataset.vendor;
@@ -189,6 +194,7 @@ function resetBillForm(){
     document.getElementById('billId').value='';
     document.getElementById('billModalTitle').textContent='Add Bill';
     document.getElementById('bDate').value=todayStr();
+    document.getElementById('bPayMonth').value=thisMonth();
     ['bFixed','bVariable','bChallan','bTolls','bTDS'].forEach(id=>document.getElementById(id).value='0');
     calcBill();
 }
@@ -289,6 +295,7 @@ function editBill(bid){
     document.getElementById('billId').value=b.BillID;
     document.getElementById('billModalTitle').textContent='Edit Bill';
     document.getElementById('bDate').value=b.InvoiceDate||'';
+    document.getElementById('bPayMonth').value=b.PaymentMonth||b.InvoiceDate.slice(0,7)||'';
     document.getElementById('bInvNum').value=b.InvoiceNumber||'';
     document.getElementById('bVehicle').value=b.VehicleNumber||'';
     document.getElementById('bVendor').value=b.VendorName||'';
@@ -304,7 +311,7 @@ function editBill(bid){
 
 async function saveBill(){
     var id=document.getElementById('billId').value;
-    var payload={InvoiceDate:document.getElementById('bDate').value,InvoiceNumber:document.getElementById('bInvNum').value,VehicleNumber:document.getElementById('bVehicle').value,VendorName:document.getElementById('bVendor').value,FixedAmount:document.getElementById('bFixed').value,VariableAmount:document.getElementById('bVariable').value,TrafficChallan:document.getElementById('bChallan').value,Tollgates:document.getElementById('bTolls').value,TDS:document.getElementById('bTDS').value,Description:document.getElementById('bDesc').value};
+    var payload={InvoiceDate:document.getElementById('bDate').value,PaymentMonth:document.getElementById('bPayMonth').value,InvoiceNumber:document.getElementById('bInvNum').value,VehicleNumber:document.getElementById('bVehicle').value,VendorName:document.getElementById('bVendor').value,FixedAmount:document.getElementById('bFixed').value,VariableAmount:document.getElementById('bVariable').value,TrafficChallan:document.getElementById('bChallan').value,Tollgates:document.getElementById('bTolls').value,TDS:document.getElementById('bTDS').value,Description:document.getElementById('bDesc').value};
     if(!payload.InvoiceDate||!payload.VehicleNumber||!payload.VendorName){showToast('Fill required fields','danger');return;}
     try{
         var res=await fetch(id?'/billing/api/'+id:'/billing/api/add',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});

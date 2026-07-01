@@ -73,7 +73,7 @@ SHEET_HEADERS = {
         "Description", "CreatedDate",
     ],
     "Billing": [
-        "BillID", "InvoiceNumber", "InvoiceDate", "VehicleNumber", "VendorName",
+        "BillID", "InvoiceNumber", "InvoiceDate", "PaymentMonth", "VehicleNumber", "VendorName",
         "FixedAmount", "VariableAmount", "TrafficChallan", "Tollgates",
         "SubTotal", "SGST", "CGST", "TDS", "TotalAmount",
         "PaymentStatus", "PaidAmount", "BalanceAmount",
