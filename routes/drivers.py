@@ -249,7 +249,7 @@ async def get_driver(request: Request, driver_id: str):
     docs = get_all_records("Documents")
     driver_docs = [d for d in docs if d.get("EntityType") == "Driver" and d.get("EntityID") == driver_id]
     expenses = get_all_records("Expenses")
-    driver_expenses = [e for e in expenses if str(e.get("DriverName", "")) == str(record.get("DriverName", ""))]
+    driver_expenses = [e for e in expenses if str(e.get("DriverName", "")) == str(record.get("DriverName", "")) and str(e.get("Category", "")) == "Driver Expense"]
     return {"driver": record, "documents": driver_docs, "expenses": driver_expenses}
 
 

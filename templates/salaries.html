@@ -73,12 +73,7 @@ async function loadSalaries() {
             <td><span class="badge ${r.EmployeeType==='Driver'?'bg-warning text-dark':'bg-info text-dark'}">${r.EmployeeType}</span></td>
             <td>${r.AssignedVehicle||'-'}</td>
             <td class="fw-bold">${fmt(r.ProfileSalary)}</td>
-            <td>
-                ${canEdit ? `<div class="input-group input-group-sm" style="width:140px">
-                    <span class="input-group-text">₹</span>
-                    <input type="number" class="form-control incentive-input" data-driver="${r.DriverID}" value="${r.Incentive||0}" min="0" step="1" onchange="saveIncentive(this)">
-                </div>` : fmt(r.Incentive)}
-            </td>
+            <td>${fmt(r.Incentive)}</td>
             <td class="${r.Advance?'text-danger':''}">${fmt(r.Advance)}</td>
             <td class="${r.Meals?'text-danger':''}">${fmt(r.Meals)}</td>
             <td class="${r.Deductions?'text-danger':''}">${fmt(r.Deductions)}</td>
