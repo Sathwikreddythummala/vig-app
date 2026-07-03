@@ -176,10 +176,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     except ImportError:
         return JSONResponse({"error": "openpyxl not installed"}, 500)
-    data = await salaries_api(request, month)
-    salaries = data.body
-    import json
-    body = json.loads(salaries)
+    body = await salaries_api(request, month)
     rows = body["salaries"]
     totals = body["totals"]
     wb = openpyxl.Workbook()
