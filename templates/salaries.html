@@ -16,6 +16,7 @@
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.05s"><div class="stat-icon bg-driver"><i class="bi bi-fuel-pump"></i></div><div class="stat-info"><small>Total Incentive</small><h5 id="statIncentive">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Total Advance</small><h5 id="statAdvance">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Total Meals</small><h5 id="statMeals">₹0</h5></div></div></div>
+    <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.25s"><div class="stat-icon bg-expense"><i class="bi bi-dash-circle"></i></div><div class="stat-info"><small>Total Deductions</small><h5 id="statDeductions" class="text-danger">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Other</small><h5 id="statOther">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.4s"><div class="stat-icon" style="background:var(--accent-green,#28a745)"><i class="bi bi-wallet2"></i></div><div class="stat-info"><small>Net Payable</small><h5 id="statNet">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.5s"><div class="stat-icon bg-month"><i class="bi bi-check-circle"></i></div><div class="stat-info"><small>Salary Paid</small><h5 id="statPaid">₹0</h5></div></div></div>
@@ -25,7 +26,7 @@
         <table class="table table-hover glass-table">
             <thead><tr>
                 <th>#</th><th>Name</th><th>Type</th><th>Vehicle</th>
-                <th>Salary</th><th>Diesel Mileage Incentive</th><th>Advance</th><th>Meals</th><th>Other</th><th>Net Payable</th><th>Paid</th>
+                <th>Salary</th><th>Diesel Mileage Incentive</th><th>Advance</th><th>Meals</th><th>Deductions</th><th>Other</th><th>Net Payable</th><th>Paid</th>
             </tr></thead>
             <tbody id="salaryTable">
                 <tr><td colspan="11" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
@@ -59,6 +60,7 @@ async function loadSalaries() {
     document.getElementById('statIncentive').textContent = fmt(t.Incentive);
     document.getElementById('statAdvance').textContent = fmt(t.Advance);
     document.getElementById('statMeals').textContent = fmt(t.Meals);
+    document.getElementById('statDeductions').textContent = fmt(t.Deductions);
     document.getElementById('statOther').textContent = fmt(t.Other);
     document.getElementById('statNet').textContent = fmt(t.NetPayable);
     document.getElementById('statPaid').textContent = fmt(t.SalaryPaid);
@@ -79,19 +81,22 @@ async function loadSalaries() {
             </td>
             <td class="${r.Advance?'text-danger':''}">${fmt(r.Advance)}</td>
             <td class="${r.Meals?'text-danger':''}">${fmt(r.Meals)}</td>
+            <td class="${r.Deductions?'text-danger':''}">${fmt(r.Deductions)}</td>
             <td class="${r.Other?'text-danger':''}">${fmt(r.Other)}</td>
             <td class="fw-bold ${r.NetPayable>=0?'text-success':'text-danger'}" id="net-${r.DriverID}">${fmt(r.NetPayable)}</td>
             <td>${fmt(r.SalaryPaid)}</td>
         </tr>`).join('');
     } else {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No employees found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No employees found</td></tr>';
     }
 
     document.getElementById('salaryTotals').innerHTML = `<tr class="fw-bold" style="background:rgba(212,160,23,0.1)">
         <td></td><td>TOTAL</td><td></td><td></td>
         <td>${fmt(t.ProfileSalary)}</td><td>${fmt(t.Incentive)}</td>
         <td class="text-danger">${fmt(t.Advance)}</td>
-        <td class="text-danger">${fmt(t.Meals)}</td><td class="text-danger">${fmt(t.Other)}</td>
+        <td class="text-danger">${fmt(t.Meals)}</td>
+        <td class="text-danger">${fmt(t.Deductions)}</td>
+        <td class="text-danger">${fmt(t.Other)}</td>
         <td class="${t.NetPayable>=0?'text-success':'text-danger'}">${fmt(t.NetPayable)}</td>
         <td>${fmt(t.SalaryPaid)}</td>
     </tr>`;

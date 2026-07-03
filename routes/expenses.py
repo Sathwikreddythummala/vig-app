@@ -12,7 +12,7 @@ router = APIRouter(prefix="/expenses", tags=["expenses"])
 
 CATEGORIES = {
     "Fuel": ["Diesel", "AdBlue", "Engine Oil", "Coolant"],
-    "Driver Expense": ["Salary", "Advance", "Meals", "Phone Recharge", "Travel", "Accommodation"],
+    "Driver Expense": ["Salary", "Advance", "Meals", "Phone Recharge", "Travel", "Accommodation", "Deductions"],
     "Tyres": ["Tyre Purchase", "Tyre Puncture", "Tube", "Alignment", "Balancing"],
     "Maintenance": ["Servicing", "Greasing", "Mechanic Charges", "Electrical", "Welding", "Battery", "Clutch Plate", "Gear Box", "Oil Change", "Engine Repair"],
     "EMI": [],
@@ -42,6 +42,9 @@ async def expenses_page(request: Request):
 
 @router.get("/api/categories")
 async def get_categories(request: Request):
+    user = get_user(request)
+    if user and user.get("role") == "driver":
+        return {"categories": {"Driver Expense": CATEGORIES["Driver Expense"]}}
     return {"categories": CATEGORIES}
 
 
@@ -61,6 +64,10 @@ async def list_expenses(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     expenses = get_all_records("Expenses")
+    # Drivers only see their own Driver Expense and Deductions entries
+    if user.get("role") == "driver":
+        driver_name = user.get("driver_name", "")
+        expenses = [e for e in expenses if str(e.get("Category", "")) == "Driver Expense" and str(e.get("DriverName", "")) == driver_name]
     if date_from:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:

@@ -82,18 +82,20 @@ async def salaries_api(request: Request, month: str = ""):
         did = d.get("DriverID", "")
         name = str(d.get("DriverName", "")).strip()
         profile_salary = float(d.get("Salary", 0) or 0)
-        drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name]
+        # Only Driver Expense category counts for salary calculation
+        drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name and str(e.get("Category", "")) == "Driver Expense"]
         if month:
-            drv_expenses = [e for e in drv_expenses if e.get("ForMonth", "") == month or str(e.get("ExpenseDate", ""))[:7] == month]
+            drv_expenses = [e for e in drv_expenses if (e.get("ForMonth") or str(e.get("ExpenseDate", ""))[:7]) == month]
         salary_paid = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Salary")
         advance = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Advance")
         meals = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Meals")
-        other = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") not in ("Salary", "Advance", "Meals"))
+        deductions = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Deductions")
+        other = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") not in ("Salary", "Advance", "Meals", "Deductions"))
         incentive_row = None
         if month:
             incentive_row = next((i for i in incentives if str(i.get("DriverID", "")) == did and str(i.get("ForMonth", "")) == month), None)
         incentive = float(incentive_row.get("Amount", 0) or 0) if incentive_row else 0.0
-        net_payable = profile_salary + incentive - advance - meals - other
+        net_payable = profile_salary + incentive - advance - meals - deductions - other
         result.append({
             "DriverID": did,
             "DriverName": name,
@@ -103,6 +105,7 @@ async def salaries_api(request: Request, month: str = ""):
             "SalaryPaid": salary_paid,
             "Advance": advance,
             "Meals": meals,
+            "Deductions": deductions,
             "Other": other,
             "Incentive": incentive,
             "IncentiveID": incentive_row.get("IncentiveID", "") if incentive_row else "",
@@ -114,6 +117,7 @@ async def salaries_api(request: Request, month: str = ""):
         "SalaryPaid": sum(r["SalaryPaid"] for r in result),
         "Advance": sum(r["Advance"] for r in result),
         "Meals": sum(r["Meals"] for r in result),
+        "Deductions": sum(r["Deductions"] for r in result),
         "Other": sum(r["Other"] for r in result),
         "Incentive": sum(r["Incentive"] for r in result),
         "NetPayable": sum(r["NetPayable"] for r in result),

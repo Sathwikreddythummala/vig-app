@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from services.auth_service import is_email_allowed, is_admin, get_driver_by_email, get_user_role, is_driver_record
-from services.sheets_service import add_audit_log
+from services.sheets_service import add_audit_log, get_all_records
 from utils.templates import templates
 from config import settings
 from urllib.parse import urlencode
@@ -108,3 +108,88 @@ async def login_page(request: Request):
 @router.get("/unauthorized")
 async def unauthorized(request: Request):
     return templates.TemplateResponse(request=request, name="unauthorized.html")
+
+
+def _normalize_mobile(mobile: str) -> str:
+    mobile = str(mobile or "").strip().replace(" ", "").replace("-", "")
+    if mobile.startswith("+91"):
+        return mobile
+    if mobile.startswith("91") and len(mobile) == 12:
+        return "+" + mobile
+    if len(mobile) == 10:
+        return "+91" + mobile
+    return mobile
+
+
+def _get_driver_by_mobile(mobile: str):
+    digits = mobile.lstrip("+").lstrip("91") if mobile.startswith("+91") else mobile
+    digits = digits[-10:]
+    try:
+        drivers = get_all_records("Drivers")
+        for d in drivers:
+            dm = str(d.get("MobileNumber", "")).strip().replace(" ", "").replace("-", "")
+            dm_digits = dm.lstrip("+").lstrip("91")[-10:] if dm else ""
+            if dm_digits == digits and str(d.get("Status", "Active")).strip().lower() != "inactive":
+                return d
+    except Exception:
+        pass
+    return None
+
+
+@router.post("/otp/send")
+async def otp_send(request: Request):
+    data = await request.json()
+    mobile = _normalize_mobile(data.get("mobile", ""))
+    if not mobile or len(mobile) < 10:
+        return JSONResponse({"error": "Enter a valid 10-digit mobile number"}, 400)
+    driver = _get_driver_by_mobile(mobile)
+    if not driver:
+        return JSONResponse({"error": "Mobile number not registered. Contact admin."}, 403)
+    try:
+        from twilio.rest import Client
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        client.verify.v2.services(settings.TWILIO_VERIFY_SERVICE_SID).verifications.create(
+            to=mobile, channel="sms"
+        )
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to send OTP: {str(e)}"}, 500)
+    request.session["otp_mobile"] = mobile
+    return JSONResponse({"success": True})
+
+
+@router.post("/otp/verify")
+async def otp_verify(request: Request):
+    data = await request.json()
+    mobile = request.session.get("otp_mobile", "")
+    otp = str(data.get("otp", "")).strip()
+    if not mobile or not otp:
+        return JSONResponse({"error": "Session expired. Please request OTP again."}, 400)
+    try:
+        from twilio.rest import Client
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        result = client.verify.v2.services(settings.TWILIO_VERIFY_SERVICE_SID).verification_checks.create(
+            to=mobile, code=otp
+        )
+        if result.status != "approved":
+            return JSONResponse({"error": "Invalid or expired OTP"}, 401)
+    except Exception as e:
+        return JSONResponse({"error": f"Verification failed: {str(e)}"}, 500)
+    driver = _get_driver_by_mobile(mobile)
+    if not driver:
+        return JSONResponse({"error": "Driver not found"}, 404)
+    request.session.pop("otp_mobile", None)
+    request.session["user"] = {
+        "email": driver.get("Email", mobile),
+        "name": driver.get("DriverName", "Driver"),
+        "picture": "",
+        "role": "driver",
+        "driver_id": driver.get("DriverID", ""),
+        "driver_name": driver.get("DriverName", ""),
+        "assigned_vehicle": driver.get("AssignedVehicle", ""),
+        "mobile": mobile,
+    }
+    try:
+        add_audit_log("LOGIN", "Auth", "", f"Driver {driver.get('DriverName','')} logged in via OTP ({mobile})", mobile)
+    except Exception:
+        pass
+    return JSONResponse({"success": True, "redirect": "/driver-portal"})

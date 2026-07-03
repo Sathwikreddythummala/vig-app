@@ -179,7 +179,7 @@ function loadSubCategories() {
 function toggleForMonth() {
     var cat = document.getElementById('expCategory').value;
     var sub = document.getElementById('expSubCategory').value;
-    var show = (cat === 'Driver Expense' && (sub === 'Salary' || sub === 'Advance' || sub === 'Meals'));
+    var show = (cat === 'Driver Expense' && (sub === 'Salary' || sub === 'Advance' || sub === 'Meals' || sub === 'Deductions'));
     document.getElementById('forMonthField').style.display = show ? '' : 'none';
     if (show && !document.getElementById('expForMonth').value) {
         document.getElementById('expForMonth').value = document.getElementById('expDate').value.slice(0,7);

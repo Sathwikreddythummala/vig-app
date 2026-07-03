@@ -30,7 +30,10 @@ class Settings:
         "https://www.googleapis.com/auth/drive",
     ]
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
-    SESSION_MAX_AGE: int = 86400
+    SESSION_MAX_AGE: int = 60 * 60 * 24 * 365  # 1 year — session persists until explicit logout
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_VERIFY_SERVICE_SID: str = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
 
 
 settings = Settings()
