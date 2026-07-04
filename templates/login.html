@@ -55,10 +55,10 @@
             <div id="stepMobile">
                 <div class="d-flex mb-2">
                     <div class="prefix-box">+91</div>
-                    <input type="tel" class="otp-input with-prefix" id="mobileInput" maxlength="10" placeholder="10-digit mobile number" oninput="this.value=this.value.replace(/\D/g,'')">
+                    <input type="tel" class="otp-input with-prefix" id="mobileInput" maxlength="10" placeholder="10-digit mobile number" oninput="this.value=this.value.replace(/\D/g,'');onMobileInput()">
                 </div>
                 <div class="err-msg" id="mobileErr"></div>
-                <button class="otp-btn mt-2" onclick="sendOTP()"><i class="bi bi-send"></i> Send OTP</button>
+                <button class="otp-btn mt-2" id="sendBtn" onclick="sendOTP()"><i class="bi bi-send"></i> Send OTP</button>
             </div>
 
             <div id="stepOtp" style="display:none">
@@ -77,6 +77,11 @@
         if(step==='mobile') document.getElementById('mobileInput').focus();
     }
     function setErr(id, msg){ var el=document.getElementById(id); el.textContent=msg; el.style.display=msg?'block':'none'; }
+
+    function onMobileInput(){
+        var len = document.getElementById('mobileInput').value.length;
+        document.getElementById('sendBtn').classList.toggle('ready', len===10);
+    }
 
     function onOtpInput(){
         var len = document.getElementById('otpInput').value.length;
