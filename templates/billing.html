@@ -400,23 +400,28 @@ function resetRecvForm(){
     document.getElementById('rBillID').innerHTML='<option value="">-- General Payment --</option>';
 }
 
-function loadVendorBills(){
+async function loadVendorBills(){
     var vendor=document.getElementById('rVendor').value;
     var sel=document.getElementById('rBillID');
     sel.innerHTML='<option value="">-- General Payment --</option>';
-    // One option per invoice number (unpaid/partial only)
+    if(!vendor) return;
+    sel.innerHTML='<option value="">Loading...</option>';
+    var res=await fetch('/billing/api/list?per_page=1000&vendor='+encodeURIComponent(vendor));
+    var data=await res.json();
+    var bills=data.bills||[];
+    sel.innerHTML='<option value="">-- General Payment --</option>';
     var invGroups={}, invOrder=[];
-    allBills.filter(b=>b.VendorName===vendor && b.PaymentStatus!=='Paid').forEach(b=>{
+    bills.filter(b=>b.PaymentStatus!=='Paid').forEach(b=>{
         var inv=b.InvoiceNumber||'Unknown';
         if(!invGroups[inv]){invGroups[inv]=[];invOrder.push(inv);}
         invGroups[inv].push(b);
     });
     invOrder.forEach(function(inv){
-        var bills=invGroups[inv];
-        var totalBal=bills.reduce((s,b)=>s+parseFloat(b.BalanceAmount||0),0);
+        var grp=invGroups[inv];
+        var totalBal=grp.reduce((s,b)=>s+parseFloat(b.BalanceAmount||0),0);
         var opt=document.createElement('option');
         opt.value='INV:'+inv;
-        opt.textContent=inv+' | ₹'+totalBal.toLocaleString('en-IN')+' pending ('+bills.length+' vehicle'+(bills.length>1?'s':'')+')';
+        opt.textContent=inv+' | ₹'+totalBal.toLocaleString('en-IN')+' pending ('+grp.length+' vehicle'+(grp.length>1?'s':'')+')';
         sel.appendChild(opt);
     });
 }
