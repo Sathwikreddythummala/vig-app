@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Fuel Reconciliation - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Fuel Reconciliation{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <select class="form-select glass-input" id="filterMonth" style="width:180px" onchange="load()">
+            <option value="">All Time</option>
+        </select>
+        <button class="btn btn-warning btn-sm" onclick="load()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        <span class="text-muted small ms-2">Compares Fuel Entries (Diesel) vs Expenses (Category=Fuel, SubCategory=Diesel)</span>
+    </div>
+</div>
+
+<div class="row g-3 mb-4" id="statsRow">
+    <div class="col-md-3"><div class="glass-card stat-card animate-in">
+        <div class="stat-icon bg-vehicle"><i class="bi bi-fuel-pump"></i></div>
+        <div class="stat-info"><small>Fuel Entries (Diesel)</small><h3 id="cntFuel">—</h3></div>
+    </div></div>
+    <div class="col-md-3"><div class="glass-card stat-card animate-in" style="animation-delay:.1s">
+        <div class="stat-icon bg-expense"><i class="bi bi-receipt"></i></div>
+        <div class="stat-info"><small>Expense Entries (Diesel)</small><h3 id="cntExp">—</h3></div>
+    </div></div>
+    <div class="col-md-3"><div class="glass-card stat-card animate-in" style="animation-delay:.2s">
+        <div class="stat-icon bg-month"><i class="bi bi-currency-rupee"></i></div>
+        <div class="stat-info"><small>Fuel Total (₹)</small><h3 id="totFuel">—</h3></div>
+    </div></div>
+    <div class="col-md-3"><div class="glass-card stat-card animate-in" style="animation-delay:.3s">
+        <div class="stat-icon bg-driver"><i class="bi bi-currency-rupee"></i></div>
+        <div class="stat-info"><small>Expense Total (₹)</small><h3 id="totExp">—</h3></div>
+    </div></div>
+</div>
+
+<div class="glass-card mb-3 animate-in" id="statusBanner" style="display:none"></div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="glass-card animate-in">
+            <h6 class="mb-3 text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> In Fuel Entries — No Matching Expense <span class="badge bg-danger ms-1" id="badgeFuelOnly">0</span></h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Litres</th><th>Amount</th></tr></thead>
+                    <tbody id="tblFuelOnly"><tr><td colspan="5" class="text-center text-muted">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card animate-in" style="animation-delay:.2s">
+            <h6 class="mb-3 text-warning"><i class="bi bi-exclamation-circle-fill me-1"></i> In Expenses — No Matching Fuel Entry <span class="badge bg-warning text-dark ms-1" id="badgeExpOnly">0</span></h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Amount</th><th>Description</th></tr></thead>
+                    <tbody id="tblExpOnly"><tr><td colspan="5" class="text-center text-muted">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function fmt(v){return '₹'+parseFloat(v||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0});}
+
+// Populate month options
+(function(){
+    var sel=document.getElementById('filterMonth');
+    var now=new Date();
+    for(var i=0;i<18;i++){
+        var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+        var val=d.toISOString().slice(0,7);
+        var lbl=d.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+        var opt=document.createElement('option');
+        opt.value=val; opt.textContent=lbl;
+        if(i===0) opt.selected=true;
+        sel.appendChild(opt);
+    }
+})();
+
+async function load(){
+    var month=document.getElementById('filterMonth').value;
+    var url='/fuel/api/reconcile'+(month?'?month='+month:'');
+    document.getElementById('tblFuelOnly').innerHTML='<tr><td colspan="5" class="text-center text-muted">Loading…</td></tr>';
+    document.getElementById('tblExpOnly').innerHTML='<tr><td colspan="5" class="text-center text-muted">Loading…</td></tr>';
+    document.getElementById('statusBanner').style.display='none';
+    var res=await fetch(url);
+    var d=await res.json();
+
+    document.getElementById('cntFuel').textContent=d.fuel_count;
+    document.getElementById('cntExp').textContent=d.expense_count;
+    document.getElementById('totFuel').textContent=fmt(d.fuel_total);
+    document.getElementById('totExp').textContent=fmt(d.expense_total);
+
+    var banner=document.getElementById('statusBanner');
+    if(d.fuel_count===d.expense_count && d.fuel_total===d.expense_total){
+        banner.className='glass-card mb-3 animate-in p-3 text-center fw-bold';
+        banner.style.background='rgba(40,167,69,0.15)';
+        banner.innerHTML='<i class="bi bi-check-circle-fill text-success me-2"></i><span class="text-success">All good — Fuel Entries and Expenses match perfectly!</span>';
+    } else {
+        banner.className='glass-card mb-3 animate-in p-3 text-center fw-bold';
+        banner.style.background='rgba(220,53,69,0.12)';
+        var diff=d.fuel_count-d.expense_count;
+        var tdiff=(d.fuel_total-d.expense_total);
+        banner.innerHTML='<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i><span class="text-danger">Mismatch detected — Count diff: '+(diff>=0?'+':'')+diff+' &nbsp;|&nbsp; Amount diff: '+(tdiff>=0?'+':'')+fmt(tdiff)+'</span>';
+    }
+    banner.style.display='';
+
+    var fo=d.in_fuel_not_expense||[];
+    document.getElementById('badgeFuelOnly').textContent=fo.length;
+    if(fo.length===0){
+        document.getElementById('tblFuelOnly').innerHTML='<tr><td colspan="5" class="text-center text-success"><i class="bi bi-check-circle me-1"></i>No unmatched fuel entries</td></tr>';
+    } else {
+        document.getElementById('tblFuelOnly').innerHTML=fo.map(function(r){
+            return '<tr class="table-danger"><td>'+r.date+'</td><td>'+r.vehicle+'</td><td>'+(r.driver||'—')+'</td><td>'+(r.litres||'—')+'</td><td>'+fmt(r.amount)+'</td></tr>';
+        }).join('');
+    }
+
+    var eo=d.in_expense_not_fuel||[];
+    document.getElementById('badgeExpOnly').textContent=eo.length;
+    if(eo.length===0){
+        document.getElementById('tblExpOnly').innerHTML='<tr><td colspan="5" class="text-center text-success"><i class="bi bi-check-circle me-1"></i>No unmatched expenses</td></tr>';
+    } else {
+        document.getElementById('tblExpOnly').innerHTML=eo.map(function(r){
+            return '<tr class="table-warning"><td>'+r.date+'</td><td>'+r.vehicle+'</td><td>'+(r.driver||'—')+'</td><td>'+fmt(r.amount)+'</td><td>'+(r.description||'—')+'</td></tr>';
+        }).join('');
+    }
+}
+
+load();
+</script>
+{% endblock %}

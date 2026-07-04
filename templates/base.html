@@ -21,7 +21,8 @@
             <ul class="sidebar-nav">
                 <li><a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
                 <li><a href="/expenses" class="nav-link {% if '/expenses' in request.url.path %}active{% endif %}"><i class="bi bi-cash-stack"></i><span>Expenses</span></a></li>
-                <li><a href="/fuel" class="nav-link {% if '/fuel' in request.url.path %}active{% endif %}"><i class="bi bi-fuel-pump"></i><span>Fuel</span></a></li>
+                <li><a href="/fuel" class="nav-link {% if request.url.path == '/fuel' %}active{% endif %}"><i class="bi bi-fuel-pump"></i><span>Fuel</span></a></li>
+                <li><a href="/fuel/reconcile" class="nav-link {% if '/fuel/reconcile' in request.url.path %}active{% endif %}"><i class="bi bi-arrow-left-right"></i><span>Fuel Reconcile</span></a></li>
                 <li><a href="/vehicles" class="nav-link {% if '/vehicles' in request.url.path %}active{% endif %}"><i class="bi bi-truck"></i><span>Vehicles</span></a></li>
                 <li><a href="/drivers" class="nav-link {% if '/drivers' in request.url.path %}active{% endif %}"><i class="bi bi-people"></i><span>Employees</span></a></li>
                 <li><a href="/attendance" class="nav-link {% if '/attendance' in request.url.path %}active{% endif %}"><i class="bi bi-calendar-check"></i><span>Attendance</span></a></li>
