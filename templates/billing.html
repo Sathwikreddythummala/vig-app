@@ -219,8 +219,16 @@ async function loadBills(page){
     var data=await res.json();
     allBills=data.bills||[];
     document.getElementById('statTotal').textContent=fmt(data.total_amount);
-    document.getElementById('statPaid').textContent=fmt(data.total_paid);
     document.getElementById('statBalance').textContent=fmt(data.total_balance);
+    // Total Received from Receivables (includes general payments)
+    var month=document.getElementById('filterDateFrom').value?document.getElementById('filterDateFrom').value.slice(0,7):'';
+    var vendor=document.getElementById('filterVendor').value;
+    var recvParams=new URLSearchParams();
+    if(month) recvParams.set('payment_month',month);
+    if(vendor) recvParams.set('vendor',vendor);
+    var recvRes=await fetch('/billing/api/receivables?'+recvParams);
+    var recvData=await recvRes.json();
+    document.getElementById('statPaid').textContent=fmt(recvData.total_received||0);
     renderBillTable(allBills);
     renderBillSummary(allBills);
 }
@@ -411,17 +419,19 @@ async function loadVendorBills(){
     var bills=data.bills||[];
     sel.innerHTML='<option value="">-- General Payment --</option>';
     var invGroups={}, invOrder=[];
-    bills.filter(b=>b.PaymentStatus!=='Paid').forEach(b=>{
+    bills.forEach(b=>{
         var inv=b.InvoiceNumber||'Unknown';
         if(!invGroups[inv]){invGroups[inv]=[];invOrder.push(inv);}
         invGroups[inv].push(b);
     });
+    if(!invOrder.length){ sel.innerHTML+=''; return; }
     invOrder.forEach(function(inv){
         var grp=invGroups[inv];
         var totalBal=grp.reduce((s,b)=>s+parseFloat(b.BalanceAmount||0),0);
+        var status=grp[0].PaymentStatus||'Pending';
         var opt=document.createElement('option');
         opt.value='INV:'+inv;
-        opt.textContent=inv+' | ₹'+totalBal.toLocaleString('en-IN')+' pending ('+grp.length+' vehicle'+(grp.length>1?'s':'')+')';
+        opt.textContent=inv+' | '+status+' | ₹'+totalBal.toLocaleString('en-IN')+' balance ('+grp.length+' vehicle'+(grp.length>1?'s':'')+')';
         sel.appendChild(opt);
     });
 }
