@@ -21,8 +21,10 @@
         .login-btn{display:inline-flex;align-items:center;gap:12px;padding:13px 36px;background:linear-gradient(135deg,#FFD54F,#FFC107);border:none;border-radius:50px;font-size:1rem;font-weight:600;color:#3E2723;cursor:pointer;transition:all 0.3s;box-shadow:0 4px 15px rgba(255,193,7,0.3);text-decoration:none;width:100%;justify-content:center}
         .login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,193,7,0.5);color:#3E2723}
         .login-btn i{font-size:1.2rem}
-        .otp-btn{display:inline-flex;align-items:center;gap:12px;padding:13px 36px;background:rgba(255,255,255,0.4);border:1.5px solid rgba(255,193,7,0.5);border-radius:50px;font-size:1rem;font-weight:600;color:#3E2723;cursor:pointer;transition:all 0.3s;width:100%;justify-content:center}
+        .otp-btn{display:inline-flex;align-items:center;gap:12px;padding:13px 36px;background:rgba(255,255,255,0.4);border:1.5px solid rgba(255,193,7,0.5);border-radius:50px;font-size:1rem;font-weight:600;color:#3E2723;cursor:pointer;transition:all 0.3s;width:100%;justify-content:center;pointer-events:auto}
+        .otp-btn *{pointer-events:none}
         .otp-btn:hover{background:rgba(255,255,255,0.6);transform:translateY(-2px)}
+        .otp-btn.ready{background:linear-gradient(135deg,#FFD54F,#FFC107);box-shadow:0 4px 15px rgba(255,193,7,0.5);transform:translateY(-1px)}
         .otp-input{background:rgba(255,255,255,0.5);border:1.5px solid rgba(255,193,7,0.4);border-radius:12px;padding:12px 16px;font-size:1rem;width:100%;outline:none;color:#3E2723;font-family:'Poppins',sans-serif;transition:border 0.2s}
         .otp-input:focus{border-color:#FFC107;background:rgba(255,255,255,0.7)}
         .otp-input::placeholder{color:#a0856b}
@@ -61,9 +63,9 @@
 
             <div id="stepOtp" style="display:none">
                 <p style="color:#5D4037;font-size:0.85rem;margin-bottom:10px">OTP sent to <strong id="sentTo"></strong> &nbsp;<a href="#" onclick="showStep('mobile');return false" style="color:#8D6E63;font-size:0.8rem">Change</a></p>
-                <input type="text" class="otp-input mb-2" id="otpInput" maxlength="6" placeholder="Enter 6-digit OTP" oninput="this.value=this.value.replace(/\D/g,'')">
+                <input type="text" class="otp-input mb-2" id="otpInput" maxlength="6" placeholder="Enter 6-digit OTP" oninput="this.value=this.value.replace(/\D/g,'');onOtpInput()">
                 <div class="err-msg" id="otpErr"></div>
-                <button class="otp-btn mt-2" onclick="verifyOTP()"><i class="bi bi-shield-check"></i> Verify OTP</button>
+                <button class="otp-btn mt-2" id="verifyBtn" onclick="verifyOTP(this)"><i class="bi bi-shield-check"></i> Verify OTP</button>
             </div>
         </div>
     </div>
@@ -76,11 +78,17 @@
     }
     function setErr(id, msg){ var el=document.getElementById(id); el.textContent=msg; el.style.display=msg?'block':'none'; }
 
+    function onOtpInput(){
+        var len = document.getElementById('otpInput').value.length;
+        document.getElementById('verifyBtn').classList.toggle('ready', len===6);
+    }
+
     async function sendOTP(){
         var mobile = document.getElementById('mobileInput').value.trim();
         if(mobile.length !== 10){ setErr('mobileErr','Enter a valid 10-digit mobile number'); return; }
         setErr('mobileErr','');
-        var btn = event.target; btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split"></i> Sending…';
+        var btn = document.querySelector('#stepMobile .otp-btn');
+        btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split"></i> Sending…';
         try{
             var r = await fetch('/auth/otp/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile})});
             var d = await r.json();
@@ -95,11 +103,11 @@
         btn.disabled=false; btn.innerHTML='<i class="bi bi-send"></i> Send OTP';
     }
 
-    async function verifyOTP(){
+    async function verifyOTP(btn){
         var otp = document.getElementById('otpInput').value.trim();
         if(otp.length !== 6){ setErr('otpErr','Enter the 6-digit OTP'); return; }
         setErr('otpErr','');
-        var btn = event.target; btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split"></i> Verifying…';
+        btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split"></i> Verifying…';
         try{
             var r = await fetch('/auth/otp/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({otp})});
             var d = await r.json();
@@ -110,7 +118,7 @@
     }
 
     document.getElementById('mobileInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendOTP(); });
-    document.getElementById('otpInput').addEventListener('keydown', e=>{ if(e.key==='Enter') verifyOTP(); });
+    document.getElementById('otpInput').addEventListener('keydown', e=>{ if(e.key==='Enter') verifyOTP(document.getElementById('verifyBtn')); });
     </script>
 </body>
 </html>
