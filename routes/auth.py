@@ -136,55 +136,16 @@ def _get_driver_by_mobile(mobile: str):
     return None
 
 
-@router.post("/otp/send")
-async def otp_send(request: Request):
-    import random
-    data = await request.json()
-    mobile = _normalize_mobile(data.get("mobile", ""))
-    digits_only = mobile[-10:]
-    if not digits_only or len(digits_only) != 10:
-        return JSONResponse({"error": "Enter a valid 10-digit mobile number"}, 400)
-    driver = _get_driver_by_mobile(mobile)
-    if not driver:
-        return JSONResponse({"error": "Mobile number not registered. Contact admin."}, 403)
-    otp = str(random.randint(100000, 999999))
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://www.fast2sms.com/dev/bulkV2",
-                headers={"authorization": settings.FAST2SMS_API_KEY},
-                json={
-                    "route": "otp",
-                    "variables_values": otp,
-                    "numbers": digits_only,
-                },
-                timeout=10,
-            )
-        result = resp.json()
-        if not result.get("return"):
-            return JSONResponse({"error": result.get("message", "Failed to send OTP")}, 500)
-    except Exception as e:
-        return JSONResponse({"error": f"Failed to send OTP: {str(e)}"}, 500)
-    request.session["otp_mobile"] = mobile
-    request.session["otp_code"] = otp
-    return JSONResponse({"success": True})
-
 
 @router.post("/otp/verify")
 async def otp_verify(request: Request):
     data = await request.json()
-    mobile = request.session.get("otp_mobile", "")
-    saved_otp = request.session.get("otp_code", "")
-    otp = str(data.get("otp", "")).strip()
-    if not mobile or not saved_otp:
-        return JSONResponse({"error": "Session expired. Please request OTP again."}, 400)
-    if otp != saved_otp:
-        return JSONResponse({"error": "Invalid OTP. Please try again."}, 401)
+    mobile = _normalize_mobile(str(data.get("mobile", "")).strip())
+    if not mobile:
+        return JSONResponse({"error": "Mobile number missing"}, 400)
     driver = _get_driver_by_mobile(mobile)
     if not driver:
-        return JSONResponse({"error": "Driver not found"}, 404)
-    request.session.pop("otp_mobile", None)
-    request.session.pop("otp_code", None)
+        return JSONResponse({"error": "Mobile number not registered. Contact admin."}, 403)
     request.session["user"] = {
         "email": driver.get("Email", mobile),
         "name": driver.get("DriverName", "Driver"),
