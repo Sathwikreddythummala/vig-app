@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Login - Vigneshwara Enterprises</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -36,7 +37,7 @@
         .otp-section{text-align:left}
         .otp-section label{font-size:0.85rem;font-weight:600;color:#5D4037;margin-bottom:6px;display:block}
         .input-row{display:flex;margin-bottom:8px;position:relative;z-index:2}
-        .grecaptcha-badge{visibility:hidden !important}
+        .grecaptcha-badge{bottom:12px !important;right:12px !important}
     </style>
 </head>
 <body>
@@ -88,13 +89,24 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     let confirmationResult = null;
+    let recaptchaWidgetId = null;
+    let otpSending = false;
 
-    function setupRecaptcha() {
+    async function getRecaptchaVerifier() {
         if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'sendBtn', {
                 size: 'invisible',
-                callback: () => {}
+                callback: () => {},
+                'expired-callback': () => resetRecaptcha()
             });
+            recaptchaWidgetId = await window.recaptchaVerifier.render();
+        }
+        return window.recaptchaVerifier;
+    }
+
+    function resetRecaptcha() {
+        if (window.grecaptcha && recaptchaWidgetId !== null) {
+            window.grecaptcha.reset(recaptchaWidgetId);
         }
     }
 
@@ -122,22 +134,32 @@
     };
 
     window.sendOTP = async function() {
+        if (otpSending) return;
         var mobile = document.getElementById('mobileInput').value.trim();
         if (mobile.length !== 10) { setErr('mobileErr', 'Enter a valid 10-digit mobile number'); return; }
         setErr('mobileErr', '');
         var btn = document.getElementById('sendBtn');
-        btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
+        otpSending = true;
+        btn.setAttribute('aria-busy', 'true');
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
         try {
-            setupRecaptcha();
-            confirmationResult = await signInWithPhoneNumber(auth, '+91' + mobile, window.recaptchaVerifier);
+            const verifier = await getRecaptchaVerifier();
+            confirmationResult = await signInWithPhoneNumber(auth, '+91' + mobile, verifier);
             document.getElementById('sentTo').textContent = '+91 ' + mobile;
             showStep('otp');
             document.getElementById('otpInput').focus();
         } catch(e) {
-            setErr('mobileErr', e.message || 'Failed to send OTP. Try again.');
-            if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
+            console.error('Firebase OTP send failed:', e);
+            resetRecaptcha();
+            const firebaseCode = e.code ? ` (${e.code})` : '';
+            const firebaseMessage = e.message || 'Failed to send OTP. Try again.';
+            setErr('mobileErr', e.code === 'auth/invalid-app-credential'
+                ? `OTP could not be sent${firebaseCode}. Check Firebase Phone Auth, authorized domain, and API key settings.`
+                : `${firebaseMessage}${firebaseCode}`);
         }
-        btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> Send OTP';
+        otpSending = false;
+        btn.removeAttribute('aria-busy');
+        btn.innerHTML = '<i class="bi bi-send"></i> Send OTP';
     };
 
     window.verifyOTP = async function(btn) {
