@@ -231,10 +231,10 @@ async def export_pdf(
             str(e.get("Category", "")),
             str(e.get("SubCategory", "")),
             str(e.get("Description", ""))[:30],
-            f"₹{amt:,.2f}",
+            f"Rs.{amt:,.0f}",
             str(e.get("PaymentMode", "")),
         ])
-    data.append(["", "", "", "", "", "Total", f"₹{total:,.2f}", ""])
+    data.append(["", "", "", "", "", "Total", f"Rs.{total:,.0f}", ""])
     table = Table(data, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FFD54F")),
