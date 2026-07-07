@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Documents - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Documents{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <select class="form-select glass-input" id="filterType" style="width:160px" onchange="applyFilter()">
+            <option value="">All Types</option>
+            <option value="Vehicle">Vehicle</option>
+            <option value="Driver">Driver</option>
+            <option value="GST">GST</option>
+        </select>
+        <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search vehicle / driver / document type…" style="width:260px" oninput="applyFilter()">
+        <span class="text-muted small ms-auto" id="docCount"></span>
+    </div>
+</div>
+
+<div class="row g-3" id="docsGrid">
+    <div class="col-12 text-center py-5"><div class="spinner-border text-warning"></div></div>
+</div>
+
+<script>
+var allDocs = [];
+var entityCache = {};
+
+async function load() {
+    var res = await fetch('/documents/api/list');
+    allDocs = await res.json();
+    // Fetch entity names
+    var [vRes, dRes] = await Promise.all([
+        fetch('/vehicles/api/list?per_page=1000'),
+        fetch('/drivers/api/list?per_page=1000'),
+    ]);
+    var vData = await vRes.json();
+    var dData = await dRes.json();
+    (vData.vehicles||[]).forEach(function(v){ entityCache['Vehicle_'+v.VehicleID] = v.VehicleNumber; });
+    (dData.drivers||[]).forEach(function(d){ entityCache['Driver_'+d.DriverID] = d.DriverName; });
+    applyFilter();
+}
+
+function entityLabel(doc) {
+    var key = doc.EntityType + '_' + doc.EntityID;
+    return entityCache[key] || doc.EntityID;
+}
+
+function applyFilter() {
+    var type = document.getElementById('filterType').value;
+    var search = document.getElementById('filterSearch').value.toLowerCase();
+    var filtered = allDocs.filter(function(d) {
+        if (type && d.EntityType !== type) return false;
+        if (search) {
+            var label = entityLabel(d).toLowerCase();
+            var doctype = (d.DocumentType||'').toLowerCase();
+            var fname = (d.FileName||'').toLowerCase();
+            if (!label.includes(search) && !doctype.includes(search) && !fname.includes(search)) return false;
+        }
+        return true;
+    });
+    document.getElementById('docCount').textContent = filtered.length + ' document' + (filtered.length !== 1 ? 's' : '');
+    render(filtered);
+}
+
+function entityBadgeClass(type) {
+    if (type === 'Vehicle') return 'bg-warning text-dark';
+    if (type === 'Driver') return 'bg-success';
+    if (type === 'GST') return 'bg-primary';
+    return 'bg-secondary';
+}
+
+function docIcon(fname) {
+    if (!fname) return 'bi-file-earmark';
+    var ext = fname.split('.').pop().toLowerCase();
+    if (ext === 'pdf') return 'bi-file-earmark-pdf text-danger';
+    if (['jpg','jpeg','png','gif','webp'].includes(ext)) return 'bi-file-earmark-image text-success';
+    if (['xlsx','xls'].includes(ext)) return 'bi-file-earmark-excel text-success';
+    if (['doc','docx'].includes(ext)) return 'bi-file-earmark-word text-primary';
+    return 'bi-file-earmark text-warning';
+}
+
+function render(docs) {
+    var grid = document.getElementById('docsGrid');
+    if (!docs.length) {
+        grid.innerHTML = '<div class="col-12 text-center text-muted py-5"><i class="bi bi-folder2 fs-1"></i><p class="mt-2">No documents found</p></div>';
+        return;
+    }
+    grid.innerHTML = docs.map(function(d) {
+        var label = entityLabel(d);
+        var icon = docIcon(d.FileName);
+        var uploaded = (d.UploadedDate||'').slice(0,10);
+        return '<div class="col-xl-3 col-lg-4 col-md-6">' +
+            '<div class="glass-card animate-in h-100 d-flex flex-column" style="gap:8px">' +
+                '<div class="d-flex align-items-center gap-2 mb-1">' +
+                    '<i class="bi ' + icon + ' fs-3"></i>' +
+                    '<div class="flex-grow-1 overflow-hidden">' +
+                        '<div class="fw-bold text-truncate" style="font-size:.95rem">' + (d.DocumentType||'Document') + '</div>' +
+                        '<div class="text-muted small text-truncate">' + d.FileName + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="d-flex align-items-center gap-2 flex-wrap">' +
+                    '<span class="badge ' + entityBadgeClass(d.EntityType) + '">' + d.EntityType + '</span>' +
+                    '<span class="badge bg-light text-dark border">' + label + '</span>' +
+                '</div>' +
+                '<div class="text-muted small">' + (uploaded || '') + '</div>' +
+                '<div class="d-flex gap-2 mt-auto pt-2">' +
+                    '<a href="/documents/api/view/' + d.DocumentID + '" target="_blank" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye me-1"></i>View</a>' +
+                    '<a href="/documents/api/download/' + d.DocumentID + '" class="btn btn-sm btn-warning flex-fill"><i class="bi bi-download me-1"></i>Download</a>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+load();
+</script>
+{% endblock %}

@@ -45,6 +45,15 @@ def _build_filename(doc: dict) -> str:
     return f"{prefix}_{doc_type}.{ext}"
 
 
+@router.get("")
+async def documents_page(request: Request):
+    user = get_user(request)
+    if not user:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/auth/login-page")
+    return templates.TemplateResponse(request=request, name="documents.html", context={"user": user})
+
+
 @router.get("/api/list")
 async def list_docs(request: Request, entity_type: str = "", entity_id: str = ""):
     user = get_user(request)
