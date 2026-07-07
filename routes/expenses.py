@@ -214,6 +214,9 @@ async def export_pdf(
         expenses = [e for e in expenses if str(e.get("VehicleNumber", "")) == vehicle]
     if category:
         expenses = [e for e in expenses if str(e.get("Category", "")) == category]
+    def safe(v, limit=30):
+        return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4))
     styles = getSampleStyleSheet()
@@ -225,14 +228,14 @@ async def export_pdf(
         amt = float(e.get("Amount", 0) or 0)
         total += amt
         data.append([
-            str(e.get("ExpenseDate", "")),
-            str(e.get("VehicleNumber", "")),
-            str(e.get("DriverName", "")),
-            str(e.get("Category", "")),
-            str(e.get("SubCategory", "")),
-            str(e.get("Description", ""))[:30],
+            safe(e.get("ExpenseDate")),
+            safe(e.get("VehicleNumber")),
+            safe(e.get("DriverName")),
+            safe(e.get("Category")),
+            safe(e.get("SubCategory")),
+            safe(e.get("Description")),
             f"Rs.{amt:,.0f}",
-            str(e.get("PaymentMode", "")),
+            safe(e.get("PaymentMode")),
         ])
     data.append(["", "", "", "", "", "Total", f"Rs.{total:,.0f}", ""])
     table = Table(data, repeatRows=1)
