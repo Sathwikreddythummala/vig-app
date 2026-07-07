@@ -109,7 +109,7 @@ body::after {
 .logo-text { font-size: 1rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0; }
 .logo-sub { font-size: 0.7rem; color: var(--text-muted); }
 
-.sidebar-nav { list-style: none; padding: 15px 10px; flex: 1; }
+.sidebar-nav { list-style: none; padding: 15px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; }
 .sidebar-nav .nav-link {
     display: flex;
     align-items: center;
@@ -151,6 +151,10 @@ body::after {
 }
 .sidebar-footer .nav-link i { margin-right: 12px; }
 .sidebar-footer .nav-link:hover { background: rgba(220, 53, 69, 0.15); color: #dc3545; }
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,193,7,0.4); border-radius: 4px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,193,7,0.7); }
 
 /* Main Content */
 .main-content {
