@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from services.sheets_service import (
     get_all_records, find_row_by_id, append_row, update_row, delete_row,
     gen_id, now_str, add_audit_log, SHEET_HEADERS,
 )
 from utils.templates import templates
 from datetime import datetime
+import io
 
 router = APIRouter(prefix="/emi", tags=["emi"])
 
@@ -109,6 +110,62 @@ async def list_emis(request: Request):
         "total_completed": completed_v + completed_o,
         "total_paid": total_paid,
     }
+
+
+@router.get("/api/export/excel")
+async def export_excel(request: Request):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    import pandas as pd
+    data = await list_emis(request)
+    vehicle_emis = data["vehicle_emis"]
+    other_emis = data["other_emis"]
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        # Vehicle EMIs sheet
+        v_rows = [{
+            "Vehicle Number": e["VehicleNumber"],
+            "Vehicle Type": e.get("VehicleType", ""),
+            "Bank Name": e["BankName"],
+            "Loan Account": e["LoanAccountNumber"],
+            "EMI Amount": e["EMIAmount"],
+            "EMI Day": e["EMIDate"],
+            "Loan Start": e["LoanStartDate"],
+            "Loan End": e["LoanEndDate"],
+            "Next Due": e["NextDue"],
+            "Days Left": e["DaysLeft"],
+            "Status": e["Status"],
+        } for e in vehicle_emis]
+        pd.DataFrame(v_rows).to_excel(writer, sheet_name="Vehicle EMIs", index=False)
+
+        # Other EMIs sheet
+        o_rows = [{
+            "EMI Name": e.get("EMIName", ""),
+            "Category": e.get("Category", ""),
+            "Vehicle": e.get("VehicleNumber", ""),
+            "Lender": e.get("LenderName", ""),
+            "Total Amount": e.get("TotalAmount", ""),
+            "Down Payment": e.get("DownPayment", ""),
+            "EMI Amount": e.get("EMIAmount", ""),
+            "EMI Day": e.get("EMIDate", ""),
+            "Start Date": e.get("StartDate", ""),
+            "End Date": e.get("EndDate", ""),
+            "Paid Installments": e.get("PaidInstallments", ""),
+            "Total Installments": e.get("TotalInstallments", ""),
+            "Next Due": e.get("NextDue", ""),
+            "Days Left": e.get("DaysLeft", ""),
+            "Status": e.get("Status", ""),
+        } for e in other_emis]
+        pd.DataFrame(o_rows).to_excel(writer, sheet_name="Other EMIs", index=False)
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=emi_report.xlsx"},
+    )
 
 
 @router.post("/api/other/add")
