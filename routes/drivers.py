@@ -243,8 +243,10 @@ async def get_driver(request: Request, driver_id: str):
     if not result:
         return JSONResponse({"error": "Driver not found"}, 404)
     _, record = result
-    docs = get_all_records("Documents")
-    driver_docs = [d for d in docs if d.get("EntityType") == "Driver" and d.get("EntityID") == driver_id]
+    from services.db import execute as db_exec
+    db_exec("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, entity_type TEXT, entity_id TEXT, doc_type TEXT, file_name TEXT, mime_type TEXT, file_data BYTEA, uploaded_by TEXT, uploaded_date TEXT)")
+    driver_docs = db_exec("SELECT doc_id, entity_type, entity_id, doc_type, file_name, mime_type, uploaded_date FROM document_files WHERE entity_type='Driver' AND entity_id=%s ORDER BY uploaded_date DESC", [driver_id], fetch=True) or []
+    driver_docs = [dict(d) for d in driver_docs]
     expenses = get_all_records("Expenses")
     driver_expenses = [e for e in expenses if str(e.get("DriverName", "")) == str(record.get("DriverName", "")) and str(e.get("Category", "")) == "Driver Expense"]
     return {"driver": record, "documents": driver_docs, "expenses": driver_expenses}
@@ -407,11 +409,14 @@ async def upload_driver_doc(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     content = await file.read()
-    result = upload_file(content, file.filename, file.content_type or "application/octet-stream", "Drivers", doc_type)
     doc_id = gen_id("DOC")
-    append_row("Documents", [doc_id, "Driver", driver_id, doc_type, file.filename, result["view_url"], now_str()])
+    mime = file.content_type or "application/octet-stream"
+    from services.db import execute as db_exec
+    db_exec("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, entity_type TEXT, entity_id TEXT, doc_type TEXT, file_name TEXT, mime_type TEXT, file_data BYTEA, uploaded_by TEXT, uploaded_date TEXT)")
+    db_exec("INSERT INTO document_files (doc_id,entity_type,entity_id,doc_type,file_name,mime_type,file_data,uploaded_by,uploaded_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        [doc_id, "Driver", driver_id, doc_type, file.filename, mime, content, user["email"], now_str()])
     add_audit_log("UPLOAD", "Documents", doc_id, f"Uploaded {doc_type} for driver {driver_id}", user["email"])
-    return {"success": True, "document": result, "doc_id": doc_id}
+    return {"success": True, "doc_id": doc_id}
 
 
 @router.get("/salaries")

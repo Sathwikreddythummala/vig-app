@@ -78,8 +78,10 @@ async def get_vehicle(request: Request, vehicle_id: str):
     if not result:
         return JSONResponse({"error": "Vehicle not found"}, 404)
     _, record = result
-    docs = get_all_records("Documents")
-    vehicle_docs = [d for d in docs if d.get("EntityType") == "Vehicle" and d.get("EntityID") == vehicle_id]
+    from services.db import execute as db_exec
+    db_exec("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, entity_type TEXT, entity_id TEXT, doc_type TEXT, file_name TEXT, mime_type TEXT, file_data BYTEA, uploaded_by TEXT, uploaded_date TEXT)")
+    vehicle_docs = db_exec("SELECT doc_id, entity_type, entity_id, doc_type, file_name, mime_type, uploaded_date FROM document_files WHERE entity_type='Vehicle' AND entity_id=%s ORDER BY uploaded_date DESC", [vehicle_id], fetch=True) or []
+    vehicle_docs = [dict(d) for d in vehicle_docs]
     expenses = get_all_records("Expenses")
     vehicle_expenses = [e for e in expenses if str(e.get("VehicleNumber", "")) == str(record.get("VehicleNumber", ""))]
     return {"vehicle": record, "documents": vehicle_docs, "expenses": vehicle_expenses}
@@ -225,12 +227,14 @@ async def upload_vehicle_doc(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     content = await file.read()
-    result = upload_file(content, file.filename, file.content_type or "application/octet-stream", "Vehicles", doc_type)
     doc_id = gen_id("DOC")
-    from services.sheets_service import append_row as sa, now_str as ns
-    sa("Documents", [doc_id, "Vehicle", vehicle_id, doc_type, file.filename, result["view_url"], ns()])
+    mime = file.content_type or "application/octet-stream"
+    from services.db import execute as db_exec
+    db_exec("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, entity_type TEXT, entity_id TEXT, doc_type TEXT, file_name TEXT, mime_type TEXT, file_data BYTEA, uploaded_by TEXT, uploaded_date TEXT)")
+    db_exec("INSERT INTO document_files (doc_id,entity_type,entity_id,doc_type,file_name,mime_type,file_data,uploaded_by,uploaded_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        [doc_id, "Vehicle", vehicle_id, doc_type, file.filename, mime, content, user["email"], now_str()])
     add_audit_log("UPLOAD", "Documents", doc_id, f"Uploaded {doc_type} for vehicle {vehicle_id}", user["email"])
-    return {"success": True, "document": result, "doc_id": doc_id}
+    return {"success": True, "doc_id": doc_id}
 
 
 @router.get("/details/{vehicle_id}")
