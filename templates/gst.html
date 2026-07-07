@@ -48,6 +48,7 @@
 <ul class="nav nav-tabs mb-3" style="border-color:rgba(255,213,79,0.3)">
     <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabPurchases" style="color:var(--text-dark);font-weight:600"><i class="bi bi-cart"></i> Purchases (Input GST)</a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabSales" style="color:var(--text-muted)"><i class="bi bi-receipt"></i> Sales (Output GST from Billing)</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabDocs" style="color:var(--text-muted)" onclick="loadGstDocs()"><i class="bi bi-folder"></i> Documents</a></li>
 </ul>
 <div class="tab-content">
 <div class="tab-pane fade show active" id="tabPurchases">
@@ -77,6 +78,32 @@
         </div>
     </div>
 </div>
+</div>
+
+<div class="tab-pane fade" id="tabDocs">
+    <div class="glass-card mb-3 animate-in">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h6 class="mb-0"><i class="bi bi-folder"></i> GST Documents</h6>
+            <button class="btn btn-warning btn-sm viewer-hide" onclick="document.getElementById('gstDocFile').click()"><i class="bi bi-upload"></i> Upload Document</button>
+        </div>
+        <input type="file" id="gstDocFile" style="display:none" onchange="uploadGstDoc(this)">
+        <div class="mt-2">
+            <select class="form-select glass-input" id="gstDocType" style="width:200px;display:inline-block">
+                <option value="GSTR3B">GSTR-3B</option>
+                <option value="GSTR2A">GSTR-2A</option>
+                <option value="GSTR1">GSTR-1</option>
+                <option value="GSTR9">GSTR-9 (Annual)</option>
+                <option value="GST_Payment">GST Payment Challan</option>
+                <option value="Other">Other</option>
+            </select>
+            <small class="text-muted ms-2">Select type before uploading</small>
+        </div>
+    </div>
+    <div class="glass-card animate-in" id="gstDocsContainer">
+        <p class="text-muted text-center py-3">Click Documents tab to load</p>
+    </div>
+</div>
+
 </div>
 <div class="modal fade" id="purchaseModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg">
@@ -227,6 +254,56 @@ async function deletePurchase(id) {
     if (!confirm('Delete this purchase?')) return;
     try { var res=await fetch('/gst/api/purchases/'+id,{method:'DELETE'}); var data=await res.json(); if(data.success){showToast('Deleted','success');loadAll();}else{showToast(data.error||'Failed','danger');} }
     catch(err) { showToast('Network error','danger'); }
+}
+
+var gstDocsLoaded = false;
+async function loadGstDocs() {
+    if (gstDocsLoaded) return;
+    gstDocsLoaded = true;
+    var month = getMonth();
+    var res = await fetch('/documents/api/list?entity_type=GST');
+    var docs = await res.json();
+    var container = document.getElementById('gstDocsContainer');
+    if (!docs.length) { container.innerHTML = '<p class="text-muted text-center py-3">No GST documents uploaded yet</p>'; return; }
+    container.innerHTML = docs.map(function(d) {
+        return '<div class="d-flex justify-content-between align-items-center border-bottom py-2">' +
+            '<div><i class="bi bi-file-earmark me-1"></i><strong>' + d.DocumentType + '</strong> <span class="badge bg-warning text-dark ms-1">' + d.EntityID + '</span> <small class="text-muted ms-1">' + d.FileName + '</small></div>' +
+            '<div class="d-flex gap-1">' +
+            '<a href="/documents/api/view/' + d.DocumentID + '" target="_blank" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>' +
+            '<a href="/documents/api/download/' + d.DocumentID + '" class="btn btn-sm btn-outline-warning" title="Download"><i class="bi bi-download"></i></a>' +
+            '<button class="btn btn-sm btn-outline-danger viewer-hide" onclick="deleteGstDoc(\'' + d.DocumentID + '\')" title="Delete"><i class="bi bi-trash"></i></button>' +
+            '</div></div>';
+    }).join('');
+}
+
+async function uploadGstDoc(input) {
+    var file = input.files[0]; if (!file) return;
+    var month = getMonth();
+    if (!month) { showToast('Select a month first', 'danger'); return; }
+    var docType = document.getElementById('gstDocType').value;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('entity_type', 'GST');
+    fd.append('entity_id', month);
+    fd.append('doc_type', docType);
+    showToast('Uploading…', 'warning');
+    try {
+        var res = await fetch('/documents/api/upload', { method: 'POST', body: fd });
+        var data = await res.json();
+        if (data.success) { showToast('Uploaded successfully', 'success'); gstDocsLoaded = false; loadGstDocs(); }
+        else { showToast(data.error || 'Upload failed', 'danger'); }
+    } catch(e) { showToast('Upload failed', 'danger'); }
+    input.value = '';
+}
+
+async function deleteGstDoc(docId) {
+    if (!confirm('Delete this document?')) return;
+    try {
+        var res = await fetch('/documents/api/' + docId, { method: 'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('Deleted', 'success'); gstDocsLoaded = false; loadGstDocs(); }
+        else { showToast(data.error || 'Failed', 'danger'); }
+    } catch(e) { showToast('Error', 'danger'); }
 }
 </script>
 {% endblock %}

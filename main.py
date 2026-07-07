@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from config import settings
-from routes import auth, dashboard, vehicles, drivers, expenses, emi, vendors, driver_portal, fuel, billing, purse, gst, access, outside, attendance
+from routes import auth, dashboard, vehicles, drivers, expenses, emi, vendors, driver_portal, fuel, billing, purse, gst, access, outside, attendance, documents
 from services.sheets_service import initialize_sheets
 from services.drive_service import initialize_drive_folders
 
@@ -106,6 +106,7 @@ app.include_router(gst.router)
 app.include_router(outside.router)
 app.include_router(access.router)
 app.include_router(attendance.router)
+app.include_router(documents.router)
 
 
 if __name__ == "__main__":
