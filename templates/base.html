@@ -31,7 +31,8 @@
                 <li><a href="/outside" class="nav-link {% if '/outside' in request.url.path %}active{% endif %}"><i class="bi bi-truck-front"></i><span>Outside Vehicles</span></a></li>
                 <li><a href="/emi" class="nav-link {% if '/emi' in request.url.path %}active{% endif %}"><i class="bi bi-bank"></i><span>EMI</span></a></li>
                 <li><a href="/gst" class="nav-link {% if '/gst' in request.url.path %}active{% endif %}"><i class="bi bi-percent"></i><span>GST</span></a></li>
-                <li><a href="/documents" class="nav-link {% if '/documents' in request.url.path %}active{% endif %}"><i class="bi bi-folder2-open"></i><span>Documents</span></a></li>
+                <li><a href="/documents" class="nav-link {% if request.url.path == '/documents' %}active{% endif %}"><i class="bi bi-folder2-open"></i><span>Documents</span></a></li>
+                <li><a href="/company-profile" class="nav-link {% if '/company-profile' in request.url.path %}active{% endif %}"><i class="bi bi-building-fill"></i><span>Company Profile</span></a></li>
                 {% if user and user.role == 'admin' %}<li><a href="/access" class="nav-link {% if '/access' in request.url.path %}active{% endif %}"><i class="bi bi-shield-lock"></i><span>Access</span></a></li>{% endif %}
             </ul>
             <div class="sidebar-footer">

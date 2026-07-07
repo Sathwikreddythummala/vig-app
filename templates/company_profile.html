@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Company Profile - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Company Profile{% endblock %}
+{% block content %}
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="glass-card animate-in text-center" style="animation-delay:0.1s">
+            <div style="width:80px;height:80px;background:linear-gradient(135deg,#FFD54F,#FFC107);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:2rem;color:#3E2723">
+                <i class="bi bi-building-fill"></i>
+            </div>
+            <h5 class="fw-bold mb-1">Vigneshwara Enterprises</h5>
+            <div class="text-muted small">Fleet Management Company</div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="glass-card animate-in" style="animation-delay:0.2s">
+            <h6 class="mb-3"><i class="bi bi-info-circle me-1"></i> Company Details</h6>
+            <div class="row g-2 small">
+                <div class="col-sm-4 text-muted">Company Name</div><div class="col-sm-8 fw-bold">Vigneshwara Enterprises</div>
+                <div class="col-sm-4 text-muted">Business Type</div><div class="col-sm-8">Transport / Fleet Management</div>
+                <div class="col-sm-4 text-muted">State</div><div class="col-sm-8">Telangana</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card mb-3 animate-in" style="animation-delay:0.3s">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h6 class="mb-0"><i class="bi bi-folder2-open me-1"></i> Company Documents</h6>
+        <div class="d-flex gap-2 align-items-center viewer-hide">
+            <select class="form-select glass-input" id="uploadDocType" style="width:220px">
+                <option value="GST_Certificate">GST Certificate</option>
+                <option value="PAN_Card">PAN Card</option>
+                <option value="MSME_Certificate">MSME Certificate</option>
+                <option value="Trade_License">Trade License</option>
+                <option value="Shop_Establishment">Shop & Establishment</option>
+                <option value="Bank_Statement">Bank Statement</option>
+                <option value="AOA_MOA">AOA / MOA</option>
+                <option value="Partnership_Deed">Partnership Deed</option>
+                <option value="Cancelled_Cheque">Cancelled Cheque</option>
+                <option value="Other">Other</option>
+            </select>
+            <button class="btn btn-warning btn-sm" onclick="document.getElementById('companyDocFile').click()">
+                <i class="bi bi-upload me-1"></i> Upload
+            </button>
+            <input type="file" id="companyDocFile" style="display:none" onchange="uploadDoc(this)">
+        </div>
+    </div>
+</div>
+
+<div class="glass-card animate-in" style="animation-delay:0.4s">
+    <div class="table-responsive">
+        <table class="table table-hover glass-table mb-0">
+            <thead>
+                <tr><th>Document Type</th><th>File Name</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="docsTable">
+                <tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function loadDocs() {
+    var res = await fetch('/documents/api/list?entity_type=Company&entity_id=VIGNESHWARA');
+    var docs = await res.json();
+    var tbody = document.getElementById('docsTable');
+    if (!docs.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-folder2 me-2"></i>No company documents uploaded yet</td></tr>';
+        return;
+    }
+    tbody.innerHTML = docs.map(function(d) {
+        var uploaded = (d.uploaded_date||'').slice(0,10);
+        var ext = (d.file_name||'').split('.').pop().toLowerCase();
+        var icon = ext==='pdf' ? 'bi-file-earmark-pdf text-danger' : ['jpg','jpeg','png'].includes(ext) ? 'bi-file-earmark-image text-success' : 'bi-file-earmark text-warning';
+        return '<tr>' +
+            '<td><strong>' + (d.doc_type||'').replace(/_/g,' ') + '</strong></td>' +
+            '<td><i class="bi ' + icon + ' me-1"></i>' + (d.file_name||'') + '</td>' +
+            '<td class="text-muted small">' + uploaded + '</td>' +
+            '<td class="text-muted small">' + (d.uploaded_by||'').split('@')[0] + '</td>' +
+            '<td><div class="d-flex gap-1">' +
+                '<a href="/documents/api/view/' + d.doc_id + '" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i> View</a>' +
+                '<a href="/documents/api/download/' + d.doc_id + '" class="btn btn-sm btn-warning"><i class="bi bi-download"></i> Download</a>' +
+                '<button class="btn btn-sm btn-outline-danger viewer-hide" onclick="deleteDoc(\'' + d.doc_id + '\')"><i class="bi bi-trash"></i></button>' +
+            '</div></td>' +
+        '</tr>';
+    }).join('');
+}
+
+async function uploadDoc(input) {
+    var file = input.files[0]; if (!file) return;
+    var docType = document.getElementById('uploadDocType').value;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('entity_type', 'Company');
+    fd.append('entity_id', 'VIGNESHWARA');
+    fd.append('doc_type', docType);
+    showToast('Uploading…', 'warning');
+    try {
+        var res = await fetch('/documents/api/upload', { method: 'POST', body: fd });
+        var data = await res.json();
+        if (data.success) { showToast('Uploaded successfully', 'success'); loadDocs(); }
+        else { showToast(data.error || 'Upload failed', 'danger'); }
+    } catch(e) { showToast('Upload failed', 'danger'); }
+    input.value = '';
+}
+
+async function deleteDoc(docId) {
+    if (!confirm('Delete this document?')) return;
+    var res = await fetch('/documents/api/' + docId, { method: 'DELETE' });
+    var data = await res.json();
+    if (data.success) { showToast('Deleted', 'success'); loadDocs(); }
+    else { showToast(data.error || 'Failed', 'danger'); }
+}
+
+loadDocs();
+</script>
+{% endblock %}

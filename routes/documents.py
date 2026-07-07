@@ -51,6 +51,7 @@ def _build_filename(row: dict) -> str:
     return f"{prefix}_{doc_type}.{ext}"
 
 
+
 @router.get("")
 async def documents_page(request: Request):
     user = get_user(request)

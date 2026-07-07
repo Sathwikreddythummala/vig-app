@@ -109,6 +109,17 @@ app.include_router(attendance.router)
 app.include_router(documents.router)
 
 
+from utils.templates import templates as _templates
+from fastapi.responses import RedirectResponse as _RR
+
+@app.get("/company-profile")
+async def company_profile_page(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return _RR("/auth/login-page")
+    return _templates.TemplateResponse(request=request, name="company_profile.html", context={"user": user})
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
