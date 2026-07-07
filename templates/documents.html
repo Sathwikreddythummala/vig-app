@@ -39,19 +39,19 @@ async function load() {
 }
 
 function entityLabel(doc) {
-    var key = doc.EntityType + '_' + doc.EntityID;
-    return entityCache[key] || doc.EntityID;
+    var key = doc.entity_type + '_' + doc.entity_id;
+    return entityCache[key] || doc.entity_id;
 }
 
 function applyFilter() {
     var type = document.getElementById('filterType').value;
     var search = document.getElementById('filterSearch').value.toLowerCase();
     var filtered = allDocs.filter(function(d) {
-        if (type && d.EntityType !== type) return false;
+        if (type && d.entity_type !== type) return false;
         if (search) {
             var label = entityLabel(d).toLowerCase();
-            var doctype = (d.DocumentType||'').toLowerCase();
-            var fname = (d.FileName||'').toLowerCase();
+            var doctype = (d.doc_type||'').toLowerCase();
+            var fname = (d.file_name||'').toLowerCase();
             if (!label.includes(search) && !doctype.includes(search) && !fname.includes(search)) return false;
         }
         return true;
@@ -85,25 +85,25 @@ function render(docs) {
     }
     grid.innerHTML = docs.map(function(d) {
         var label = entityLabel(d);
-        var icon = docIcon(d.FileName);
-        var uploaded = (d.UploadedDate||'').slice(0,10);
+        var icon = docIcon(d.file_name);
+        var uploaded = (d.uploaded_date||'').slice(0,10);
         return '<div class="col-xl-3 col-lg-4 col-md-6">' +
             '<div class="glass-card animate-in h-100 d-flex flex-column" style="gap:8px">' +
                 '<div class="d-flex align-items-center gap-2 mb-1">' +
                     '<i class="bi ' + icon + ' fs-3"></i>' +
                     '<div class="flex-grow-1 overflow-hidden">' +
-                        '<div class="fw-bold text-truncate" style="font-size:.95rem">' + (d.DocumentType||'Document') + '</div>' +
-                        '<div class="text-muted small text-truncate">' + d.FileName + '</div>' +
+                        '<div class="fw-bold text-truncate" style="font-size:.95rem">' + (d.doc_type||'Document') + '</div>' +
+                        '<div class="text-muted small text-truncate">' + d.file_name + '</div>' +
                     '</div>' +
                 '</div>' +
                 '<div class="d-flex align-items-center gap-2 flex-wrap">' +
-                    '<span class="badge ' + entityBadgeClass(d.EntityType) + '">' + d.EntityType + '</span>' +
+                    '<span class="badge ' + entityBadgeClass(d.entity_type) + '">' + d.entity_type + '</span>' +
                     '<span class="badge bg-light text-dark border">' + label + '</span>' +
                 '</div>' +
                 '<div class="text-muted small">' + (uploaded || '') + '</div>' +
                 '<div class="d-flex gap-2 mt-auto pt-2">' +
-                    '<a href="/documents/api/view/' + d.DocumentID + '" target="_blank" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye me-1"></i>View</a>' +
-                    '<a href="/documents/api/download/' + d.DocumentID + '" class="btn btn-sm btn-warning flex-fill"><i class="bi bi-download me-1"></i>Download</a>' +
+                    '<a href="/documents/api/view/' + d.doc_id + '" target="_blank" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-eye me-1"></i>View</a>' +
+                    '<a href="/documents/api/download/' + d.doc_id + '" class="btn btn-sm btn-warning flex-fill"><i class="bi bi-download me-1"></i>Download</a>' +
                 '</div>' +
             '</div>' +
         '</div>';
