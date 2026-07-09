@@ -92,8 +92,8 @@ async def list_transactions(request: Request, vehicle: str = "", month: str = ""
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = get_all_records("OutsideTransactions")
-    if vehicle:
-        records = [r for r in records if str(r.get("VehicleNumber", "")) == vehicle]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VehicleNumber", vehicle)
     if month:
         records = [r for r in records if str(r.get("ForMonth", "")) == month]
     records.sort(key=lambda x: str(x.get("Date", "")), reverse=True)

@@ -53,7 +53,7 @@ SHEET_HEADERS = {
     "GSTpurchases": [
         "PurchaseID", "InvoiceDate", "InvoiceNumber", "CompanyName",
         "Amount", "SGST", "CGST", "TotalAmount", "Description",
-        "CreatedDate",
+        "CreditTo", "CreatedDate",
     ],
     "Purse": [
         "PurseID", "Date", "Holder", "Type", "Amount", "Description",

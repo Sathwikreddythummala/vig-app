@@ -89,6 +89,7 @@
                         <div class="col-md-2"><label class="form-label">TDS (2%)</label><input type="number" class="form-control glass-input" id="bTDS" min="0" step="0.01" value="0" oninput="this.dataset.userEdited='1';calcBill()"></div>
                         <div class="col-md-4"><label class="form-label">Total Amount</label><input type="text" class="form-control glass-input" id="bTotal" readonly style="font-weight:700;font-size:1.1rem;background:rgba(76,175,80,0.15)!important;color:#2E7D32"></div>
                         <div class="col-md-8"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="bDesc"></div>
+                        <div class="col-md-12"><label class="form-label">Invoice Document</label><input type="file" class="form-control glass-input" id="bFile" accept="image/*,.pdf"><small class="text-muted">Optional — attach signed invoice copy (PDF/image)</small></div>
                         <div class="col-md-4" id="bStatusRow" style="display:none"><label class="form-label">Override Status</label>
                             <select class="form-select glass-input" id="bStatus">
                                 <option value="">— Auto (from payments) —</option>
@@ -388,7 +389,7 @@ async function saveBill(){
     try{
         var res=await fetch(id?'/billing/api/'+id:'/billing/api/add',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         var data=await res.json();
-        if(data.success){bootstrap.Modal.getInstance(billModalEl).hide();showToast(id?'Bill updated':'Bill created','success');loadBills(currentPage);}
+        if(data.success){var invNum=String(data.invoice_number||document.getElementById('bInvNum').value||'').toUpperCase();await uploadEntityDoc('bFile','GSTSale', invNum, 'Invoice');bootstrap.Modal.getInstance(billModalEl).hide();showToast(id?'Bill updated':'Bill created','success');loadBills(currentPage);}
         else showToast(data.error||'Failed','danger');
     }catch(e){showToast('Network error','danger');}
 }

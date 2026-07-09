@@ -43,12 +43,10 @@ async def list_fuel(
         records = [r for r in records if str(r.get("EntryDate", "")) >= date_from]
     if date_to:
         records = [r for r in records if str(r.get("EntryDate", "")) <= date_to]
-    if vehicle:
-        records = [r for r in records if str(r.get("VehicleNumber", "")) == vehicle]
-    if driver:
-        records = [r for r in records if str(r.get("DriverName", "")) == driver]
-    if fuel_type:
-        records = [r for r in records if str(r.get("FuelType", "")) == fuel_type]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VehicleNumber", vehicle)
+    records = filter_multi(records, "DriverName", driver)
+    records = filter_multi(records, "FuelType", fuel_type)
     records.sort(key=lambda x: str(x.get("EntryDate", "")), reverse=True)
     total = len(records)
     total_amount = sum(float(r.get("Amount", 0) or 0) for r in records)
@@ -144,68 +142,6 @@ async def update_fuel(request: Request, fuel_id: str):
     add_audit_log("UPDATE", "FuelEntries", fuel_id, f"Fuel entry updated ₹{data.get('Amount',0)}", user["email"])
     return {"success": True}
 
-
-@router.get("/reconcile")
-async def reconcile_page(request: Request):
-    user = get_user(request)
-    if not user:
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse("/auth/login-page")
-    return templates.TemplateResponse(request=request, name="fuel_reconcile.html", context={"user": user})
-
-
-@router.get("/api/reconcile")
-async def reconcile_api(request: Request, month: str = ""):
-    user = get_user(request)
-    if not user:
-        return JSONResponse({"error": "Unauthorized"}, 401)
-    fuel_entries = get_all_records("FuelEntries")
-    expenses = get_all_records("Expenses")
-
-    # Filter to Diesel only
-    diesel_entries = [r for r in fuel_entries if str(r.get("FuelType", "")).strip().lower() == "diesel"]
-    diesel_expenses = [e for e in expenses if str(e.get("Category", "")) == "Fuel" and str(e.get("SubCategory", "")).strip().lower() == "diesel"]
-
-    if month:
-        diesel_entries = [r for r in diesel_entries if str(r.get("EntryDate", ""))[:7] == month]
-        diesel_expenses = [e for e in diesel_expenses if str(e.get("ExpenseDate", ""))[:7] == month]
-
-    def norm_amount(v):
-        try:
-            return round(float(v or 0), 2)
-        except:
-            return 0.0
-
-    def entry_key(r):
-        return (str(r.get("VehicleNumber", "")).strip().lower(), str(r.get("EntryDate", ""))[:10], norm_amount(r.get("Amount")))
-
-    def expense_key(e):
-        return (str(e.get("VehicleNumber", "")).strip().lower(), str(e.get("ExpenseDate", ""))[:10], norm_amount(e.get("Amount")))
-
-    entry_keys = [entry_key(r) for r in diesel_entries]
-    expense_keys = [expense_key(e) for e in diesel_expenses]
-
-    in_fuel_not_expense = []
-    for r in diesel_entries:
-        k = entry_key(r)
-        if k not in expense_keys:
-            in_fuel_not_expense.append({"date": r.get("EntryDate",""), "vehicle": r.get("VehicleNumber",""), "driver": r.get("DriverName",""), "litres": r.get("Litres",""), "amount": r.get("Amount","")})
-
-    in_expense_not_fuel = []
-    for e in diesel_expenses:
-        k = expense_key(e)
-        if k not in entry_keys:
-            in_expense_not_fuel.append({"date": e.get("ExpenseDate",""), "vehicle": e.get("VehicleNumber",""), "driver": e.get("DriverName",""), "amount": e.get("Amount",""), "description": e.get("Description","")})
-
-    return {
-        "fuel_count": len(diesel_entries),
-        "expense_count": len(diesel_expenses),
-        "matched": len(diesel_entries) == len(diesel_expenses),
-        "in_fuel_not_expense": in_fuel_not_expense,
-        "in_expense_not_fuel": in_expense_not_fuel,
-        "fuel_total": sum(float(r.get("Amount", 0) or 0) for r in diesel_entries),
-        "expense_total": sum(float(e.get("Amount", 0) or 0) for e in diesel_expenses),
-    }
 
 
 @router.delete("/api/{fuel_id}")

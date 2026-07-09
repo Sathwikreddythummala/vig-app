@@ -124,6 +124,11 @@
                             <label class="form-label">Status</label>
                             <select class="form-select glass-input" id="oeStatus"><option>Active</option><option>Completed</option><option>Cancelled</option></select>
                         </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Loan / Agreement Document</label>
+                            <input type="file" class="form-control glass-input" id="oeFile" accept="image/*,.pdf">
+                            <small class="text-muted">Optional — attach loan agreement or bill copy (PDF/image)</small>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -280,6 +285,7 @@ async function saveOtherEmi() {
         var res = await fetch(url, { method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
         var data = await res.json();
         if (data.success) {
+            await uploadEntityDoc('oeFile', 'EMI', id || data.emi_id, 'Agreement');
             hideOeModal();
             showToast(id?'EMI updated':'EMI added','success');
             loadEMIs();

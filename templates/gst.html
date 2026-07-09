@@ -53,16 +53,24 @@
 <div class="tab-content">
 <div class="tab-pane fade show active" id="tabPurchases">
     <div class="glass-card mb-3 animate-in" style="animation-delay:0.4s">
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-cart"></i> GST Purchases</h6>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-cart"></i> GST Purchases</h6>
+                <select class="form-select glass-input" id="filterCreditTo" style="width:170px" onchange="renderPurchases()">
+                    <option value="">All Credit To</option>
+                    <option value="TSR">TSR</option>
+                    <option value="Vig-1">Vig-1</option>
+                    <option value="Vig-2">Vig-2</option>
+                </select>
+            </div>
             <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#purchaseModal" onclick="resetPurchaseForm()"><i class="bi bi-plus-lg"></i> Add Purchase</button>
         </div>
     </div>
     <div class="glass-card animate-in" style="animation-delay:0.5s">
         <div class="table-responsive">
             <table class="table table-hover glass-table small">
-                <thead><tr><th>Date</th><th>Invoice#</th><th>Company</th><th>Amount</th><th>SGST</th><th>CGST</th><th>Total</th><th>Description</th><th>Actions</th></tr></thead>
-                <tbody id="purchaseTable"><tr><td colspan="9" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+                <thead><tr><th>Date</th><th>Invoice#</th><th>Company</th><th>Amount</th><th>SGST</th><th>CGST</th><th>Total</th><th>Credit To</th><th>Description</th><th>Invoice</th><th>Actions</th></tr></thead>
+                <tbody id="purchaseTable"><tr><td colspan="11" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
             </table>
         </div>
     </div>
@@ -72,8 +80,8 @@
     <div class="glass-card">
         <div class="table-responsive">
             <table class="table table-hover glass-table small">
-                <thead><tr><th>Invoice#</th><th>Date</th><th>Vehicle</th><th>Vendor</th><th>SubTotal</th><th>SGST</th><th>CGST</th><th>Total</th></tr></thead>
-                <tbody id="salesTable"><tr><td colspan="8" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+                <thead><tr><th>Invoice#</th><th>Date</th><th>Vehicle</th><th>Vendor</th><th>SubTotal</th><th>SGST</th><th>CGST</th><th>Total</th><th>Invoice</th></tr></thead>
+                <tbody id="salesTable"><tr><td colspan="9" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
             </table>
         </div>
     </div>
@@ -120,7 +128,16 @@
                         <div class="col-md-3"><label class="form-label">SGST (9%)</label><input type="number" class="form-control glass-input" id="gpSGST" min="0" step="0.01" style="background:rgba(255,213,79,0.15)!important"></div>
                         <div class="col-md-3"><label class="form-label">CGST (9%)</label><input type="number" class="form-control glass-input" id="gpCGST" min="0" step="0.01" style="background:rgba(255,213,79,0.15)!important"></div>
                         <div class="col-md-3"><label class="form-label">Total</label><input type="text" class="form-control glass-input" id="gpTotal" readonly style="font-weight:700;background:rgba(76,175,80,0.15)!important;color:#2E7D32"></div>
-                        <div class="col-md-12"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="gpDesc"></div>
+                        <div class="col-md-4"><label class="form-label">Credit To</label>
+                            <select class="form-select glass-input" id="gpCreditTo">
+                                <option value="">-- Select --</option>
+                                <option value="TSR">TSR</option>
+                                <option value="Vig-1">Vig-1</option>
+                                <option value="Vig-2">Vig-2</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="gpDesc"></div>
+                        <div class="col-md-12"><label class="form-label">Invoice Document</label><input type="file" class="form-control glass-input" id="gpFile" accept="image/*,.pdf"><small class="text-muted">Optional — attach invoice copy (PDF/image)</small></div>
                     </div>
                 </form>
             </div>
@@ -170,30 +187,100 @@ async function loadSummary() {
     document.getElementById('payTotal').className = totalPay>0?'text-danger fw-bold':'text-success fw-bold';
 }
 
+var purchaseDocMap = {};
+
 async function loadPurchases() {
     var res = await fetch('/gst/api/purchases?month='+getMonth()); var data = await res.json();
     allPurchases = data.purchases||[];
-    var tbody = document.getElementById('purchaseTable');
-    if (allPurchases.length) {
-        var html = allPurchases.map(function(r){
-            return '<tr><td>'+r.InvoiceDate+'</td><td class="fw-bold">'+r.InvoiceNumber+'</td><td>'+r.CompanyName+'</td><td>₹'+Number(r.Amount||0).toLocaleString('en-IN')+'</td><td>₹'+Number(r.SGST||0).toLocaleString('en-IN')+'</td><td>₹'+Number(r.CGST||0).toLocaleString('en-IN')+'</td><td class="fw-bold">₹'+Number(r.TotalAmount||0).toLocaleString('en-IN')+'</td><td>'+(r.Description||'-')+'</td><td class="viewer-hide"><button class="btn btn-sm btn-outline-warning" onclick="editPurchase(\''+r.PurchaseID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deletePurchase(\''+r.PurchaseID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
-        }).join('');
-        html += '<tr class="fw-bold" style="background:rgba(255,213,79,0.15)"><td colspan="3">Total</td><td>₹'+Number(data.total_amount||0).toLocaleString('en-IN')+'</td><td>₹'+Number(data.total_sgst||0).toLocaleString('en-IN')+'</td><td>₹'+Number(data.total_cgst||0).toLocaleString('en-IN')+'</td><td>₹'+Number(data.total||0).toLocaleString('en-IN')+'</td><td colspan="2"></td></tr>';
-        tbody.innerHTML = html;
-    } else { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No purchases this month</td></tr>'; }
+    // load invoice docs for all purchases
+    var docRes = await fetch('/documents/api/list?entity_type=GSTPurchase');
+    var docList = await docRes.json();
+    purchaseDocMap = {};
+    // list is newest-first — keep the first (latest) doc per purchase
+    docList.forEach(function(d){ if (!purchaseDocMap[d.entity_id]) purchaseDocMap[d.entity_id] = d; });
+    renderPurchases();
 }
+
+function renderPurchases() {
+    var tbody = document.getElementById('purchaseTable');
+    var creditVals = getFilterValues('filterCreditTo');
+    var rows = allPurchases.filter(function(r){
+        return !creditVals.length || creditVals.indexOf(String(r.CreditTo||'')) !== -1;
+    });
+    if (rows.length) {
+        var totAmount = 0, totSGST = 0, totCGST = 0, totTotal = 0;
+        rows.forEach(function(r){
+            totAmount += Number(r.Amount||0); totSGST += Number(r.SGST||0);
+            totCGST += Number(r.CGST||0); totTotal += Number(r.TotalAmount||0);
+        });
+        var html = rows.map(function(r){
+            var doc = purchaseDocMap[r.PurchaseID];
+            var invoiceCell = doc
+                ? '<a href="/documents/api/view/'+doc.doc_id+'" target="_blank" class="btn btn-sm btn-outline-success me-1" title="View Invoice"><i class="bi bi-eye"></i></a>'
+                  + '<a href="/documents/api/download/'+doc.doc_id+'" class="btn btn-sm btn-outline-warning me-1" title="Download"><i class="bi bi-download"></i></a>'
+                  + '<label class="btn btn-sm btn-outline-secondary viewer-hide mb-0" title="Change Invoice Document" style="cursor:pointer">'
+                  + '<i class="bi bi-pencil"></i><input type="file" style="display:none" onchange="uploadInvoice(this,\'GSTPurchase\',\''+r.PurchaseID+'\')"></label>'
+                : '<label class="btn btn-sm btn-outline-secondary viewer-hide mb-0" title="Upload Invoice" style="cursor:pointer">'
+                  + '<i class="bi bi-upload"></i><input type="file" style="display:none" onchange="uploadInvoice(this,\'GSTPurchase\',\''+r.PurchaseID+'\')"></label>';
+            return '<tr><td>'+r.InvoiceDate+'</td><td class="fw-bold">'+r.InvoiceNumber+'</td><td>'+r.CompanyName+'</td><td>₹'+Number(r.Amount||0).toLocaleString('en-IN')+'</td><td>₹'+Number(r.SGST||0).toLocaleString('en-IN')+'</td><td>₹'+Number(r.CGST||0).toLocaleString('en-IN')+'</td><td class="fw-bold">₹'+Number(r.TotalAmount||0).toLocaleString('en-IN')+'</td><td>'+(r.CreditTo||'-')+'</td><td>'+(r.Description||'-')+'</td><td>'+invoiceCell+'</td><td class="viewer-hide"><button class="btn btn-sm btn-outline-warning" onclick="editPurchase(\''+r.PurchaseID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deletePurchase(\''+r.PurchaseID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+        }).join('');
+        html += '<tr class="fw-bold" style="background:rgba(255,213,79,0.15)"><td colspan="3">Total ('+rows.length+' filtered)</td><td>₹'+totAmount.toLocaleString('en-IN')+'</td><td>₹'+totSGST.toLocaleString('en-IN')+'</td><td>₹'+totCGST.toLocaleString('en-IN')+'</td><td>₹'+totTotal.toLocaleString('en-IN')+'</td><td colspan="4"></td></tr>';
+        tbody.innerHTML = html;
+    } else { tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No purchases match</td></tr>'; }
+}
+
+var salesDocMap = {};
 
 async function loadSales() {
     var res = await fetch('/gst/api/sales?month='+getMonth()); var data = await res.json();
     var sales = data.sales||[];
+    var docRes = await fetch('/documents/api/list?entity_type=GSTSale');
+    var docList = await docRes.json();
+    salesDocMap = {};
+    // list is newest-first — keep the first (latest) doc per invoice
+    docList.forEach(function(d){ if (!salesDocMap[d.entity_id]) salesDocMap[d.entity_id] = d; });
     var tbody = document.getElementById('salesTable');
     if (sales.length) {
         var html = sales.map(function(b){
-            return '<tr><td class="fw-bold">'+b.InvoiceNumber+'</td><td>'+b.InvoiceDate+'</td><td>'+b.VehicleNumber+'</td><td>'+b.VendorName+'</td><td>₹'+Number(b.SubTotal||0).toLocaleString('en-IN')+'</td><td>₹'+Number(b.SGST||0).toLocaleString('en-IN')+'</td><td>₹'+Number(b.CGST||0).toLocaleString('en-IN')+'</td><td class="fw-bold">₹'+Number(b.TotalAmount||0).toLocaleString('en-IN')+'</td></tr>';
+            var doc = salesDocMap[b.InvoiceNumber];
+            var invoiceCell = doc
+                ? '<a href="/documents/api/view/'+doc.doc_id+'" target="_blank" class="btn btn-sm btn-outline-success me-1" title="View"><i class="bi bi-eye"></i></a>'
+                  + '<a href="/documents/api/download/'+doc.doc_id+'" class="btn btn-sm btn-outline-warning me-1" title="Download"><i class="bi bi-download"></i></a>'
+                  + '<label class="btn btn-sm btn-outline-secondary viewer-hide mb-0" title="Change Invoice Document" style="cursor:pointer">'
+                  + '<i class="bi bi-pencil"></i><input type="file" style="display:none" onchange="uploadInvoice(this,\'GSTSale\',\''+b.InvoiceNumber+'\')"></label>'
+                : '<label class="btn btn-sm btn-outline-secondary viewer-hide mb-0" title="Upload Invoice" style="cursor:pointer">'
+                  + '<i class="bi bi-upload"></i><input type="file" style="display:none" onchange="uploadInvoice(this,\'GSTSale\',\''+b.InvoiceNumber+'\')"></label>';
+            return '<tr><td class="fw-bold">'+b.InvoiceNumber+'</td><td>'+b.InvoiceDate+'</td><td>'+b.VehicleNumber+'</td><td>'+b.VendorName+'</td><td>₹'+Number(b.SubTotal||0).toLocaleString('en-IN')+'</td><td>₹'+Number(b.SGST||0).toLocaleString('en-IN')+'</td><td>₹'+Number(b.CGST||0).toLocaleString('en-IN')+'</td><td class="fw-bold">₹'+Number(b.TotalAmount||0).toLocaleString('en-IN')+'</td><td>'+invoiceCell+'</td></tr>';
         }).join('');
         html += '<tr class="fw-bold" style="background:rgba(255,213,79,0.15)"><td colspan="4">Total</td><td>₹'+Number(data.total_amount||0).toLocaleString('en-IN')+'</td><td>₹'+Number(data.total_sgst||0).toLocaleString('en-IN')+'</td><td>₹'+Number(data.total_cgst||0).toLocaleString('en-IN')+'</td><td>₹'+Number(data.total||0).toLocaleString('en-IN')+'</td></tr>';
         tbody.innerHTML = html;
-    } else { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No sales this month</td></tr>'; }
+    } else { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No sales this month</td></tr>'; }
+}
+
+async function uploadInvoice(input, entityType, entityId) {
+    var file = input.files[0]; if (!file) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('entity_type', entityType);
+    fd.append('entity_id', entityId);
+    fd.append('doc_type', 'Invoice');
+    showToast('Uploading…', 'warning');
+    try {
+        // note existing invoice docs so the new upload replaces them
+        var oldIds = [];
+        try {
+            var listRes = await fetch('/documents/api/list?entity_type='+encodeURIComponent(entityType)+'&entity_id='+encodeURIComponent(entityId));
+            oldIds = (await listRes.json()).filter(function(d){ return d.doc_type === 'Invoice'; }).map(function(d){ return d.doc_id; });
+        } catch(e) {}
+        var res = await fetch('/documents/api/upload', { method: 'POST', body: fd });
+        var data = await res.json();
+        if (data.success) {
+            for (var i = 0; i < oldIds.length; i++) { try { await fetch('/documents/api/'+oldIds[i], { method: 'DELETE' }); } catch(e) {} }
+            showToast('Invoice uploaded', 'success'); loadAll();
+        }
+        else { showToast(data.error || 'Upload failed', 'danger'); }
+    } catch(e) { showToast('Upload failed', 'danger'); }
+    input.value = '';
 }
 
 function calcPurchaseGST() {
@@ -225,6 +312,7 @@ function editPurchase(pid) {
     document.getElementById('gpSGST').value = r.SGST||'';
     document.getElementById('gpCGST').value = r.CGST||'';
     document.getElementById('gpTotal').value = '₹'+Number(r.TotalAmount||0).toLocaleString('en-IN');
+    document.getElementById('gpCreditTo').value = r.CreditTo||'';
     document.getElementById('gpDesc').value = r.Description||'';
     bootstrap.Modal.getOrCreateInstance(purchaseModalEl).show();
 }
@@ -238,6 +326,7 @@ async function savePurchase() {
         Amount: document.getElementById('gpAmount').value,
         SGST: document.getElementById('gpSGST').value,
         CGST: document.getElementById('gpCGST').value,
+        CreditTo: document.getElementById('gpCreditTo').value,
         Description: document.getElementById('gpDesc').value,
     };
     if (!payload.InvoiceDate||!payload.InvoiceNumber||!payload.CompanyName||!payload.Amount) { showToast('Fill required fields','danger'); return; }
@@ -245,7 +334,7 @@ async function savePurchase() {
         var url = id ? '/gst/api/purchases/'+id : '/gst/api/purchases/add';
         var res = await fetch(url, { method:id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
         var data = await res.json();
-        if (data.success) { var m=bootstrap.Modal.getInstance(purchaseModalEl);if(m)m.hide(); showToast(id?'Updated':'Purchase added','success'); loadAll(); }
+        if (data.success) { await uploadEntityDoc('gpFile','GSTPurchase', id||data.purchase_id, 'Invoice'); var m=bootstrap.Modal.getInstance(purchaseModalEl);if(m)m.hide(); showToast(id?'Updated':'Purchase added','success'); loadAll(); }
         else { showToast(data.error||'Failed','danger'); }
     } catch(err) { showToast('Network error','danger'); }
 }

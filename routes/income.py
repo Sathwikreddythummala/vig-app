@@ -46,12 +46,10 @@ async def list_income(
         records = [r for r in records if str(r.get("IncomeDate", "")) >= date_from]
     if date_to:
         records = [r for r in records if str(r.get("IncomeDate", "")) <= date_to]
-    if vehicle:
-        records = [r for r in records if str(r.get("VehicleNumber", "")) == vehicle]
-    if vendor:
-        records = [r for r in records if str(r.get("VendorName", "")) == vendor]
-    if payment_status:
-        records = [r for r in records if str(r.get("PaymentStatus", "")) == payment_status]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VehicleNumber", vehicle)
+    records = filter_multi(records, "VendorName", vendor)
+    records = filter_multi(records, "PaymentStatus", payment_status)
     if search:
         s = search.lower()
         records = [r for r in records if s in str(r.get("VehicleNumber", "")).lower() or s in str(r.get("VendorName", "")).lower() or s in str(r.get("TripFrom", "")).lower() or s in str(r.get("TripTo", "")).lower() or s in str(r.get("Material", "")).lower()]
@@ -188,10 +186,9 @@ async def export_income_excel(request: Request, date_from: str = "", date_to: st
         records = [r for r in records if str(r.get("IncomeDate", "")) >= date_from]
     if date_to:
         records = [r for r in records if str(r.get("IncomeDate", "")) <= date_to]
-    if vehicle:
-        records = [r for r in records if str(r.get("VehicleNumber", "")) == vehicle]
-    if vendor:
-        records = [r for r in records if str(r.get("VendorName", "")) == vendor]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VehicleNumber", vehicle)
+    records = filter_multi(records, "VendorName", vendor)
     df = pd.DataFrame(records)
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")

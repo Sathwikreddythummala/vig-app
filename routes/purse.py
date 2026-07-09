@@ -53,14 +53,15 @@ async def purse_list(request: Request, holder: str = ""):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = get_all_records("Purse")
-    if holder:
-        records = [r for r in records if r.get("Holder") == holder]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "Holder", holder)
     records.sort(key=lambda x: str(x.get("Date", "")), reverse=True)
     expenses = get_all_records("Expenses")
+    holder_vals = {v.strip() for v in (holder or "").split(",") if v.strip()}
     exp_entries = []
     for e in expenses:
         paid_by = str(e.get("PaidBy", ""))
-        if paid_by in HOLDERS and (not holder or paid_by == holder):
+        if paid_by in HOLDERS and (not holder_vals or paid_by in holder_vals):
             exp_entries.append({
                 "Date": e.get("ExpenseDate", ""),
                 "Holder": paid_by,

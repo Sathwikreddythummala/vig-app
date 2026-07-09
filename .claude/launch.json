@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tsr-enterprises",
+      "runtimeExecutable": "C:\\TSR Fleet App\\run_preview.bat",
+      "runtimeArgs": [],
+      "port": 8010
+    },
+    {
+      "name": "vig-app",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--port", "8001"],
+      "port": 8001
+    }
+  ]
+}

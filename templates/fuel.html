@@ -60,6 +60,7 @@
                             <select class="form-select glass-input" id="fPayMode"><option>Cash</option><option>UPI</option><option>Card</option><option>Company Account</option></select>
                         </div>
                         <div class="col-md-6"><label class="form-label">Fuel Station</label><input type="text" class="form-control glass-input" id="fStation"></div>
+                        <div class="col-md-12"><label class="form-label">Fuel Bill Document</label><input type="file" class="form-control glass-input" id="fFile" accept="image/*,.pdf"><small class="text-muted">Optional — attach fuel bill copy (PDF/image)</small></div>
                     </div>
                 </form>
             </div>
@@ -206,7 +207,7 @@ async function saveFuel() {
         var method = id ? 'PUT' : 'POST';
         var res = await fetch(url, { method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
         var data = await res.json();
-        if (data.success) { hideFuelModal(); showToast(id?'Updated':'Added','success'); loadFuel(currentPage); }
+        if (data.success) { await uploadEntityDoc('fFile','Fuel', id||data.fuel_id, 'Receipt'); hideFuelModal(); showToast(id?'Updated':'Added','success'); loadFuel(currentPage); }
         else { showToast(data.error||'Failed','danger'); }
     } catch(err) { showToast('Network error','danger'); }
 }

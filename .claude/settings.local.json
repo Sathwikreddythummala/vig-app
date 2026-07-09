@@ -12,7 +12,29 @@
       "Bash(grep -E \"\\\\.env$|credentials\")",
       "Bash(npx create-next-app@latest vsp-astra-portal --typescript --tailwind --eslint --app --src-dir --no-import-alias --use-npm)",
       "PowerShell(Get-Command node -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Program Files\\\\nodejs\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\nvm\" -ErrorAction SilentlyContinue | Select-Object -First 5)",
-      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; node --version; npm --version)"
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; node --version; npm --version)",
+      "Bash(python -c \"import ast; print\\('ok'\\)\")",
+      "Bash(python main.py)",
+      "Bash(curl -s http://localhost:8000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s \"http://localhost:8000/billing/api/list?page=1\")",
+      "Bash(python -c \"import json,sys; bills=json.load\\(sys.stdin\\)['bills']; [print\\(b.get\\('InvoiceNumber'\\), '|', b.get\\('PaymentMonth','MISSING'\\)\\) for b in bills[:5]]\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\); bills=d.get\\('bills',[]\\); [print\\(b.get\\('InvoiceNumber'\\), '|', repr\\(b.get\\('PaymentMonth'\\)\\)\\) for b in bills[:5]]\")",
+      "Bash(curl -s -c /tmp/cookies.txt \"http://localhost:8000/billing/api/list?page=1\")",
+      "PowerShell(cd E:\\\\vig-app; Stop-Process -Name python -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process python -ArgumentList \"main.py\" -WindowStyle Hidden; Start-Sleep 4; \\(Invoke-WebRequest -Uri \"http://localhost:8000\" -UseBasicParsing\\).StatusCode)",
+      "PowerShell(cd E:\\\\vig-app; Start-Process -FilePath \"python\" -ArgumentList \"main.py\" -WindowStyle Normal; Start-Sleep 5; \\(Invoke-WebRequest -Uri \"http://localhost:8000\" -UseBasicParsing\\).StatusCode)",
+      "PowerShell(cd E:\\\\vig-app; Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1; Start-Process -FilePath \"python\" -ArgumentList \"main.py\" -WindowStyle Normal; Start-Sleep 5; \\(Invoke-WebRequest -Uri \"http://localhost:8000\" -UseBasicParsing\\).StatusCode)",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(cd E:\\\\vig-app; \\(Invoke-WebRequest -Uri \"http://localhost:8000\" -UseBasicParsing\\).StatusCode)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(uvicorn main:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)",
+      "PowerShell(Start-Process -FilePath \"python\" -ArgumentList \"-m uvicorn main:app --reload --host 0.0.0.0 --port 8000\" -WorkingDirectory \"E:\\\\vig-app\" -WindowStyle Normal)",
+      "PowerShell(Start-Sleep 5; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/\" -UseBasicParsing -TimeoutSec 5; $r.StatusCode } catch { $_.Exception.Message })",
+      "PowerShell(Start-Sleep 5; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/\" -UseBasicParsing -TimeoutSec 8; $r.StatusCode } catch { $_.Exception.Message })",
+      "PowerShell(netstat -ano)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

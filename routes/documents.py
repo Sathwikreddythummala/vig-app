@@ -29,6 +29,7 @@ def _ensure_table():
 
 
 def _build_filename(row: dict) -> str:
+    import re
     entity_type = row.get("entity_type", "")
     entity_id = row.get("entity_id", "")
     doc_type = row.get("doc_type", "Document")
@@ -43,11 +44,22 @@ def _build_filename(row: dict) -> str:
         drivers = get_all_records("Drivers")
         d = next((d for d in drivers if d.get("DriverID") == entity_id), None)
         prefix = d.get("DriverName", entity_id).replace(" ", "_") if d else entity_id
+    elif entity_type == "GSTPurchase":
+        purchases = get_all_records("GSTpurchases")
+        p = next((p for p in purchases if p.get("PurchaseID") == entity_id), None)
+        if p:
+            month = str(p.get("InvoiceDate", ""))[:7]
+            credit = str(p.get("CreditTo", "") or "NA")
+            inv = str(p.get("InvoiceNumber", ""))
+            prefix = f"gstpurchase_{month}_{credit}_{inv}"
+        else:
+            prefix = entity_id
     elif entity_type == "GST":
         prefix = entity_id
     else:
         prefix = entity_id
 
+    prefix = re.sub(r'[\\/:*?"<>|\s]+', "-", prefix)
     return f"{prefix}_{doc_type}.{ext}"
 
 

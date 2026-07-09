@@ -72,12 +72,10 @@ async def list_expenses(
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) <= date_to]
-    if vehicle:
-        expenses = [e for e in expenses if str(e.get("VehicleNumber", "")) == vehicle]
-    if category:
-        expenses = [e for e in expenses if str(e.get("Category", "")) == category]
-    if subcategory:
-        expenses = [e for e in expenses if str(e.get("SubCategory", "")) == subcategory]
+    from utils.filters import filter_multi
+    expenses = filter_multi(expenses, "VehicleNumber", vehicle)
+    expenses = filter_multi(expenses, "Category", category)
+    expenses = filter_multi(expenses, "SubCategory", subcategory)
     if search:
         s = search.lower()
         expenses = [e for e in expenses if s in str(e.get("ExpenseID", "")).lower() or s in str(e.get("Description", "")).lower() or s in str(e.get("VehicleNumber", "")).lower() or s in str(e.get("DriverName", "")).lower() or s in str(e.get("Category", "")).lower()]
@@ -175,10 +173,9 @@ async def export_excel(
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) <= date_to]
-    if vehicle:
-        expenses = [e for e in expenses if str(e.get("VehicleNumber", "")) == vehicle]
-    if category:
-        expenses = [e for e in expenses if str(e.get("Category", "")) == category]
+    from utils.filters import filter_multi
+    expenses = filter_multi(expenses, "VehicleNumber", vehicle)
+    expenses = filter_multi(expenses, "Category", category)
     df = pd.DataFrame(expenses)
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
@@ -210,10 +207,9 @@ async def export_pdf(
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) <= date_to]
-    if vehicle:
-        expenses = [e for e in expenses if str(e.get("VehicleNumber", "")) == vehicle]
-    if category:
-        expenses = [e for e in expenses if str(e.get("Category", "")) == category]
+    from utils.filters import filter_multi
+    expenses = filter_multi(expenses, "VehicleNumber", vehicle)
+    expenses = filter_multi(expenses, "Category", category)
     def safe(v, limit=30):
         return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
 

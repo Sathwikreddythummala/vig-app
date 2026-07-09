@@ -72,12 +72,10 @@ async def list_bills(
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) >= date_from[:7]]
     if date_to:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) <= date_to[:7]]
-    if vehicle:
-        records = [r for r in records if str(r.get("VehicleNumber", "")) == vehicle]
-    if vendor:
-        records = [r for r in records if str(r.get("VendorName", "")) == vendor]
-    if status:
-        records = [r for r in records if str(r.get("PaymentStatus", "")) == status]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VehicleNumber", vehicle)
+    records = filter_multi(records, "VendorName", vendor)
+    records = filter_multi(records, "PaymentStatus", status)
     records.sort(key=lambda x: (str(x.get("PaymentMonth", "")) or str(x.get("InvoiceDate", ""))[:7]), reverse=True)
     total = len(records)
     total_amount = sum(float(r.get("TotalAmount", 0) or 0) for r in records)
@@ -218,8 +216,8 @@ async def list_receivables(request: Request, bill_id: str = "", vendor: str = ""
     records = get_all_records("Receivables")
     if bill_id:
         records = [r for r in records if str(r.get("BillID", "")) == bill_id]
-    if vendor:
-        records = [r for r in records if str(r.get("VendorName", "")) == vendor]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VendorName", vendor)
     if payment_month:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("ReceiveDate", ""))[:7]) == payment_month]
     # enrich with InvoiceNumber from Billing

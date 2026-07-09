@@ -91,6 +91,11 @@
                             <label class="form-label">Paid By</label>
                             <select class="form-select glass-input" id="expPaidBy"><option>TSR</option><option>MSR</option><option>Company</option></select>
                         </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Bill / Receipt Document</label>
+                            <input type="file" class="form-control glass-input" id="expFile" accept="image/*,.pdf">
+                            <small class="text-muted">Optional — attach bill or receipt copy (PDF/image)</small>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -144,12 +149,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function updateFilterSubCategories() {
-    const cat = document.getElementById('filterCategory').value;
+    const cats = getFilterValues('filterCategory');
     const subSel = document.getElementById('filterSubCategory');
     subSel.innerHTML = '<option value="">All SubCategories</option>';
-    if (cat && categories[cat]) {
-        categories[cat].forEach(s => subSel.innerHTML += `<option value="${s}">${s}</option>`);
-    }
+    const seen = {};
+    cats.forEach(cat => (categories[cat] || []).forEach(s => {
+        if (!seen[s]) { seen[s] = 1; subSel.innerHTML += `<option value="${s}">${s}</option>`; }
+    }));
+    subSel.value = ''; // selected subcategories may no longer apply
 }
 
 function toggleVehicleFields() {
@@ -300,6 +307,7 @@ async function saveExpense() {
         var res = await fetch(url, { method: method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         var data = await res.json();
         if (data.success) {
+            await uploadEntityDoc('expFile', 'Expense', id || data.expense_id, 'Receipt');
             hideExpModal();
             showToast(id ? 'Expense updated' : 'Expense added', 'success');
             loadExpenses(currentPage);

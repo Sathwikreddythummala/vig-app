@@ -9,6 +9,12 @@
             <option value="Vehicle">Vehicle</option>
             <option value="Driver">Driver</option>
             <option value="GST">GST</option>
+            <option value="GSTPurchase">GST Purchase</option>
+            <option value="GSTSale">GST Sale / Bill</option>
+            <option value="Expense">Expense</option>
+            <option value="Fuel">Fuel</option>
+            <option value="Income">Income</option>
+            <option value="EMI">EMI</option>
         </select>
         <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search vehicle / driver / document type…" style="width:260px" oninput="applyFilter()">
         <span class="text-muted small ms-auto" id="docCount"></span>
@@ -32,14 +38,19 @@ async function load() {
     var res = await fetch('/documents/api/list');
     allDocs = await res.json();
     // Fetch entity names
-    var [vRes, dRes] = await Promise.all([
+    var [vRes, dRes, gRes] = await Promise.all([
         fetch('/vehicles/api/list?per_page=1000'),
         fetch('/drivers/api/list?per_page=1000'),
+        fetch('/gst/api/purchases'),
     ]);
     var vData = await vRes.json();
     var dData = await dRes.json();
+    var gData = await gRes.json();
     (vData.vehicles||[]).forEach(function(v){ entityCache['Vehicle_'+v.VehicleID] = v.VehicleNumber; });
     (dData.drivers||[]).forEach(function(d){ entityCache['Driver_'+d.DriverID] = d.DriverName; });
+    (gData.purchases||[]).forEach(function(p){
+        entityCache['GSTPurchase_'+p.PurchaseID] = 'gstpurchase_' + String(p.InvoiceDate||'').slice(0,7) + '_' + (p.CreditTo||'NA') + '_' + (p.InvoiceNumber||'');
+    });
     applyFilter();
 }
 
@@ -49,10 +60,10 @@ function entityLabel(doc) {
 }
 
 function applyFilter() {
-    var type = document.getElementById('filterType').value;
+    var types = getFilterValues('filterType');
     var search = document.getElementById('filterSearch').value.toLowerCase();
     var filtered = allDocs.filter(function(d) {
-        if (type && d.entity_type !== type) return false;
+        if (types.length && types.indexOf(d.entity_type) === -1) return false;
         if (search) {
             var label = entityLabel(d).toLowerCase();
             var doctype = (d.doc_type||'').toLowerCase();
