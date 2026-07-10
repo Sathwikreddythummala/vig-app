@@ -7,6 +7,8 @@ from services.sheets_service import (
 from utils.templates import templates
 from collections import defaultdict
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/fuel", tags=["fuel"])
 
@@ -70,8 +72,8 @@ async def fuel_stats(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = get_all_records("FuelEntries")
-    today = datetime.now().strftime("%Y-%m-%d")
-    month_start = datetime.now().strftime("%Y-%m-01")
+    today = datetime.now(_IST).strftime("%Y-%m-%d")
+    month_start = datetime.now(_IST).strftime("%Y-%m-01")
     today_records = [r for r in records if str(r.get("EntryDate", "")) == today]
     month_records = [r for r in records if str(r.get("EntryDate", "")) >= month_start]
     total_today = sum(float(r.get("Amount", 0) or 0) for r in today_records)

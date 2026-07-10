@@ -120,7 +120,7 @@ def now_str() -> str:
 
 
 def today_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d")
+    return datetime.now(_IST).strftime("%Y-%m-%d")
 
 
 _cache = {}

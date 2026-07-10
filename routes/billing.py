@@ -58,6 +58,7 @@ async def list_bills(
     request: Request,
     date_from: str = "",
     date_to: str = "",
+    month: str = "",
     vehicle: str = "",
     vendor: str = "",
     status: str = "",
@@ -68,6 +69,8 @@ async def list_bills(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = get_all_records("Billing")
+    if month:
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) == month]
     if date_from:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) >= date_from[:7]]
     if date_to:
@@ -166,6 +169,24 @@ async def update_bill(request: Request, bill_id: str):
     vals = {**existing, **{k: v for k, v in data.items() if not k.startswith("_")}, "BillID": bill_id, "InvoiceNumber": (data.get("InvoiceNumber", existing.get("InvoiceNumber", "")) or "").strip().upper(), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
     row = build_row("Billing", vals)
     update_row("Billing", row_num, row)
+    # Marking a bill Paid records the outstanding balance as a received payment,
+    # so received/balance totals stay consistent with the status
+    if data.get("_statusOverride") == "Paid" and balance > 0:
+        rid = gen_id("RCV")
+        recv_vals = {
+            "ReceivableID": rid,
+            "ReceiveDate": datetime.now(_IST).strftime("%Y-%m-%d"),
+            "PaymentMonth": str(vals.get("PaymentMonth", "")) or datetime.now(_IST).strftime("%Y-%m"),
+            "BillID": bill_id,
+            "VendorName": vals.get("VendorName", ""),
+            "Amount": balance,
+            "PaymentMode": "Adjustment",
+            "Description": "Auto entry — bill marked as Paid",
+            "CreatedDate": now_str(),
+        }
+        append_row("Receivables", build_row("Receivables", recv_vals))
+        add_audit_log("CREATE", "Receivables", rid, f"Auto payment ₹{balance} (bill marked Paid)", user["email"])
+        recalc_bill(bill_id)
     add_audit_log("UPDATE", "Billing", bill_id, f"Bill updated ₹{total}", user["email"])
     return {"success": True}
 

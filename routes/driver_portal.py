@@ -5,6 +5,8 @@ from services.sheets_service import (
 )
 from utils.templates import templates
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/driver-portal", tags=["driver-portal"])
 
@@ -31,7 +33,7 @@ async def my_data(request: Request, month: str = ""):
         return JSONResponse({"error": "Unauthorized"}, 401)
     driver_name = user.get("driver_name", "")
     if not month:
-        month = datetime.now().strftime("%Y-%m")
+        month = datetime.now(_IST).strftime("%Y-%m")
     month_start = month + "-01"
     month_parts = month.split("-")
     y, m = int(month_parts[0]), int(month_parts[1])
@@ -92,7 +94,7 @@ async def add_diesel(request: Request):
         vehicle = data["VehicleNumber"]
     from utils.duplicate_check import is_duplicate
     if is_duplicate("FuelEntries", {
-        "EntryDate": data.get("Date", datetime.now().strftime("%Y-%m-%d")),
+        "EntryDate": data.get("Date", datetime.now(_IST).strftime("%Y-%m-%d")),
         "VehicleNumber": vehicle,
         "DriverName": user.get("driver_name", ""),
         "FuelType": data.get("FuelType", "Diesel"),
@@ -103,7 +105,7 @@ async def add_diesel(request: Request):
         return JSONResponse({"error": "Duplicate entry already exists"}, 400)
     fid = gen_id("FUEL")
     from services.sheets_service import build_row
-    vals = {"FuelID": fid, "EntryDate": data.get("Date", datetime.now().strftime("%Y-%m-%d")), "VehicleNumber": vehicle, "DriverName": user.get("driver_name", ""), "FuelType": data.get("FuelType", "Diesel"), "Litres": data.get("Litres", ""), "Amount": data.get("Amount", 0), "Kilometre": data.get("Kilometre", ""), "FuelStation": data.get("FuelStation", ""), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
+    vals = {"FuelID": fid, "EntryDate": data.get("Date", datetime.now(_IST).strftime("%Y-%m-%d")), "VehicleNumber": vehicle, "DriverName": user.get("driver_name", ""), "FuelType": data.get("FuelType", "Diesel"), "Litres": data.get("Litres", ""), "Amount": data.get("Amount", 0), "Kilometre": data.get("Kilometre", ""), "FuelStation": data.get("FuelStation", ""), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
     row = build_row("FuelEntries", vals)
     append_row("FuelEntries", row)
     add_audit_log("CREATE", "FuelEntries", fid,

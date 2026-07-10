@@ -18,6 +18,10 @@
 <div class="glass-card mb-3 animate-in" style="animation-delay:0.3s">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="d-flex flex-wrap gap-2 align-items-center">
+            <div class="d-flex align-items-center gap-1">
+                <label class="form-label mb-0 small fw-bold text-nowrap">Payment Month:</label>
+                <input type="month" class="form-control glass-input" id="filterMonth" style="width:170px" onchange="loadBills()">
+            </div>
             <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:150px">
             <input type="date" class="form-control glass-input" id="filterDateTo" style="width:150px">
             <select class="form-select glass-input" id="filterVehicle" style="width:155px"><option value="">All Vehicles</option></select>
@@ -151,6 +155,7 @@ document.addEventListener('DOMContentLoaded', async function(){
     document.getElementById('rDate').value=todayStr();
     document.getElementById('rPayMonth').value=thisMonth();
     document.getElementById('filterPayMonth').value=thisMonth();
+    document.getElementById('filterMonth').value=thisMonth();
     var results=await Promise.all([
         fetch('/vehicles/api/list').then(r=>r.json()),
         fetch('/vendors/api/list').then(r=>r.json()),
@@ -215,14 +220,14 @@ function resetBillForm(){
 
 async function loadBills(page){
     currentPage=page||1;
-    var params=new URLSearchParams({page:currentPage,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,vendor:document.getElementById('filterVendor').value,status:document.getElementById('filterStatus').value});
+    var params=new URLSearchParams({page:currentPage,month:document.getElementById('filterMonth').value,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,vendor:document.getElementById('filterVendor').value,status:document.getElementById('filterStatus').value});
     var res=await fetch('/billing/api/list?'+params);
     var data=await res.json();
     allBills=data.bills||[];
     document.getElementById('statTotal').textContent=fmt(data.total_amount);
     document.getElementById('statBalance').textContent=fmt(data.total_balance);
-    // Total Received from Receivables (includes general payments)
-    var month=document.getElementById('filterDateFrom').value?document.getElementById('filterDateFrom').value.slice(0,7):'';
+    // Total Received from Receivables (includes general payments), same payment month
+    var month=document.getElementById('filterMonth').value||(document.getElementById('filterDateFrom').value?document.getElementById('filterDateFrom').value.slice(0,7):'');
     var vendor=document.getElementById('filterVendor').value;
     var recvParams=new URLSearchParams();
     if(month) recvParams.set('payment_month',month);

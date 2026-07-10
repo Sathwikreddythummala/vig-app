@@ -6,6 +6,8 @@ from services.sheets_service import (
 )
 from utils.templates import templates
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/outside", tags=["outside"])
 
@@ -106,7 +108,7 @@ async def outside_summary(request: Request, month: str = ""):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     if not month:
-        month = datetime.now().strftime("%Y-%m")
+        month = datetime.now(_IST).strftime("%Y-%m")
     vehicles = get_all_records("OutsideVehicles")
     transactions = get_all_records("OutsideTransactions")
     bills = get_all_records("Billing")

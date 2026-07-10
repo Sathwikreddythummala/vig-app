@@ -6,6 +6,8 @@ from services.sheets_service import (
 )
 from utils.templates import templates
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/gst", tags=["gst"])
 
@@ -87,7 +89,7 @@ async def gst_summary(request: Request, month: str = ""):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     if not month:
-        month = datetime.now().strftime("%Y-%m")
+        month = datetime.now(_IST).strftime("%Y-%m")
     purchases = get_all_records("GSTpurchases")
     purchases = [r for r in purchases if str(r.get("InvoiceDate", ""))[:7] == month]
     bills = get_all_records("Billing")

@@ -6,6 +6,8 @@ from services.sheets_service import (
 )
 from utils.templates import templates
 from datetime import datetime
+from zoneinfo import ZoneInfo
+_IST = ZoneInfo("Asia/Kolkata")
 import io
 
 router = APIRouter(prefix="/emi", tags=["emi"])
@@ -25,7 +27,7 @@ async def emi_page(request: Request):
 
 
 def calc_next_due(emi_day_str):
-    today = datetime.now()
+    today = datetime.now(_IST)
     try:
         day = int(emi_day_str)
         next_d = today.replace(day=day)
@@ -45,7 +47,7 @@ async def list_emis(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     vehicles = get_all_records("Vehicles")
-    today = datetime.now()
+    today = datetime.now(_IST)
     vehicle_emis = []
     for v in vehicles:
         if str(v.get("LoanAvailable", "")).lower() == "yes":
