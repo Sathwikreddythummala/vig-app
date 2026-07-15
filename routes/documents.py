@@ -26,6 +26,7 @@ def _ensure_table():
             uploaded_date TEXT
         )
     """)
+    execute("ALTER TABLE document_files ADD COLUMN IF NOT EXISTS description TEXT")
 
 
 def _build_filename(row: dict) -> str:
@@ -78,7 +79,7 @@ async def list_docs(request: Request, entity_type: str = "", entity_id: str = ""
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     _ensure_table()
-    sql = "SELECT doc_id, entity_type, entity_id, doc_type, file_name, mime_type, uploaded_by, uploaded_date FROM document_files WHERE 1=1"
+    sql = "SELECT doc_id, entity_type, entity_id, doc_type, file_name, mime_type, uploaded_by, uploaded_date, description FROM document_files WHERE 1=1"
     params = []
     if entity_type:
         sql += " AND entity_type = %s"
@@ -137,6 +138,7 @@ async def upload_doc(
     entity_type: str = Form(...),
     entity_id: str = Form(...),
     doc_type: str = Form(...),
+    description: str = Form(""),
 ):
     user = get_user(request)
     if not user:
@@ -146,8 +148,8 @@ async def upload_doc(
     doc_id = gen_id("DOC")
     mime = file.content_type or "application/octet-stream"
     execute(
-        "INSERT INTO document_files (doc_id, entity_type, entity_id, doc_type, file_name, mime_type, file_data, uploaded_by, uploaded_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        [doc_id, entity_type, entity_id, doc_type, file.filename, mime, content, user["email"], now_str()],
+        "INSERT INTO document_files (doc_id, entity_type, entity_id, doc_type, file_name, mime_type, file_data, uploaded_by, uploaded_date, description) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        [doc_id, entity_type, entity_id, doc_type, file.filename, mime, content, user["email"], now_str(), description],
     )
     add_audit_log("UPLOAD", "Documents", doc_id, f"Uploaded {doc_type} for {entity_type} {entity_id}", user["email"])
     return {"success": True, "doc_id": doc_id}

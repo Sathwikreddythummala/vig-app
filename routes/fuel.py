@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+import pandas as pd
+import io
 from services.sheets_service import (
     get_all_records, find_row_by_id, append_row, update_row, delete_row,
     gen_id, now_str, add_audit_log,
@@ -99,6 +101,111 @@ async def fuel_stats(request: Request):
         "driver_wise": {"labels": list(driver_wise.keys()), "values": list(driver_wise.values())},
         "monthly_trend": {"labels": sorted_months, "values": [monthly_trend[m] for m in sorted_months]},
     }
+
+
+def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel_type: str) -> list[dict]:
+    records = get_all_records("FuelEntries")
+    if date_from:
+        records = [r for r in records if str(r.get("EntryDate", "")) >= date_from]
+    if date_to:
+        records = [r for r in records if str(r.get("EntryDate", "")) <= date_to]
+    from utils.filters import filter_multi
+    records = filter_multi(records, "VehicleNumber", vehicle)
+    records = filter_multi(records, "DriverName", driver)
+    records = filter_multi(records, "FuelType", fuel_type)
+    records.sort(key=lambda x: str(x.get("EntryDate", "")), reverse=True)
+    return records
+
+
+@router.get("/api/export/excel")
+async def export_excel(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    vehicle: str = "",
+    driver: str = "",
+    fuel_type: str = "",
+):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type)
+    df = pd.DataFrame(records)
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False, engine="openpyxl")
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=fuel_entries.xlsx"},
+    )
+
+
+@router.get("/api/export/pdf")
+async def export_pdf(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    vehicle: str = "",
+    driver: str = "",
+    fuel_type: str = "",
+):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type)
+
+    def safe(v, limit=30):
+        return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4))
+    styles = getSampleStyleSheet()
+    elements = [Paragraph("Vigneshwara Enterprises - Fuel Report", styles["Title"]), Spacer(1, 20)]
+    header = ["Date", "Vehicle", "Driver", "Fuel Type", "Litres", "Amount", "KM Reading", "Station", "Mode"]
+    data = [header]
+    total_amount = 0.0
+    total_litres = 0.0
+    for r in records:
+        amt = float(r.get("Amount", 0) or 0)
+        litres = float(r.get("Litres", 0) or 0)
+        total_amount += amt
+        total_litres += litres
+        data.append([
+            safe(r.get("EntryDate")),
+            safe(r.get("VehicleNumber")),
+            safe(r.get("DriverName")),
+            safe(r.get("FuelType")),
+            f"{litres:,.2f}" if litres else "",
+            f"Rs.{amt:,.0f}",
+            safe(r.get("Kilometre")),
+            safe(r.get("FuelStation")),
+            safe(r.get("PaymentMode")),
+        ])
+    data.append(["", "", "", "Total", f"{total_litres:,.2f}", f"Rs.{total_amount:,.0f}", "", "", ""])
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FFD54F")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#FFF9C4")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#FFFDE7")]),
+    ]))
+    elements.append(table)
+    doc.build(elements)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=fuel_entries.pdf"},
+    )
 
 
 @router.post("/api/add")

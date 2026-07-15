@@ -26,7 +26,7 @@
         <table class="table table-hover glass-table">
             <thead><tr>
                 <th>#</th><th>Name</th><th>Type</th><th>Vehicle</th>
-                <th>Salary</th><th>Diesel Mileage Incentive</th><th>Advance</th><th>Meals</th><th>Deductions</th><th>Other</th><th>Net Payable</th><th>Paid</th>
+                <th>Salary</th><th>Diesel Mileage Incentive</th><th>Paid</th><th>Advance</th><th>Meals</th><th>Deductions</th><th>Other</th><th>Net Payable</th>
             </tr></thead>
             <tbody id="salaryTable">
                 <tr><td colspan="11" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
@@ -74,12 +74,12 @@ async function loadSalaries() {
             <td>${r.AssignedVehicle||'-'}</td>
             <td class="fw-bold">${fmt(r.ProfileSalary)}</td>
             <td>${fmt(r.Incentive)}</td>
+            <td class="${r.SalaryPaid?'text-danger':''}">${fmt(r.SalaryPaid)}</td>
             <td class="${r.Advance?'text-danger':''}">${fmt(r.Advance)}</td>
             <td class="${r.Meals?'text-danger':''}">${fmt(r.Meals)}</td>
             <td class="${r.Deductions?'text-danger':''}">${fmt(r.Deductions)}</td>
             <td class="${r.Other?'text-danger':''}">${fmt(r.Other)}</td>
             <td class="fw-bold ${r.NetPayable>=0?'text-success':'text-danger'}" id="net-${r.DriverID}">${fmt(r.NetPayable)}</td>
-            <td>${fmt(r.SalaryPaid)}</td>
         </tr>`).join('');
     } else {
         tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No employees found</td></tr>';
@@ -88,12 +88,12 @@ async function loadSalaries() {
     document.getElementById('salaryTotals').innerHTML = `<tr class="fw-bold" style="background:rgba(212,160,23,0.1)">
         <td></td><td>TOTAL</td><td></td><td></td>
         <td>${fmt(t.ProfileSalary)}</td><td>${fmt(t.Incentive)}</td>
+        <td class="text-danger">${fmt(t.SalaryPaid)}</td>
         <td class="text-danger">${fmt(t.Advance)}</td>
         <td class="text-danger">${fmt(t.Meals)}</td>
         <td class="text-danger">${fmt(t.Deductions)}</td>
         <td class="text-danger">${fmt(t.Other)}</td>
         <td class="${t.NetPayable>=0?'text-success':'text-danger'}">${fmt(t.NetPayable)}</td>
-        <td>${fmt(t.SalaryPaid)}</td>
     </tr>`;
 }
 

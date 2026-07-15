@@ -23,7 +23,11 @@
             <select class="form-select glass-input" id="filterFuelType" style="width:140px"><option value="">All Types</option><option>Diesel</option><option>AdBlue</option><option>Engine Oil</option><option>Coolant</option></select>
             <button class="btn btn-warning btn-sm" onclick="loadFuel()"><i class="bi bi-funnel"></i> Filter</button>
         </div>
-        <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#fuelModal" onclick="resetFuelForm()"><i class="bi bi-plus-lg"></i> Add Fuel Entry</button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="exportFuelExcel()"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+            <button class="btn btn-outline-warning btn-sm" onclick="exportFuelPDF()"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+            <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#fuelModal" onclick="resetFuelForm()"><i class="bi bi-plus-lg"></i> Add Fuel Entry</button>
+        </div>
     </div>
 </div>
 <div class="glass-card animate-in" style="animation-delay:0.8s">
@@ -220,6 +224,24 @@ async function deleteFuel(id) {
         if (data.success) { showToast('Deleted','success'); loadFuel(currentPage); }
         else { showToast(data.error||'Failed','danger'); }
     } catch(err) { showToast('Network error','danger'); }
+}
+
+function fuelExportParams() {
+    return new URLSearchParams({
+        date_from: document.getElementById('filterDateFrom').value,
+        date_to: document.getElementById('filterDateTo').value,
+        vehicle: document.getElementById('filterVehicle').value,
+        driver: document.getElementById('filterDriver').value,
+        fuel_type: document.getElementById('filterFuelType').value,
+    });
+}
+
+function exportFuelExcel() {
+    window.open('/fuel/api/export/excel?' + fuelExportParams());
+}
+
+function exportFuelPDF() {
+    window.open('/fuel/api/export/pdf?' + fuelExportParams());
 }
 </script>
 {% endblock %}

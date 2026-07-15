@@ -95,7 +95,7 @@ async def salaries_api(request: Request, month: str = ""):
         if month:
             incentive_row = next((i for i in incentives if str(i.get("DriverID", "")) == did and str(i.get("ForMonth", "")) == month), None)
         incentive = float(incentive_row.get("Amount", 0) or 0) if incentive_row else 0.0
-        net_payable = profile_salary + incentive - advance - meals - deductions - other
+        net_payable = profile_salary + incentive - salary_paid - advance - meals - deductions - other
         result.append({
             "DriverID": did,
             "DriverName": name,
@@ -187,11 +187,11 @@ async def export_salaries_excel(request: Request, month: str = ""):
     thin_border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
     total_font = Font(bold=True, size=11)
     currency_fmt = '#,##0'
-    ws.merge_cells("A1:J1")
+    ws.merge_cells("A1:L1")
     ws["A1"] = f"Salary Report — {month or 'All Months'}"
     ws["A1"].font = Font(bold=True, size=14)
     ws["A1"].alignment = Alignment(horizontal="center")
-    headers = ["#", "Name", "Type", "Vehicle", "Salary", "Incentive", "Advance", "Meals", "Other", "Net Payable"]
+    headers = ["#", "Name", "Type", "Vehicle", "Salary", "Incentive", "Paid", "Advance", "Meals", "Deductions", "Other", "Net Payable"]
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col, value=h)
         cell.font = header_font
@@ -204,7 +204,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
         ws.cell(row=row_num, column=2, value=r["DriverName"]).border = thin_border
         ws.cell(row=row_num, column=3, value=r["EmployeeType"]).border = thin_border
         ws.cell(row=row_num, column=4, value=r["AssignedVehicle"]).border = thin_border
-        for col, key in [(5, "ProfileSalary"), (6, "Incentive"), (7, "Advance"), (8, "Meals"), (9, "Other"), (10, "NetPayable")]:
+        for col, key in [(5, "ProfileSalary"), (6, "Incentive"), (7, "SalaryPaid"), (8, "Advance"), (9, "Meals"), (10, "Deductions"), (11, "Other"), (12, "NetPayable")]:
             cell = ws.cell(row=row_num, column=col, value=r[key])
             cell.number_format = currency_fmt
             cell.border = thin_border
@@ -214,7 +214,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
     ws.cell(row=total_row, column=2).border = thin_border
     ws.cell(row=total_row, column=3, value="").border = thin_border
     ws.cell(row=total_row, column=4, value="").border = thin_border
-    for col, key in [(5, "ProfileSalary"), (6, "Incentive"), (7, "Advance"), (8, "Meals"), (9, "Other"), (10, "NetPayable")]:
+    for col, key in [(5, "ProfileSalary"), (6, "Incentive"), (7, "SalaryPaid"), (8, "Advance"), (9, "Meals"), (10, "Deductions"), (11, "Other"), (12, "NetPayable")]:
         cell = ws.cell(row=total_row, column=col, value=totals[key])
         cell.number_format = currency_fmt
         cell.font = total_font
@@ -223,7 +223,7 @@ async def export_salaries_excel(request: Request, month: str = ""):
     ws.column_dimensions["B"].width = 22
     ws.column_dimensions["C"].width = 12
     ws.column_dimensions["D"].width = 16
-    for c in ["E", "F", "G", "H", "I", "J"]:
+    for c in ["E", "F", "G", "H", "I", "J", "K", "L"]:
         ws.column_dimensions[c].width = 14
     buf = io.BytesIO()
     wb.save(buf)

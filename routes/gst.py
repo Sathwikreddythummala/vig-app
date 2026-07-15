@@ -57,13 +57,16 @@ async def get_sales(request: Request, month: str = ""):
         bills = [b for b in bills if str(b.get("InvoiceDate", ""))[:7] == month]
     # Group by InvoiceNumber — one row per invoice
     from collections import defaultdict
-    inv_groups = defaultdict(lambda: {"SubTotal": 0, "SGST": 0, "CGST": 0, "TotalAmount": 0, "VendorName": "", "InvoiceDate": "", "InvoiceNumber": "", "VehicleCount": 0})
+    inv_groups = defaultdict(lambda: {"SubTotal": 0, "SGST": 0, "CGST": 0, "TotalAmount": 0, "VendorName": "", "BillType": "", "InvoiceDate": "", "InvoiceNumber": "", "VehicleCount": 0})
     for b in bills:
         inv = str(b.get("InvoiceNumber", "")).upper()
         g = inv_groups[inv]
         g["InvoiceNumber"] = inv
         g["InvoiceDate"] = g["InvoiceDate"] or b.get("InvoiceDate", "")
         g["VendorName"] = g["VendorName"] or b.get("VendorName", "")
+        bt = str(b.get("BillType", "") or "")
+        if bt and bt not in g["BillType"].split(", "):
+            g["BillType"] = g["BillType"] + (", " if g["BillType"] else "") + bt
         g["SubTotal"] += float(b.get("SubTotal", 0) or 0)
         g["SGST"] += float(b.get("SGST", 0) or 0)
         g["CGST"] += float(b.get("CGST", 0) or 0)

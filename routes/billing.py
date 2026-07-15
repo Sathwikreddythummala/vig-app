@@ -68,7 +68,8 @@ async def list_bills(
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    records = get_all_records("Billing")
+    all_records = get_all_records("Billing")
+    records = list(all_records)
     if month:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) == month]
     if date_from:
@@ -79,6 +80,15 @@ async def list_bills(
     records = filter_multi(records, "VehicleNumber", vehicle)
     records = filter_multi(records, "VendorName", vendor)
     records = filter_multi(records, "PaymentStatus", status)
+    # an invoice is one unit: if any of its bills match the filters,
+    # include the invoice's remaining bills too so the group is never split
+    matched_invs = {str(r.get("InvoiceNumber", "")).strip().upper() for r in records if str(r.get("InvoiceNumber", "")).strip()}
+    if matched_invs:
+        seen_ids = {r.get("BillID") for r in records}
+        for r in all_records:
+            if str(r.get("InvoiceNumber", "")).strip().upper() in matched_invs and r.get("BillID") not in seen_ids:
+                records.append(r)
+                seen_ids.add(r.get("BillID"))
     records.sort(key=lambda x: (str(x.get("PaymentMonth", "")) or str(x.get("InvoiceDate", ""))[:7]), reverse=True)
     total = len(records)
     total_amount = sum(float(r.get("TotalAmount", 0) or 0) for r in records)
@@ -96,15 +106,29 @@ async def list_bills(
                 "PaymentMonth": r.get("PaymentMonth", "") or str(r.get("ReceiveDate", ""))[:7],
                 "Amount": r.get("Amount", "0"),
             })
-    start = (page - 1) * per_page
-    paginated = records[start:start + per_page]
+    # group-aware pagination: bills of one invoice always stay on the same page
+    grouped = {}
+    group_order = []
+    for r in records:
+        key = str(r.get("InvoiceNumber", "")).strip().upper() or f"#{r.get('BillID', '')}"
+        if key not in grouped:
+            grouped[key] = []
+            group_order.append(key)
+        grouped[key].append(r)
+    pages = [[]]
+    for key in group_order:
+        if pages[-1] and len(pages[-1]) + len(grouped[key]) > per_page:
+            pages.append([])
+        pages[-1].extend(grouped[key])
+    total_pages = len(pages)
+    paginated = pages[page - 1] if 1 <= page <= total_pages else []
     for b in paginated:
         b["_receivables"] = recv_by_bill.get(b.get("BillID", ""), [])
     return {
         "bills": paginated,
         "total": total,
         "page": page,
-        "total_pages": (total + per_page - 1) // per_page if total else 1,
+        "total_pages": total_pages,
         "total_amount": total_amount,
         "total_paid": total_paid,
         "total_balance": total_balance,
@@ -134,6 +158,66 @@ async def add_bill(request: Request):
     append_row("Billing", row)
     add_audit_log("CREATE", "Billing", bid, f"Bill {inv_num} ₹{total} for {data.get('VendorName','')}", user["email"])
     return {"success": True, "bill_id": bid, "invoice_number": inv_num}
+
+
+@router.post("/api/add-invoice")
+async def add_invoice_bills(request: Request):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    items = data.get("items") or []
+    if not items:
+        return JSONResponse({"error": "Add at least one vehicle bill"}, 400)
+    inv_num = (data.get("InvoiceNumber", "") or next_invoice_number()).strip().upper()
+    # block duplicate vehicle bills on the same invoice
+    existing_bills = get_all_records("Billing")
+    billed_vehicles = {
+        str(b.get("VehicleNumber", "")).strip().upper()
+        for b in existing_bills
+        if str(b.get("InvoiceNumber", "")).strip().upper() == inv_num
+    }
+    seen_in_batch = set()
+    dups = []
+    for it in items:
+        v = str(it.get("VehicleNumber", "")).strip().upper()
+        if v in billed_vehicles or v in seen_in_batch:
+            dups.append(it.get("VehicleNumber", ""))
+        seen_in_batch.add(v)
+    if dups:
+        return JSONResponse({"error": f"Already billed in {inv_num}: {', '.join(dups)}. Edit the existing bill instead."}, 400)
+    from services.sheets_service import build_row
+    created = []
+    for it in items:
+        fixed = float(it.get("FixedAmount", 0) or 0)
+        variable = float(it.get("VariableAmount", 0) or 0)
+        challan = float(it.get("TrafficChallan", 0) or 0)
+        tolls = float(it.get("Tollgates", 0) or 0)
+        sub_total = fixed + variable + tolls + challan
+        sgst = round(sub_total * 0.09, 2)
+        cgst = round(sub_total * 0.09, 2)
+        tds = float(it.get("TDS", 0) or 0)
+        total = round(sub_total + sgst + cgst - tds, 2)
+        bid = gen_id("BILL")
+        vals = {
+            "BillID": bid, "InvoiceNumber": inv_num,
+            "BillType": data.get("BillType", ""),
+            "InvoiceDate": data.get("InvoiceDate", ""),
+            "PaymentMonth": data.get("PaymentMonth", ""),
+            "VehicleNumber": it.get("VehicleNumber", ""),
+            "VendorName": it.get("VendorName", ""),
+            "FixedAmount": fixed, "VariableAmount": variable,
+            "TrafficChallan": challan, "Tollgates": tolls,
+            "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds,
+            "TotalAmount": total, "PaymentStatus": "Pending",
+            "PaidAmount": 0, "BalanceAmount": total,
+            "Description": data.get("Description", ""),
+            "CreatedDate": now_str(), "UpdatedDate": now_str(),
+        }
+        append_row("Billing", build_row("Billing", vals))
+        created.append(bid)
+    add_audit_log("CREATE", "Billing", inv_num, f"Invoice {inv_num} created with {len(created)} vehicle bill(s)", user["email"])
+    return {"success": True, "invoice_number": inv_num, "bill_ids": created}
 
 
 @router.put("/api/{bill_id}")
@@ -248,11 +332,29 @@ async def list_receivables(request: Request, bill_id: str = "", vendor: str = ""
         bid = r.get("BillID", "")
         bill = bill_map.get(bid, {})
         r["InvoiceNumber"] = bill.get("InvoiceNumber", "")
+        r["BillType"] = bill.get("BillType", "")
         r["VehicleNumber"] = bill.get("VehicleNumber", r.get("VehicleNumber", ""))
         r["PaymentMonth"] = r.get("PaymentMonth", "") or str(r.get("ReceiveDate", ""))[:7]
     records.sort(key=lambda x: (str(x.get("InvoiceNumber", "")), str(x.get("ReceiveDate", ""))))
     total_received = sum(float(r.get("Amount", 0) or 0) for r in records)
-    return {"receivables": records, "total_received": total_received}
+    # invoice-level payment status (all bills of the invoice combined)
+    invoice_status = {}
+    for b in bills:
+        inv = str(b.get("InvoiceNumber", "") or "")
+        if not inv:
+            continue
+        s = invoice_status.setdefault(inv, {"total": 0.0, "paid": 0.0, "balance": 0.0})
+        s["total"] += float(b.get("TotalAmount", 0) or 0)
+        s["paid"] += float(b.get("PaidAmount", 0) or 0)
+        s["balance"] += float(b.get("BalanceAmount", 0) or 0)
+    for inv, s in invoice_status.items():
+        if s["paid"] > 0 and s["balance"] <= 0:
+            s["status"] = "Fully Received"
+        elif s["paid"] > 0:
+            s["status"] = "Partially Received"
+        else:
+            s["status"] = "Pending"
+    return {"receivables": records, "total_received": total_received, "invoice_status": invoice_status}
 
 
 @router.post("/api/receivables/add")
@@ -317,6 +419,9 @@ async def update_receivable(request: Request, recv_id: str):
     row = build_row("Receivables", vals)
     update_row("Receivables", row_num, row)
     add_audit_log("UPDATE", "Receivables", recv_id, f"Receivable updated", user["email"])
+    bill_id = str(vals.get("BillID", "") or "")
+    if bill_id:
+        recalc_bill(bill_id)
     return {"success": True}
 
 

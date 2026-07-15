@@ -68,7 +68,8 @@ function applyFilter() {
             var label = entityLabel(d).toLowerCase();
             var doctype = (d.doc_type||'').toLowerCase();
             var fname = (d.file_name||'').toLowerCase();
-            if (!label.includes(search) && !doctype.includes(search) && !fname.includes(search)) return false;
+            var desc = (d.description||'').toLowerCase();
+            if (!label.includes(search) && !doctype.includes(search) && !fname.includes(search) && !desc.includes(search)) return false;
         }
         return true;
     });
@@ -105,7 +106,7 @@ function render(docs) {
         var uploaded = (d.uploaded_date||'').slice(0,10);
         return '<tr>' +
             '<td><span class="badge ' + entityBadgeClass(d.entity_type) + '">' + d.entity_type + '</span></td>' +
-            '<td><i class="bi ' + icon + ' me-1"></i><strong>' + (d.doc_type||'Document') + '</strong></td>' +
+            '<td><i class="bi ' + icon + ' me-1"></i><strong>' + (d.doc_type||'Document') + '</strong>' + (d.description ? '<br><small class="text-muted">' + d.description + '</small>' : '') + '</td>' +
             '<td>' + label + '</td>' +
             '<td class="text-muted small">' + (d.file_name||'') + '</td>' +
             '<td class="text-muted small">' + uploaded + '</td>' +

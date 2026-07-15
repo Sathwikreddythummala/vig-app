@@ -35,14 +35,8 @@
 <div class="glass-card animate-in" style="animation-delay:0.4s">
     <div class="table-responsive">
         <table class="table table-hover glass-table small">
-            <thead><tr>
-                <th>Invoice#</th><th>Date</th><th>Vehicle</th><th>Vendor</th>
-                <th>Fixed</th><th>Variable</th><th>Challan</th><th>Tolls</th>
-                <th>SGST</th><th>CGST</th><th>TDS</th>
-                <th>Total</th><th>Paid</th><th>Balance</th>
-                <th>Payment Month</th><th>Status</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="billTable"><tr><td colspan="17" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            <thead></thead>
+            <tbody id="billTable"><tr><td colspan="15" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
             <tfoot id="billSummary"></tfoot>
         </table>
     </div>
@@ -79,13 +73,26 @@
                     <div class="row g-3">
                         <div class="col-md-3"><label class="form-label">Invoice Date *</label><input type="date" class="form-control glass-input" id="bDate" required oninput="syncBillPayMonth()"></div>
                         <div class="col-md-3"><label class="form-label">Payment Month *<small class="text-muted ms-1">(expected payment)</small></label><input type="month" class="form-control glass-input" id="bPayMonth" required></div>
-                        <div class="col-md-3"><label class="form-label">Invoice Number</label><input type="text" class="form-control glass-input" id="bInvNum" placeholder="Auto-generated"></div>
+                        <div class="col-md-3"><label class="form-label">Invoice Number <small class="text-muted">(one for all vehicles)</small></label><input type="text" class="form-control glass-input" id="bInvNum" placeholder="Auto-generated" list="invNumList" oninput="checkInvNum()"><datalist id="invNumList"></datalist><small id="invNumHint" class="text-success fw-semibold" style="display:none"><i class="bi bi-link-45deg"></i> Existing invoice — vehicles will be added to it</small></div>
                         <div class="col-md-3"><label class="form-label">Vehicle *</label><select class="form-select glass-input" id="bVehicle" required onchange="autoFillVendor()"><option value="">-- Select --</option></select></div>
                         <div class="col-md-3"><label class="form-label">Vendor *</label><select class="form-select glass-input" id="bVendor" required><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Bill Type</label><select class="form-select glass-input" id="bBillType"><option value="">-- Select --</option><option>Fixed</option><option>Variable</option><option>Tollgate</option><option>Taxi TM</option><option>Total Bill</option><option>Other</option></select></div>
                         <div class="col-md-3"><label class="form-label">Fixed Amount (₹)</label><input type="number" class="form-control glass-input" id="bFixed" min="0" step="0.01" value="0" oninput="calcBill()"></div>
                         <div class="col-md-3"><label class="form-label">Variable Amount (₹)</label><input type="number" class="form-control glass-input" id="bVariable" min="0" step="0.01" value="0" oninput="calcBill()"></div>
                         <div class="col-md-3"><label class="form-label">Traffic Challan (₹)</label><input type="number" class="form-control glass-input" id="bChallan" min="0" step="0.01" value="0" oninput="calcBill()"></div>
                         <div class="col-md-3"><label class="form-label">Tollgates (₹)</label><input type="number" class="form-control glass-input" id="bTolls" min="0" step="0.01" value="0" oninput="calcBill()"></div>
+                        <div class="col-md-12 d-flex align-items-center gap-2" id="addVehBillRow">
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="addVehicleBillItem()"><i class="bi bi-plus-circle"></i> Add Vehicle Bill</button>
+                            <small class="text-muted">Adds this vehicle to the invoice — then enter the next vehicle. All vehicles share the same invoice number.</small>
+                        </div>
+                        <div class="col-md-12" id="billItemsWrap" style="display:none">
+                            <div class="table-responsive">
+                                <table class="table table-sm glass-table mb-0 small">
+                                    <thead><tr><th>Vehicle</th><th>Vendor</th><th>Fixed</th><th>Variable</th><th>Challan</th><th>Tolls</th><th>TDS</th><th>Total</th><th></th></tr></thead>
+                                    <tbody id="billItemsList"></tbody>
+                                </table>
+                            </div>
+                        </div>
                         <div class="col-md-12"><hr class="my-2"></div>
                         <div class="col-md-2"><label class="form-label">Sub Total</label><input type="text" class="form-control glass-input" id="bSubTotal" readonly style="font-weight:700;background:rgba(255,213,79,0.15)!important"></div>
                         <div class="col-md-2"><label class="form-label">SGST (9%)</label><input type="text" class="form-control glass-input" id="bSGST" readonly style="background:rgba(255,213,79,0.15)!important"></div>
@@ -117,7 +124,7 @@
 <div class="modal fade" id="recvModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg">
         <div class="modal-content glass-modal">
-            <div class="modal-header border-0"><h5 class="modal-title">Add Received Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header border-0"><h5 class="modal-title" id="recvModalTitle">Add Received Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <form id="recvForm">
                     <div class="row g-3">
@@ -143,6 +150,7 @@
 {% block scripts %}
 <script>
 var allVehicles=[], allVendors=[], allBills=[], currentPage=1;
+var editingRecvId=null, recvCache={};
 var billModalEl=document.getElementById('billModal'), recvModalEl=document.getElementById('recvModal');
 var canEdit = (typeof USER_ROLE !== 'undefined') && USER_ROLE !== 'viewer';
 
@@ -175,6 +183,7 @@ document.addEventListener('DOMContentLoaded', async function(){
     });
     loadBills();
     loadAlerts();
+    refreshInvoiceList();
 });
 
 function syncPayMonth(){
@@ -189,16 +198,96 @@ function autoFillVendor(){
     var sel=document.getElementById('bVehicle'),opt=sel.options[sel.selectedIndex];
     if(opt&&opt.dataset.vendor) document.getElementById('bVendor').value=opt.dataset.vendor;
 }
+var billItems=[];
+var allInvoiceNumbers=[];
+
+async function refreshInvoiceList(){
+    try{
+        var res=await fetch('/billing/api/list?per_page=100000');
+        var data=await res.json();
+        var seen={};
+        allInvoiceNumbers=[];
+        (data.bills||[]).forEach(function(b){
+            var n=String(b.InvoiceNumber||'').trim().toUpperCase();
+            if(n&&!seen[n]){seen[n]=1;allInvoiceNumbers.push(n);}
+        });
+        allInvoiceNumbers.sort();
+        document.getElementById('invNumList').innerHTML=allInvoiceNumbers.map(function(n){return '<option value="'+n+'">';}).join('');
+    }catch(e){}
+}
+
+function checkInvNum(){
+    var v=document.getElementById('bInvNum').value.trim().toUpperCase();
+    document.getElementById('invNumHint').style.display=(v&&allInvoiceNumbers.indexOf(v)>=0)?'':'none';
+}
+
+function currentBillEntry(){
+    return {
+        VehicleNumber:document.getElementById('bVehicle').value,
+        VendorName:document.getElementById('bVendor').value,
+        FixedAmount:parseFloat(document.getElementById('bFixed').value)||0,
+        VariableAmount:parseFloat(document.getElementById('bVariable').value)||0,
+        TrafficChallan:parseFloat(document.getElementById('bChallan').value)||0,
+        Tollgates:parseFloat(document.getElementById('bTolls').value)||0,
+        TDS:parseFloat(document.getElementById('bTDS').value)||0
+    };
+}
+
+function itemTotals(it){
+    var sub=it.FixedAmount+it.VariableAmount+it.TrafficChallan+it.Tollgates;
+    var gst=Math.round(sub*0.09*100)/100;
+    var total=Math.round((sub+gst+gst-it.TDS)*100)/100;
+    return {sub:sub,gst:gst,total:total};
+}
+
+function addVehicleBillItem(){
+    var it=currentBillEntry();
+    if(!it.VehicleNumber||!it.VendorName){showToast('Select vehicle and vendor first','danger');return;}
+    if(billItems.some(function(x){return x.VehicleNumber===it.VehicleNumber;})){showToast(it.VehicleNumber+' is already in this invoice','danger');return;}
+    billItems.push(it);
+    renderBillItems();
+    // clear vehicle + amounts for the next entry (vendor kept — usually same)
+    document.getElementById('bVehicle').value='';
+    ['bFixed','bVariable','bChallan','bTolls','bTDS'].forEach(id=>document.getElementById(id).value='0');
+    delete document.getElementById('bTDS').dataset.userEdited;
+    calcBill();
+}
+
+function removeBillItem(i){
+    billItems.splice(i,1);
+    renderBillItems();
+    calcBill();
+}
+
+function renderBillItems(){
+    var wrap=document.getElementById('billItemsWrap'), tb=document.getElementById('billItemsList');
+    if(!billItems.length){wrap.style.display='none';tb.innerHTML='';return;}
+    wrap.style.display='';
+    tb.innerHTML=billItems.map(function(it,i){
+        var t=itemTotals(it);
+        return '<tr><td class="fw-bold">'+it.VehicleNumber+'</td><td>'+it.VendorName+'</td>'+
+            '<td>'+fmt(it.FixedAmount)+'</td><td>'+fmt(it.VariableAmount)+'</td>'+
+            '<td>'+fmt(it.TrafficChallan)+'</td><td>'+fmt(it.Tollgates)+'</td>'+
+            '<td>'+fmt(it.TDS)+'</td><td class="fw-bold text-success">'+fmt(t.total)+'</td>'+
+            '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBillItem('+i+')"><i class="bi bi-x-lg"></i></button></td></tr>';
+    }).join('');
+}
+
 function calcBill(){
     var fixed=parseFloat(document.getElementById('bFixed').value)||0;
     var variable=parseFloat(document.getElementById('bVariable').value)||0;
     var challan=parseFloat(document.getElementById('bChallan').value)||0;
     var tolls=parseFloat(document.getElementById('bTolls').value)||0;
-    var sub=fixed+variable+tolls+challan;
-    var sgst=Math.round(sub*0.09*100)/100, cgst=Math.round(sub*0.09*100)/100;
+    var entrySub=fixed+variable+tolls+challan;
     var tdsEl=document.getElementById('bTDS');
-    if(!tdsEl.dataset.userEdited) tdsEl.value=Math.round(sub*0.02*100)/100;
-    var tds=parseFloat(tdsEl.value)||0;
+    if(!tdsEl.dataset.userEdited) tdsEl.value=Math.round(entrySub*0.02*100)/100;
+    var entryGst=Math.round(entrySub*0.09*100)/100;
+    var sub=entrySub, sgst=entryGst, cgst=entryGst, tds=parseFloat(tdsEl.value)||0;
+    // include already-added vehicle bills in the totals
+    billItems.forEach(function(it){
+        var t=itemTotals(it);
+        sub+=t.sub; sgst+=t.gst; cgst+=t.gst; tds+=it.TDS;
+    });
     var total=Math.round((sub+sgst+cgst-tds)*100)/100;
     document.getElementById('bSubTotal').value='₹'+sub.toLocaleString('en-IN');
     document.getElementById('bSGST').value='₹'+sgst.toLocaleString('en-IN');
@@ -215,6 +304,10 @@ function resetBillForm(){
     document.getElementById('bStatus').value='';
     ['bFixed','bVariable','bChallan','bTolls','bTDS'].forEach(id=>document.getElementById(id).value='0');
     delete document.getElementById('bTDS').dataset.userEdited;
+    billItems=[];
+    renderBillItems();
+    document.getElementById('addVehBillRow').style.display='';
+    document.getElementById('invNumHint').style.display='none';
     calcBill();
 }
 
@@ -259,7 +352,7 @@ async function savePayMonth(recvId, input){
 function invDescRow(inv, desc, color){
     var safeDesc=(desc||'').replace(/"/g,'&quot;');
     return '<tr style="background:rgba(0,0,0,0.02);border-left:4px solid '+color+'44;border-bottom:2px solid '+color+'">'
-        +'<td colspan="14" class="py-1 px-3">'
+        +'<td colspan="12" class="py-1 px-3">'
         +'<div class="d-flex align-items-center gap-2">'
         +'<i class="bi bi-sticky text-muted" style="font-size:0.8em"></i>'
         +'<input type="text" class="form-control form-control-sm" style="font-size:0.82em;max-width:520px" '
@@ -268,7 +361,7 @@ function invDescRow(inv, desc, color){
         +'onclick="saveInvoiceDesc(\''+inv+'\')"><i class="bi bi-save me-1"></i>Save</button>'
         +'</div>'
         +'</td><td colspan="3"></td></tr>'
-        +'<tr><td colspan="17" style="height:8px;padding:0;background:transparent;border:none"></td></tr>';
+        +'<tr><td colspan="15" style="height:8px;padding:0;background:transparent;border:none"></td></tr>';
 }
 
 function saveInvoiceDesc(inv){
@@ -288,34 +381,58 @@ function saveInvoiceDesc(inv){
 
 function renderBillTable(bills){
     var tbody=document.getElementById('billTable');
-    if(!bills.length){tbody.innerHTML='<tr><td colspan="17" class="text-center text-muted">No bills yet</td></tr>';return;}
-    bills.sort((a,b)=>String(a.InvoiceNumber||'').toUpperCase().localeCompare(String(b.InvoiceNumber||'').toUpperCase()));
-    var html='', lastInv='', grpTotal=0, grpPaid=0, grpBal=0, grpCount=0, grpDesc='';
+    if(!bills.length){tbody.innerHTML='<tr><td colspan="15" class="text-center text-muted">No bills yet</td></tr>';return;}
+    // strict grouping: exact invoice number match only; no invoice number = its own separate section
+    bills.sort((a,b)=>String(a.InvoiceNumber||'').trim().toUpperCase().localeCompare(String(b.InvoiceNumber||'').trim().toUpperCase()));
+    // distinct vendors and bill types per invoice, for the group header
+    var invMeta={};
+    bills.forEach(function(b){
+        var inv=(b.InvoiceNumber||'').trim().toUpperCase();
+        if(!inv)return;
+        var m=invMeta[inv]||(invMeta[inv]={vendors:{},types:{}});
+        if(b.VendorName)m.vendors[b.VendorName]=1;
+        if(b.BillType)m.types[b.BillType]=1;
+    });
+    var html='', lastKey=null, lastLabel='', lastHadInv=false, grpTotal=0, grpPaid=0, grpBal=0, grpCount=0, grpDesc='';
     // border colours per group (cycle)
     var palette=['#FFB300','#29B6F6','#66BB6A','#EF5350','#AB47BC','#26C6DA','#FF7043','#8D6E63'];
     var palIdx=0;
     var curColor='';
+    function closeGroup(){
+        html+='<tr style="background:rgba(255,213,79,0.1)">'
+            +'<td colspan="9" class="text-end text-muted fst-italic pe-2" style="font-size:0.82em">Subtotal — '+lastLabel+' &nbsp;('+grpCount+' vehicle'+(grpCount>1?'s':'')+')</td>'
+            +'<td class="fw-bold" style="font-size:0.85em">'+fmt(grpTotal)+'</td>'
+            +'<td class="text-success fw-bold" style="font-size:0.85em">'+fmt(grpPaid)+'</td>'
+            +'<td class="text-danger fw-bold" style="font-size:0.85em">'+fmt(grpBal)+'</td>'
+            +'<td colspan="3"></td></tr>';
+        if(lastHadInv) html+=invDescRow(lastLabel, grpDesc, curColor);
+        else html+='<tr><td colspan="15" style="height:8px;padding:0;background:transparent;border:none"></td></tr>';
+    }
     bills.forEach(function(b,i){
-        var inv=(b.InvoiceNumber||'').toUpperCase();
+        var inv=(b.InvoiceNumber||'').trim().toUpperCase();
+        var key=inv||('#'+b.BillID);
         var sc=b.PaymentStatus==='Paid'?'bg-success':b.PaymentStatus==='Partial'?'bg-warning text-dark':'bg-danger';
-        if(inv!==lastInv){
-            if(lastInv!==''){
-                // subtotal row — close group
-                html+='<tr style="background:rgba(255,213,79,0.1)">'
-                    +'<td colspan="11" class="text-end text-muted fst-italic pe-2" style="font-size:0.82em">Subtotal — '+lastInv+' &nbsp;('+grpCount+' vehicle'+(grpCount>1?'s':'')+')</td>'
-                    +'<td class="fw-bold" style="font-size:0.85em">'+fmt(grpTotal)+'</td>'
-                    +'<td class="text-success fw-bold" style="font-size:0.85em">'+fmt(grpPaid)+'</td>'
-                    +'<td class="text-danger fw-bold" style="font-size:0.85em">'+fmt(grpBal)+'</td>'
-                    +'<td colspan="3"></td></tr>'
-                    +invDescRow(lastInv, grpDesc, curColor);
-            }
+        if(key!==lastKey){
+            if(lastKey!==null) closeGroup();
             curColor = palette[palIdx % palette.length]; palIdx++;
+            var meta=invMeta[inv]||{vendors:{},types:{}};
+            var vendorsTxt=Object.keys(meta.vendors).join(', ');
+            var typesTxt=Object.keys(meta.types).join(', ');
+            var label=inv||'(No Invoice)';
             html+='<tr style="background:linear-gradient(90deg,'+curColor+'22,transparent);border-left:4px solid '+curColor+';border-top:1px solid '+curColor+'44">'
-                +'<td colspan="17" class="py-2 px-3">'
+                +'<td colspan="15" class="py-2 px-3">'
                 +'<i class="bi bi-receipt me-1" style="color:'+curColor+'"></i>'
-                +'<strong style="color:'+curColor+'">'+inv+'</strong>'
-                +'</td></tr>';
-            lastInv=inv; grpTotal=0; grpPaid=0; grpBal=0; grpCount=0; grpDesc='';
+                +'<strong style="color:'+curColor+'">'+label+'</strong>'
+                +(vendorsTxt?'<span class="mx-2" style="color:'+curColor+'">|</span><span class="fw-semibold text-muted">'+vendorsTxt+'</span>':'')
+                +(typesTxt?'<span class="mx-2" style="color:'+curColor+'">|</span><span class="fw-semibold text-muted">'+typesTxt+'</span>':'')
+                +'</td></tr>'
+                +'<tr style="background:rgba(255,213,79,0.15);font-size:0.75em;text-transform:uppercase;letter-spacing:0.04em;border-left:4px solid '+curColor+'44">'
+                +'<td class="ps-3 fw-bold">Date</td><td class="fw-bold">Vehicle</td>'
+                +'<td class="fw-bold">Fixed</td><td class="fw-bold">Variable</td><td class="fw-bold">Challan</td><td class="fw-bold">Tolls</td>'
+                +'<td class="fw-bold">SGST</td><td class="fw-bold">CGST</td><td class="fw-bold">TDS</td>'
+                +'<td class="fw-bold">Total</td><td class="fw-bold">Paid</td><td class="fw-bold">Balance</td>'
+                +'<td class="fw-bold">Payment Month</td><td class="fw-bold">Status</td><td class="fw-bold viewer-hide">Actions</td></tr>';
+            lastKey=key; lastLabel=label; lastHadInv=!!inv; grpTotal=0; grpPaid=0; grpBal=0; grpCount=0; grpDesc='';
         }
         grpTotal+=parseFloat(b.TotalAmount||0);
         grpPaid+=parseFloat(b.PaidAmount||0);
@@ -323,8 +440,7 @@ function renderBillTable(bills){
         grpCount++;
         if(!grpDesc && b.InvoiceDescription) grpDesc=b.InvoiceDescription;
         html+='<tr style="border-left:4px solid '+curColor+'44">'+
-            '<td class="ps-3 text-muted" style="font-size:0.85em">'+inv+'</td>'+
-            '<td>'+b.InvoiceDate+'</td><td>'+b.VehicleNumber+'</td><td>'+b.VendorName+'</td>'+
+            '<td class="ps-3">'+b.InvoiceDate+'</td><td>'+b.VehicleNumber+'</td>'+
             '<td>'+fmt(b.FixedAmount)+'</td><td>'+fmt(b.VariableAmount)+'</td>'+
             '<td>'+fmt(b.TrafficChallan)+'</td><td>'+fmt(b.Tollgates)+'</td>'+
             '<td>'+fmt(b.SGST)+'</td><td>'+fmt(b.CGST)+'</td><td>'+fmt(b.TDS)+'</td>'+
@@ -334,15 +450,7 @@ function renderBillTable(bills){
             payMonthCell(b)+
             '<td><span class="badge '+sc+'">'+b.PaymentStatus+'</span></td>'+
             '<td class="viewer-hide"><button class="btn btn-sm btn-outline-warning me-1" onclick="editBill(\''+b.BillID+'\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteBill(\''+b.BillID+'\')"><i class="bi bi-trash"></i></button></td></tr>';
-        if(i===bills.length-1){
-            html+='<tr style="background:rgba(255,213,79,0.1)">'
-                +'<td colspan="11" class="text-end text-muted fst-italic pe-2" style="font-size:0.82em">Subtotal — '+inv+' &nbsp;('+grpCount+' vehicle'+(grpCount>1?'s':'')+')</td>'
-                +'<td class="fw-bold" style="font-size:0.85em">'+fmt(grpTotal)+'</td>'
-                +'<td class="text-success fw-bold" style="font-size:0.85em">'+fmt(grpPaid)+'</td>'
-                +'<td class="text-danger fw-bold" style="font-size:0.85em">'+fmt(grpBal)+'</td>'
-                +'<td colspan="3"></td></tr>'
-                +invDescRow(inv, grpDesc, curColor);
-        }
+        if(i===bills.length-1) closeGroup();
     });
     tbody.innerHTML=html;
 }
@@ -351,7 +459,7 @@ function renderBillSummary(bills){
     var tfoot=document.getElementById('billSummary');
     var c={Pending:0,Partial:0,Paid:0},t={Pending:0,Partial:0,Paid:0},bal={Pending:0,Partial:0,Paid:0};
     bills.forEach(function(b){var s=b.PaymentStatus||'Pending';if(c[s]!==undefined){c[s]++;t[s]+=parseFloat(b.TotalAmount||0);bal[s]+=parseFloat(b.BalanceAmount||0);}});
-    tfoot.innerHTML='<tr style="background:rgba(0,0,0,0.05);border-top:2px solid rgba(255,193,7,0.5)"><td colspan="17" class="py-2">'+
+    tfoot.innerHTML='<tr style="background:rgba(0,0,0,0.05);border-top:2px solid rgba(255,193,7,0.5)"><td colspan="15" class="py-2">'+
         '<div class="d-flex flex-wrap gap-4 px-2">'+
         '<span><span class="badge bg-danger me-1">Pending</span>'+c.Pending+' bills &nbsp;|&nbsp; Billed: <strong>'+fmt(t.Pending)+'</strong> &nbsp;|&nbsp; Outstanding: <strong class="text-danger">'+fmt(bal.Pending)+'</strong></span>'+
         '<span><span class="badge bg-warning text-dark me-1">Partial</span>'+c.Partial+' bills &nbsp;|&nbsp; Billed: <strong>'+fmt(t.Partial)+'</strong> &nbsp;|&nbsp; Outstanding: <strong class="text-warning">'+fmt(bal.Partial)+'</strong></span>'+
@@ -361,11 +469,16 @@ function renderBillSummary(bills){
 
 function editBill(bid){
     var b=allBills.find(x=>x.BillID===bid);if(!b)return;
+    billItems=[];
+    renderBillItems();
+    document.getElementById('addVehBillRow').style.display='none'; // edit is single-vehicle only
     document.getElementById('billId').value=b.BillID;
     document.getElementById('billModalTitle').textContent='Edit Bill';
     document.getElementById('bDate').value=b.InvoiceDate||'';
     document.getElementById('bPayMonth').value=b.PaymentMonth||(b.InvoiceDate?b.InvoiceDate.slice(0,7):'');
     document.getElementById('bInvNum').value=b.InvoiceNumber||'';
+    document.getElementById('invNumHint').style.display='none';
+    document.getElementById('bBillType').value=b.BillType||'';
     // Show status override for admins only on edit
     if(typeof USER_ROLE!=='undefined' && USER_ROLE==='admin'){
         document.getElementById('bStatusRow').style.display='';
@@ -387,14 +500,38 @@ function editBill(bid){
 
 async function saveBill(){
     var id=document.getElementById('billId').value;
-    var statusOverride=document.getElementById('bStatus').value;
-    var payload={InvoiceDate:document.getElementById('bDate').value,PaymentMonth:document.getElementById('bPayMonth').value,InvoiceNumber:document.getElementById('bInvNum').value,VehicleNumber:document.getElementById('bVehicle').value,VendorName:document.getElementById('bVendor').value,FixedAmount:document.getElementById('bFixed').value,VariableAmount:document.getElementById('bVariable').value,TrafficChallan:document.getElementById('bChallan').value,Tollgates:document.getElementById('bTolls').value,TDS:document.getElementById('bTDS').value,Description:document.getElementById('bDesc').value};
-    if(statusOverride) payload._statusOverride=statusOverride;
-    if(!payload.InvoiceDate||!payload.VehicleNumber||!payload.VendorName){showToast('Fill required fields','danger');return;}
+    var invDate=document.getElementById('bDate').value;
+    if(!invDate){showToast('Fill required fields','danger');return;}
     try{
-        var res=await fetch(id?'/billing/api/'+id:'/billing/api/add',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        var data=await res.json();
-        if(data.success){var invNum=String(data.invoice_number||document.getElementById('bInvNum').value||'').toUpperCase();await uploadEntityDoc('bFile','GSTSale', invNum, 'Invoice');bootstrap.Modal.getInstance(billModalEl).hide();showToast(id?'Bill updated':'Bill created','success');loadBills(currentPage);}
+        var res, data;
+        if(id){
+            // edit — single bill update (unchanged behaviour)
+            var statusOverride=document.getElementById('bStatus').value;
+            var payload={InvoiceDate:invDate,PaymentMonth:document.getElementById('bPayMonth').value,InvoiceNumber:document.getElementById('bInvNum').value.trim().toUpperCase(),BillType:document.getElementById('bBillType').value,VehicleNumber:document.getElementById('bVehicle').value,VendorName:document.getElementById('bVendor').value,FixedAmount:document.getElementById('bFixed').value,VariableAmount:document.getElementById('bVariable').value,TrafficChallan:document.getElementById('bChallan').value,Tollgates:document.getElementById('bTolls').value,TDS:document.getElementById('bTDS').value,Description:document.getElementById('bDesc').value};
+            if(statusOverride) payload._statusOverride=statusOverride;
+            if(!payload.VehicleNumber||!payload.VendorName){showToast('Fill required fields','danger');return;}
+            res=await fetch('/billing/api/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        }else{
+            // add — all added vehicles + the currently filled entry go under one invoice
+            var items=billItems.slice();
+            var cur=currentBillEntry();
+            if(cur.VehicleNumber&&cur.VendorName) items.push(cur);
+            else if(cur.VehicleNumber&&!cur.VendorName){showToast('Select vendor for '+cur.VehicleNumber,'danger');return;}
+            if(!items.length){showToast('Add at least one vehicle bill','danger');return;}
+            var invPayload={InvoiceDate:invDate,PaymentMonth:document.getElementById('bPayMonth').value,InvoiceNumber:document.getElementById('bInvNum').value.trim().toUpperCase(),BillType:document.getElementById('bBillType').value,Description:document.getElementById('bDesc').value,items:items};
+            res=await fetch('/billing/api/add-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(invPayload)});
+        }
+        data=await res.json();
+        if(data.success){
+            var invNum=String(data.invoice_number||document.getElementById('bInvNum').value||'').toUpperCase();
+            await uploadEntityDoc('bFile','GSTSale', invNum, 'Invoice');
+            bootstrap.Modal.getInstance(billModalEl).hide();
+            var wasExisting=allInvoiceNumbers.indexOf(invNum)>=0;
+            showToast(id?'Bill updated':(data.bill_ids?data.bill_ids.length:1)+' vehicle bill(s) '+(wasExisting?'added to existing invoice ':'created under new invoice ')+invNum,'success');
+            billItems=[];
+            loadBills(currentPage);
+            refreshInvoiceList();
+        }
         else showToast(data.error||'Failed','danger');
     }catch(e){showToast('Network error','danger');}
 }
@@ -408,10 +545,38 @@ async function deleteBill(id){
 }
 
 function resetRecvForm(){
+    editingRecvId=null;
+    document.getElementById('recvModalTitle').textContent='Add Received Payment';
     document.getElementById('recvForm').reset();
     document.getElementById('rDate').value=todayStr();
     document.getElementById('rPayMonth').value=thisMonth();
-    document.getElementById('rBillID').innerHTML='<option value="">-- General Payment --</option>';
+    var billSel=document.getElementById('rBillID');
+    billSel.innerHTML='<option value="">-- General Payment --</option>';
+    billSel.disabled=false;
+}
+
+function editRecv(id){
+    var r=recvCache[id];
+    if(!r){showToast('Payment not found','danger');return;}
+    resetRecvForm();
+    editingRecvId=id;
+    document.getElementById('recvModalTitle').textContent='Edit Received Payment';
+    document.getElementById('rDate').value=r.ReceiveDate||'';
+    document.getElementById('rPayMonth').value=r.PaymentMonth||(r.ReceiveDate||'').slice(0,7);
+    var vSel=document.getElementById('rVendor');
+    vSel.value=r.VendorName||'';
+    if(r.VendorName && vSel.value!==r.VendorName){
+        var opt=document.createElement('option');opt.value=r.VendorName;opt.textContent=r.VendorName;
+        vSel.appendChild(opt);vSel.value=r.VendorName;
+    }
+    document.getElementById('rAmount').value=r.Amount||'';
+    document.getElementById('rPayMode').value=r.PaymentMode||'Bank Transfer';
+    document.getElementById('rRefNum').value=r.ReferenceNumber||'';
+    document.getElementById('rDesc').value=r.Description||'';
+    var billSel=document.getElementById('rBillID');
+    billSel.innerHTML='<option value="">'+(r.InvoiceNumber?r.InvoiceNumber+' (linked bill kept)':'-- General Payment --')+'</option>';
+    billSel.disabled=true;
+    bootstrap.Modal.getOrCreateInstance(recvModalEl).show();
 }
 
 async function loadVendorBills(){
@@ -452,27 +617,42 @@ async function loadRecv(){
     var data=await res.json();
     document.getElementById('recvTotal').textContent=fmt(data.total_received||0);
     var list=data.receivables||[];
+    recvCache={};
+    list.forEach(function(r){recvCache[r.ReceivableID]=r;});
     // Group by InvoiceNumber
     var groups={}, order=[];
     list.forEach(function(r){
-        var key=r.InvoiceNumber||'(No Bill)';
+        var key=String(r.InvoiceNumber||'').trim().toUpperCase()||'(No Bill)';
         if(!groups[key]){groups[key]=[];order.push(key);}
         groups[key].push(r);
     });
     var container=document.getElementById('recvGroups');
     if(!list.length){container.innerHTML='<div class="glass-card text-center text-muted py-4">No payments for this period</div>';return;}
     var html='';
+    var invStatus=data.invoice_status||{};
     order.forEach(function(inv){
         var rows=groups[inv];
         var grpTotal=rows.reduce((s,r)=>s+parseFloat(r.Amount||0),0);
+        var st=invStatus[inv];
+        var stBadge='';
+        if(st){
+            var cls = st.status==='Fully Received' ? 'bg-success' : st.status==='Partially Received' ? 'bg-warning text-dark' : 'bg-danger';
+            var balTxt = st.balance>0 ? ' <small class="text-muted ms-2">Balance: '+fmt(st.balance)+' of '+fmt(st.total)+'</small>' : '';
+            stBadge='<span class="badge '+cls+' ms-2">'+st.status+'</span>'+balTxt;
+        }
+        var rv={}, rt={};
+        rows.forEach(function(r){if(r.VendorName)rv[r.VendorName]=1;if(r.BillType)rt[r.BillType]=1;});
+        var rvTxt=Object.keys(rv).join(', '), rtTxt=Object.keys(rt).join(', ');
+        var metaTxt=(rvTxt?'<span class="mx-2 text-warning">|</span><span class="fw-semibold text-muted">'+rvTxt+'</span>':'')
+            +(rtTxt?'<span class="mx-2 text-warning">|</span><span class="fw-semibold text-muted">'+rtTxt+'</span>':'');
         html+='<div class="glass-card mb-3 animate-in">'+
-            '<div class="d-flex justify-content-between align-items-center mb-2" style="background:rgba(255,193,7,0.12);margin:-1rem -1rem 1rem -1rem;padding:0.6rem 1rem;border-radius:8px 8px 0 0">'+
-            '<strong><i class="bi bi-receipt me-1 text-warning"></i>'+inv+'</strong>'+
+            '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap" style="background:rgba(255,193,7,0.12);margin:-1rem -1rem 1rem -1rem;padding:0.6rem 1rem;border-radius:8px 8px 0 0">'+
+            '<span><strong><i class="bi bi-receipt me-1 text-warning"></i>'+inv+'</strong>'+metaTxt+stBadge+'</span>'+
             '<span class="fw-bold text-success">'+fmt(grpTotal)+'</span>'+
             '</div>'+
             '<div class="table-responsive">'+
             '<table class="table table-sm table-hover glass-table mb-0 small">'+
-            '<thead><tr><th>Receive Date</th><th>Payment Month</th><th>Vendor</th><th>Vehicle</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Description</th><th class="viewer-hide">Actions</th></tr></thead>'+
+            '<thead><tr><th>Receive Date</th><th>Payment Month</th><th>Vendor</th><th>Vehicle</th><th>Bill Type</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Description</th><th class="viewer-hide">Actions</th></tr></thead>'+
             '<tbody>'+
             rows.map(function(r){
                 var pm=r.PaymentMonth||r.ReceiveDate.slice(0,7)||'—';
@@ -484,11 +664,12 @@ async function loadRecv(){
                     '<td>'+pmCell+'</td>'+
                     '<td>'+r.VendorName+'</td>'+
                     '<td>'+(r.VehicleNumber||'—')+'</td>'+
+                    '<td>'+(r.BillType||'—')+'</td>'+
                     '<td class="fw-bold text-success">'+fmt(r.Amount)+'</td>'+
                     '<td>'+r.PaymentMode+'</td>'+
                     '<td>'+(r.ReferenceNumber||'—')+'</td>'+
                     '<td>'+(r.Description||'—')+'</td>'+
-                    '<td class="viewer-hide"><button class="btn btn-sm btn-outline-danger" onclick="deleteRecv(\''+r.ReceivableID+'\')"><i class="bi bi-trash"></i></button></td>'+
+                    '<td class="viewer-hide"><button class="btn btn-sm btn-outline-warning me-1" title="Edit payment" onclick="editRecv(\''+r.ReceivableID+'\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" title="Delete payment" onclick="deleteRecv(\''+r.ReceivableID+'\')"><i class="bi bi-trash"></i></button></td>'+
                     '</tr>';
             }).join('')+
             '</tbody></table></div></div>';
@@ -500,9 +681,17 @@ async function saveRecv(){
     var payload={ReceiveDate:document.getElementById('rDate').value,PaymentMonth:document.getElementById('rPayMonth').value,VendorName:document.getElementById('rVendor').value,BillID:document.getElementById('rBillID').value,Amount:document.getElementById('rAmount').value,PaymentMode:document.getElementById('rPayMode').value,ReferenceNumber:document.getElementById('rRefNum').value,Description:document.getElementById('rDesc').value};
     if(!payload.ReceiveDate||!payload.VendorName||!payload.Amount){showToast('Fill required fields','danger');return;}
     try{
-        var res=await fetch('/billing/api/receivables/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        var res, msg;
+        if(editingRecvId){
+            delete payload.BillID; // keep existing bill link on edit
+            res=await fetch('/billing/api/receivables/'+editingRecvId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            msg='Payment updated';
+        }else{
+            res=await fetch('/billing/api/receivables/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            msg='Payment recorded';
+        }
         var data=await res.json();
-        if(data.success){bootstrap.Modal.getInstance(recvModalEl).hide();showToast('Payment recorded','success');loadRecv();loadBills(currentPage);}
+        if(data.success){bootstrap.Modal.getInstance(recvModalEl).hide();showToast(msg,'success');loadRecv();loadBills(currentPage);}
         else showToast(data.error||'Failed','danger');
     }catch(e){showToast('Network error','danger');}
 }
