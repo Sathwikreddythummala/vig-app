@@ -407,21 +407,78 @@ body::after {
 /* Form Label */
 .form-label { font-weight: 500; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
 
-/* Responsive */
+/* Mobile sidebar backdrop (only shows on small screens when drawer is open) */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(62, 39, 35, 0.45);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Responsive: tablets and phones */
 @media (max-width: 991.98px) {
+    /* Sidebar becomes an off-canvas drawer */
     .sidebar {
         transform: translateX(-100%);
-        width: var(--sidebar-width);
+        width: var(--sidebar-width) !important;
+        box-shadow: 6px 0 30px rgba(0, 0, 0, 0.18);
     }
-    .sidebar.collapsed { transform: translateX(0); width: var(--sidebar-width); }
-    .main-content { margin-left: 0 !important; }
-    .alerts-dropdown { right: 10px; width: calc(100vw - 20px); }
+    .sidebar.mobile-open { transform: translateX(0); }
+    /* ignore the desktop icon-collapse behaviour on mobile */
+    .sidebar.collapsed .logo-text,
+    .sidebar.collapsed .logo-sub,
+    .sidebar.collapsed .nav-link span,
+    .sidebar.collapsed .sidebar-footer span { display: inline; }
+    .sidebar.collapsed .nav-link { justify-content: flex-start; padding: 12px 16px; }
+    .sidebar.collapsed .nav-link i { margin-right: 12px; font-size: 1.1rem; }
+    .main-content,
+    .sidebar.collapsed ~ .main-content { margin-left: 0 !important; }
+    .sidebar-backdrop.show { display: block; opacity: 1; }
+    /* bigger, tappable nav rows */
+    .sidebar-nav .nav-link { padding: 14px 16px; font-size: 0.95rem; }
+    .sidebar-nav .nav-link:hover { transform: none; }
+    .top-navbar { padding: 0 14px; }
+    .alerts-dropdown { right: 10px; left: 10px; width: auto; }
 }
+
+/* Responsive: phones */
+@media (max-width: 767.98px) {
+    .content-area { padding: 14px; }
+    .glass-card { padding: 14px; border-radius: 14px; }
+    .glass-card:hover { transform: none; }
+    .navbar-title { font-size: 1rem; }
+    /* Filter/action bars: controls go full-width and stack cleanly */
+    .glass-card .form-select.glass-input,
+    .glass-card input.glass-input,
+    .glass-card .ms-filter { width: 100% !important; }
+    .glass-card .d-flex.flex-wrap > .btn,
+    .glass-card .d-flex.gap-2 > .btn { flex: 1 1 auto; }
+    /* Tables never widen the page — they scroll inside their card */
+    .table-responsive { -webkit-overflow-scrolling: touch; }
+    .glass-table { min-width: 640px; }
+    .glass-table thead th, .glass-table tbody td { padding: 8px 10px; font-size: 0.8rem; }
+    /* Modals use the full width on phones */
+    .modal-dialog { margin: 8px; max-width: none; }
+    .glass-modal .modal-body { padding: 14px 16px; }
+    .glass-modal .modal-header { padding: 16px 16px 8px; }
+    /* comfortable tap target for icon action buttons */
+    .btn-sm { padding: 7px 11px; }
+}
+
+/* Responsive: small phones */
 @media (max-width: 575.98px) {
-    .content-area { padding: 12px; }
-    .glass-card { padding: 14px; border-radius: 12px; }
+    .content-area { padding: 10px; }
+    .glass-card { padding: 12px; border-radius: 12px; }
     .stat-card { gap: 10px; }
     .stat-icon { width: 44px; height: 44px; font-size: 1.2rem; border-radius: 10px; }
     .stat-info h3, .stat-info h4 { font-size: 1.1rem; }
     .navbar-title { font-size: 0.9rem; }
+    .user-avatar { width: 32px; height: 32px; }
+    /* dashboard stat columns: 2-up instead of cramped 4-up */
+    .row.g-3 > [class*="col-xl-3"] { flex: 0 0 50%; max-width: 50%; }
 }

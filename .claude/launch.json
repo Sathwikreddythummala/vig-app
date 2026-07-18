@@ -24,6 +24,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "E:\\Trader\\frontend", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "vsp-astra-portal",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["D:\\Resume KPI for all\\vsp-astra-portal\\node_modules\\next\\dist\\bin\\next", "dev", "D:\\Resume KPI for all\\vsp-astra-portal", "--port", "3001"],
+      "port": 3001
     }
   ]
 }

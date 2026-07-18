@@ -170,6 +170,42 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('select[id^="filter"]').forEach(makeMultiSelect);
 });
 
+// ---- Mobile sidebar ----
+// On phones/tablets the sidebar slides in over the content with a dimmed
+// backdrop; on desktop the same button collapses it to an icon rail.
+function _isMobileView() { return window.matchMedia('(max-width: 991.98px)').matches; }
+
+function toggleSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    if (_isMobileView()) {
+        var open = sidebar.classList.toggle('mobile-open');
+        if (backdrop) backdrop.classList.toggle('show', open);
+        document.body.style.overflow = open ? 'hidden' : '';
+    } else {
+        sidebar.classList.toggle('collapsed');
+    }
+}
+
+function closeSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+// Tapping a nav link on mobile closes the drawer before navigating.
+document.addEventListener('DOMContentLoaded', function () {
+    if (_isMobileView()) {
+        document.querySelectorAll('.sidebar .nav-link').forEach(function (a) {
+            a.addEventListener('click', function () { closeSidebar(); });
+        });
+    }
+});
+// Reset drawer state when rotating/resizing back to desktop.
+window.addEventListener('resize', function () { if (!_isMobileView()) closeSidebar(); });
+
 let alertsVisible = false;
 
 function toggleAlerts() {

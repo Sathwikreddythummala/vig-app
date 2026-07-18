@@ -34,6 +34,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="d-flex gap-2 align-items-center">
             <select class="form-select glass-input" id="filterHolder" style="width:140px" onchange="loadEntries()"><option value="">All</option><option>TSR</option><option>MSR</option></select>
+            <select class="form-select glass-input" id="filterType" style="width:140px" onchange="loadEntries()"><option value="">All Types</option><option>Credit</option><option>Debit</option><option>Expense</option></select>
             <span class="text-muted small"><i class="bi bi-info-circle"></i> Shows purse entries + expenses paid by TSR/MSR</span>
         </div>
     </div>
@@ -110,9 +111,11 @@ async function loadSummary() {
 
 async function loadEntries() {
     var holder = document.getElementById('filterHolder').value;
+    var type = document.getElementById('filterType').value;
     var res = await fetch('/purse/api/list?holder='+holder); var data = await res.json();
     var tbody = document.getElementById('entryTable');
     var entries = data.entries || [];
+    if (type) entries = entries.filter(function(e){ return e.Type === type; });
     if (entries.length) {
         tbody.innerHTML = entries.map(function(e) {
             var typeClass = e.Type==='Credit'?'text-success fw-bold':e.Type==='Debit'?'text-danger fw-bold':'text-warning fw-bold';
