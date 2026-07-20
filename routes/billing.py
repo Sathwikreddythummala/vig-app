@@ -80,15 +80,18 @@ async def list_bills(
     records = filter_multi(records, "VehicleNumber", vehicle)
     records = filter_multi(records, "VendorName", vendor)
     records = filter_multi(records, "PaymentStatus", status)
-    # an invoice is one unit: if any of its bills match the filters,
-    # include the invoice's remaining bills too so the group is never split
-    matched_invs = {str(r.get("InvoiceNumber", "")).strip().upper() for r in records if str(r.get("InvoiceNumber", "")).strip()}
-    if matched_invs:
-        seen_ids = {r.get("BillID") for r in records}
-        for r in all_records:
-            if str(r.get("InvoiceNumber", "")).strip().upper() in matched_invs and r.get("BillID") not in seen_ids:
-                records.append(r)
-                seen_ids.add(r.get("BillID"))
+    # An invoice is one unit for period filters (month/date), so when any of its
+    # bills match, include the rest of the invoice too. But a vehicle/vendor/status
+    # filter is a targeted search — only show the bills that actually match, never
+    # pull in the invoice's other vehicles.
+    if not (vehicle or vendor or status):
+        matched_invs = {str(r.get("InvoiceNumber", "")).strip().upper() for r in records if str(r.get("InvoiceNumber", "")).strip()}
+        if matched_invs:
+            seen_ids = {r.get("BillID") for r in records}
+            for r in all_records:
+                if str(r.get("InvoiceNumber", "")).strip().upper() in matched_invs and r.get("BillID") not in seen_ids:
+                    records.append(r)
+                    seen_ids.add(r.get("BillID"))
     records.sort(key=lambda x: (str(x.get("PaymentMonth", "")) or str(x.get("InvoiceDate", ""))[:7]), reverse=True)
     total = len(records)
     total_amount = sum(float(r.get("TotalAmount", 0) or 0) for r in records)
