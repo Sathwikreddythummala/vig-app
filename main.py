@@ -120,6 +120,30 @@ async def company_profile_page(request: Request):
     return _templates.TemplateResponse(request=request, name="company_profile.html", context={"user": user})
 
 
+@app.get("/company/logo")
+async def company_logo(request: Request):
+    """Streams the current company logo (latest uploaded), used by the sidebar app-wide."""
+    from fastapi.responses import Response
+    from services.db import execute
+    try:
+        rows = execute(
+            "SELECT file_data, mime_type FROM document_files "
+            "WHERE entity_type = 'Company' AND entity_id = 'VIGNESHWARA' AND doc_type = 'Logo' "
+            "ORDER BY uploaded_date DESC LIMIT 1",
+            fetch=True,
+        )
+    except Exception:
+        rows = None
+    if not rows:
+        return Response(status_code=404)
+    row = rows[0]
+    return Response(
+        content=bytes(row["file_data"]),
+        media_type=row["mime_type"] or "image/png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -6,11 +6,19 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-4">
         <div class="glass-card animate-in text-center" style="animation-delay:0.1s">
-            <div style="width:80px;height:80px;background:linear-gradient(135deg,#FFD54F,#FFC107);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:2rem;color:#3E2723">
-                <i class="bi bi-building-fill"></i>
+            <div id="logoWrap" style="width:110px;height:110px;background:linear-gradient(135deg,#FFD54F,#FFC107);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:2.6rem;color:#3E2723;overflow:hidden;box-shadow:0 4px 15px rgba(255,193,7,0.35)">
+                <img id="logoImg" src="/company/logo?t={{ range(100000) | random }}" alt="Logo" style="width:100%;height:100%;object-fit:contain;display:none" onload="this.style.display='block';document.getElementById('logoFallback').style.display='none'" onerror="this.style.display='none'">
+                <i class="bi bi-building-fill" id="logoFallback"></i>
             </div>
             <h5 class="fw-bold mb-1">Vigneshwara Enterprises</h5>
-            <div class="text-muted small">Fleet Management Company</div>
+            <div class="text-muted small mb-3">Fleet Management Company</div>
+            <div class="viewer-hide">
+                <button class="btn btn-warning btn-sm" onclick="document.getElementById('logoFile').click()">
+                    <i class="bi bi-image me-1"></i> <span id="logoBtnText">Upload Logo</span>
+                </button>
+                <input type="file" id="logoFile" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display:none" onchange="uploadLogo(this)">
+                <div class="text-muted mt-2" style="font-size:0.72rem">PNG, JPG or SVG · shown in sidebar</div>
+            </div>
         </div>
     </div>
     <div class="col-lg-8">
@@ -66,6 +74,7 @@
 async function loadDocs() {
     var res = await fetch('/documents/api/list?entity_type=Company&entity_id=VIGNESHWARA');
     var docs = await res.json();
+    docs = (docs || []).filter(function(d){ return d.doc_type !== 'Logo'; }); // logo has its own card
     var tbody = document.getElementById('docsTable');
     if (!docs.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-folder2 me-2"></i>No company documents uploaded yet</td></tr>';
@@ -87,6 +96,38 @@ async function loadDocs() {
             '</div></td>' +
         '</tr>';
     }).join('');
+}
+
+async function uploadLogo(input) {
+    var file = input.files[0]; if (!file) return;
+    var btnText = document.getElementById('logoBtnText');
+    btnText.textContent = 'Uploading…';
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('entity_type', 'Company');
+    fd.append('entity_id', 'VIGNESHWARA');
+    fd.append('doc_type', 'Logo');
+    try {
+        // remove previous logo(s) so only the newest is kept
+        var oldIds = [];
+        try {
+            var existing = await (await fetch('/documents/api/list?entity_type=Company&entity_id=VIGNESHWARA')).json();
+            oldIds = (existing || []).filter(function(d){ return d.doc_type === 'Logo'; }).map(function(d){ return d.doc_id; });
+        } catch(e) {}
+        var res = await fetch('/documents/api/upload', { method: 'POST', body: fd });
+        var data = await res.json();
+        if (data.success) {
+            for (var i = 0; i < oldIds.length; i++) {
+                try { await fetch('/documents/api/' + oldIds[i], { method: 'DELETE' }); } catch(e) {}
+            }
+            showToast('Logo updated', 'success');
+            var img = document.getElementById('logoImg');
+            img.src = '/company/logo?t=' + Date.now();
+            loadDocs();
+        } else { showToast(data.error || 'Upload failed', 'danger'); }
+    } catch(e) { showToast('Upload failed', 'danger'); }
+    btnText.textContent = 'Upload Logo';
+    input.value = '';
 }
 
 async function uploadDoc(input) {
