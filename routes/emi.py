@@ -5,10 +5,11 @@ from services.sheets_service import (
     gen_id, now_str, add_audit_log, SHEET_HEADERS,
 )
 from utils.templates import templates
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 _IST = ZoneInfo("Asia/Kolkata")
 import io
+import calendar
 
 router = APIRouter(prefix="/emi", tags=["emi"])
 
@@ -26,19 +27,34 @@ async def emi_page(request: Request):
     return templates.TemplateResponse(request=request, name="emi.html", context={"user": user})
 
 
-def calc_next_due(emi_day_str):
-    today = datetime.now(_IST)
+def _emi_day_on_or_after(d: date, day: int) -> date:
+    """First date with day-of-month `day` that is on or after `d` (clamps to month length)."""
+    y, m = d.year, d.month
+    cand = date(y, m, min(day, calendar.monthrange(y, m)[1]))
+    if cand < d:
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        cand = date(y, m, min(day, calendar.monthrange(y, m)[1]))
+    return cand
+
+
+def calc_next_due(emi_day_str, start_date_str=""):
+    today = datetime.now(_IST).date()
     try:
         day = int(emi_day_str)
-        next_d = today.replace(day=day)
-        if next_d.date() < today.date():
-            if today.month == 12:
-                next_d = next_d.replace(year=today.year + 1, month=1)
-            else:
-                next_d = next_d.replace(month=today.month + 1)
-        return next_d.strftime("%Y-%m-%d"), (next_d.date() - today.date()).days
     except (ValueError, TypeError):
         return "", None
+    next_d = _emi_day_on_or_after(today, day)
+    # An EMI can never fall due before the loan actually starts. If the loan
+    # begins in the future, the next due is its first scheduled instalment.
+    if start_date_str:
+        try:
+            start = datetime.strptime(str(start_date_str)[:10], "%Y-%m-%d").date()
+            first = _emi_day_on_or_after(start, day)
+            if next_d < first:
+                next_d = first
+        except (ValueError, TypeError):
+            pass
+    return next_d.strftime("%Y-%m-%d"), (next_d - today).days
 
 
 @router.get("/api/list")
@@ -60,7 +76,7 @@ async def list_emis(request: Request):
                     status = "Completed"
             except (ValueError, TypeError):
                 pass
-            next_due, days_left = calc_next_due(emi_day) if status == "Active" else ("", None)
+            next_due, days_left = calc_next_due(emi_day, v.get("LoanStartDate", "")) if status == "Active" else ("", None)
             vehicle_emis.append({
                 "VehicleID": v.get("VehicleID", ""),
                 "VehicleNumber": v.get("VehicleNumber", ""),
@@ -87,7 +103,7 @@ async def list_emis(request: Request):
             pass
         emi_day = str(oe.get("EMIDate", "")).strip()
         if oe.get("Status", "") == "Active":
-            nd, dl = calc_next_due(emi_day)
+            nd, dl = calc_next_due(emi_day, oe.get("StartDate", ""))
             oe["NextDue"] = nd
             oe["DaysLeft"] = dl
         else:
@@ -160,7 +176,8 @@ async def export_excel(request: Request):
             "Days Left": e.get("DaysLeft", ""),
             "Status": e.get("Status", ""),
         } for e in other_emis]
-        pd.DataFrame(o_rows).to_excel(writer, sheet_name="Other EMIs", index=False)
+        from utils.exports import to_numeric_df
+        to_numeric_df(o_rows, ["Total Amount", "Down Payment", "EMI Amount", "Paid Installments", "Total Installments", "Days Left"]).to_excel(writer, sheet_name="Other EMIs", index=False)
 
     buf.seek(0)
     return StreamingResponse(

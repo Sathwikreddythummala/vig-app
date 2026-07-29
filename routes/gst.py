@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from services.sheets_service import (
     get_all_records, find_row_by_id, append_row, update_row, delete_row,
     gen_id, now_str, add_audit_log,
 )
+from services.db import execute
 from utils.templates import templates
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import io
+import zipfile
 _IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/gst", tags=["gst"])
@@ -14,6 +17,42 @@ router = APIRouter(prefix="/gst", tags=["gst"])
 
 def get_user(request: Request):
     return request.session.get("user")
+
+
+def _zip_documents(entity_type: str, entity_ids: list[str], zip_name: str):
+    """Fetch all document files for the given entities and stream them as a ZIP."""
+    if not entity_ids:
+        return JSONResponse({"error": "No documents found for this month"}, 404)
+    rows = execute(
+        "SELECT doc_id, entity_type, entity_id, doc_type, file_name, file_data "
+        "FROM document_files WHERE entity_type = %s AND entity_id = ANY(%s) "
+        "ORDER BY entity_id",
+        [entity_type, entity_ids],
+        fetch=True,
+    ) or []
+    if not rows:
+        return JSONResponse({"error": "No invoice documents uploaded for this month"}, 404)
+    from routes.documents import _build_filename
+    buf = io.BytesIO()
+    used = {}
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for r in rows:
+            row = dict(r)
+            name = _build_filename(row)
+            # avoid name collisions inside the archive
+            if name in used:
+                used[name] += 1
+                stem, _, ext = name.rpartition(".")
+                name = f"{stem}_{used[name]}.{ext}" if stem else f"{name}_{used[name]}"
+            else:
+                used[name] = 0
+            zf.writestr(name, bytes(row["file_data"]))
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+    )
 
 
 @router.get("")
@@ -45,6 +84,32 @@ async def list_purchases(request: Request, month: str = ""):
         "total_cgst": total_cgst,
         "total": total,
     }
+
+
+@router.get("/api/purchases/zip")
+async def download_purchases_zip(request: Request, month: str = ""):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    records = get_all_records("GSTpurchases")
+    if month:
+        records = [r for r in records if str(r.get("InvoiceDate", ""))[:7] == month]
+    ids = [str(r.get("PurchaseID", "")) for r in records if r.get("PurchaseID")]
+    label = month or "all"
+    return _zip_documents("GSTPurchase", ids, f"gst_input_purchases_{label}.zip")
+
+
+@router.get("/api/sales/zip")
+async def download_sales_zip(request: Request, month: str = ""):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    bills = get_all_records("Billing")
+    if month:
+        bills = [b for b in bills if str(b.get("InvoiceDate", ""))[:7] == month]
+    ids = sorted({str(b.get("InvoiceNumber", "")).upper() for b in bills if b.get("InvoiceNumber")})
+    label = month or "all"
+    return _zip_documents("GSTSale", ids, f"gst_output_sales_{label}.zip")
 
 
 @router.get("/api/sales")

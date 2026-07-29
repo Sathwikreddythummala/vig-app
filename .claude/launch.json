@@ -11,7 +11,8 @@
       "name": "vig-app",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "uvicorn", "main:app", "--port", "8000"],
-      "port": 8000
+      "port": 8000,
+      "autoPort": false
     },
     {
       "name": "bhevora-backend",
@@ -30,6 +31,13 @@
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": ["D:\\Resume KPI for all\\vsp-astra-portal\\node_modules\\next\\dist\\bin\\next", "dev", "D:\\Resume KPI for all\\vsp-astra-portal", "--port", "3001"],
       "port": 3001
+    },
+    {
+      "name": "vsp-astra-flask",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-c", "import os, runpy; os.chdir(r'D:\\Resume KPI for all\\vsp-astra-flask'); runpy.run_path('app.py', run_name='__main__')"],
+      "port": 5000,
+      "autoPort": false
     }
   ]
 }

@@ -37,6 +37,10 @@
             <select class="form-select glass-input" id="filterType" style="width:140px" onchange="loadEntries()"><option value="">All Types</option><option>Credit</option><option>Debit</option><option>Expense</option></select>
             <span class="text-muted small"><i class="bi bi-info-circle"></i> Shows purse entries + expenses paid by TSR/MSR</span>
         </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="exportPurse('excel')" title="Download purse report (person-wise sheets)"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+            <button class="btn btn-outline-warning btn-sm" onclick="exportPurse('pdf')" title="Download purse report (person-wise sections)"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+        </div>
     </div>
 </div>
 <div class="glass-card animate-in" style="animation-delay:0.3s">
@@ -107,6 +111,14 @@ async function loadSummary() {
         document.getElementById('msrBalance').textContent = '₹'+Number(mb).toLocaleString('en-IN');
         document.getElementById('msrBalance').className = 'fw-bold '+(mb>=0?'text-success':'text-danger');
     }
+}
+
+function exportPurse(fmt) {
+    var params = new URLSearchParams({
+        holder: document.getElementById('filterHolder').value,
+        type: document.getElementById('filterType').value,
+    });
+    window.open('/purse/api/export/' + fmt + '?' + params);
 }
 
 async function loadEntries() {

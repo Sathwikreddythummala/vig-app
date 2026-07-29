@@ -30,6 +30,7 @@
         </div>
     </div>
 </div>
+<input type="file" id="replaceDocFile" style="display:none" onchange="onReplaceFileChosen(this)">
 {% endblock %}
 {% block scripts %}
 <script>
@@ -130,7 +131,7 @@ async function loadVehicleDetails() {
     '<div class="row g-3 mb-3">' +
         '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.6s">' +
             '<h6><i class="bi bi-folder"></i> Documents</h6>' +
-            (docs.length ? docs.map(function(d){return '<div class="d-flex justify-content-between align-items-center border-bottom py-2"><div><i class="bi bi-file-earmark me-1"></i><strong>' + d.doc_type + '</strong> <small class="text-muted ms-1">' + d.file_name + '</small></div><div class="d-flex gap-1"><a href="/documents/api/view/' + d.doc_id + '" target="_blank" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a><a href="/documents/api/download/' + d.doc_id + '" class="btn btn-sm btn-outline-warning" title="Download"><i class="bi bi-download"></i></a></div></div>';}).join('') : '<p class="text-muted">No documents uploaded</p>') +
+            (docs.length ? docs.map(function(d){return '<div class="d-flex justify-content-between align-items-center border-bottom py-2"><div><i class="bi bi-file-earmark me-1"></i><strong>' + d.doc_type + '</strong> <small class="text-muted ms-1">' + d.file_name + '</small></div><div class="d-flex gap-1"><a href="/documents/api/view/' + d.doc_id + '" target="_blank" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a><a href="/documents/api/download/' + d.doc_id + '" class="btn btn-sm btn-outline-warning" title="Download"><i class="bi bi-download"></i></a><button class="btn btn-sm btn-outline-primary viewer-hide" title="Replace file" onclick="replaceDoc(\'' + d.doc_id + '\',\'' + d.doc_type + '\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger viewer-hide" title="Delete document" onclick="deleteVehDoc(\'' + d.doc_id + '\')"><i class="bi bi-trash"></i></button></div></div>';}).join('') : '<p class="text-muted">No documents uploaded</p>') +
         '</div></div>' +
         '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.7s">' +
             '<h6><i class="bi bi-pie-chart"></i> Category Wise Expense</h6>' +
@@ -194,6 +195,46 @@ async function assignVendor() {
     } catch(err) {
         showToast('Network error', 'danger');
     }
+}
+
+var _replaceDocId = null, _replaceDocType = '';
+
+function replaceDoc(docId, docType) {
+    _replaceDocId = docId;
+    _replaceDocType = docType;
+    document.getElementById('replaceDocFile').click();
+}
+
+async function onReplaceFileChosen(input) {
+    var file = input.files[0];
+    if (!file || !_replaceDocId) { input.value = ''; return; }
+    showToast('Replacing…', 'warning');
+    try {
+        // upload the new file first, then remove the old one so nothing is lost on failure
+        var form = new FormData();
+        form.append('doc_type', _replaceDocType || 'Document');
+        form.append('file', file);
+        var res = await fetch('/vehicles/api/' + vehicleId + '/upload', { method: 'POST', body: form });
+        var data = await res.json();
+        if (!data.success) { showToast(data.error || 'Upload failed', 'danger'); input.value = ''; return; }
+        try { await fetch('/documents/api/' + _replaceDocId, { method: 'DELETE' }); } catch(e) {}
+        showToast('Document replaced', 'success');
+        loadVehicleDetails();
+    } catch(e) {
+        showToast('Replace failed', 'danger');
+    }
+    _replaceDocId = null; _replaceDocType = '';
+    input.value = '';
+}
+
+async function deleteVehDoc(docId) {
+    if (!confirm('Delete this document? This cannot be undone.')) return;
+    try {
+        var res = await fetch('/documents/api/' + docId, { method: 'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('Document deleted', 'success'); loadVehicleDetails(); }
+        else { showToast(data.error || 'Delete failed', 'danger'); }
+    } catch(e) { showToast('Delete failed', 'danger'); }
 }
 
 async function uploadDoc() {

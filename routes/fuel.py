@@ -130,7 +130,8 @@ async def export_excel(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type)
-    df = pd.DataFrame(records)
+    from utils.exports import to_numeric_df
+    df = to_numeric_df(records, ["Litres", "Amount", "Kilometre"])
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
     buf.seek(0)

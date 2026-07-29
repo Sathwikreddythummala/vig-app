@@ -191,7 +191,8 @@ async def export_income_excel(request: Request, date_from: str = "", date_to: st
     from utils.filters import filter_multi
     records = filter_multi(records, "VehicleNumber", vehicle)
     records = filter_multi(records, "VendorName", vendor)
-    df = pd.DataFrame(records)
+    from utils.exports import to_numeric_df
+    df = to_numeric_df(records, ["Quantity", "Rate", "Amount"])
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
     buf.seek(0)

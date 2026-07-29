@@ -32,7 +32,7 @@ SHEET_HEADERS = {
     "Expenses": [
         "ExpenseID", "ExpenseDate", "ForMonth", "ExpenseFor", "VehicleNumber", "DriverName",
         "Category", "SubCategory", "Description", "Amount",
-        "PaymentMode", "PaidBy", "CreatedDate",
+        "PaymentMode", "PaidBy", "CreatedDate", "UpdatedDate",
     ],
     "Documents": [
         "DocumentID", "EntityType", "EntityID", "DocumentType",

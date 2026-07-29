@@ -70,7 +70,40 @@
     </div>
 </div>
 
+<input type="file" id="replaceDocFile" style="display:none" onchange="onReplaceFileChosen(this)">
 <script>
+var _replaceDocId = null, _replaceDocType = '';
+
+function replaceDoc(docId, docType) {
+    _replaceDocId = docId;
+    _replaceDocType = docType;
+    document.getElementById('replaceDocFile').click();
+}
+
+async function onReplaceFileChosen(input) {
+    var file = input.files[0];
+    if (!file || !_replaceDocId) { input.value = ''; return; }
+    showToast('Replacing…', 'warning');
+    try {
+        // upload the new file first, then remove the old one so nothing is lost on failure
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('entity_type', 'Company');
+        fd.append('entity_id', 'VIGNESHWARA');
+        fd.append('doc_type', _replaceDocType || 'Other');
+        var res = await fetch('/documents/api/upload', { method: 'POST', body: fd });
+        var data = await res.json();
+        if (!data.success) { showToast(data.error || 'Upload failed', 'danger'); input.value = ''; return; }
+        try { await fetch('/documents/api/' + _replaceDocId, { method: 'DELETE' }); } catch(e) {}
+        showToast('Document replaced', 'success');
+        loadDocs();
+    } catch(e) {
+        showToast('Replace failed', 'danger');
+    }
+    _replaceDocId = null; _replaceDocType = '';
+    input.value = '';
+}
+
 async function loadDocs() {
     var res = await fetch('/documents/api/list?entity_type=Company&entity_id=VIGNESHWARA');
     var docs = await res.json();
@@ -92,7 +125,8 @@ async function loadDocs() {
             '<td><div class="d-flex gap-1">' +
                 '<a href="/documents/api/view/' + d.doc_id + '" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i> View</a>' +
                 '<a href="/documents/api/download/' + d.doc_id + '" class="btn btn-sm btn-warning"><i class="bi bi-download"></i> Download</a>' +
-                '<button class="btn btn-sm btn-outline-danger viewer-hide" onclick="deleteDoc(\'' + d.doc_id + '\')"><i class="bi bi-trash"></i></button>' +
+                '<button class="btn btn-sm btn-outline-primary viewer-hide" title="Replace file" onclick="replaceDoc(\'' + d.doc_id + '\',\'' + (d.doc_type||'') + '\')"><i class="bi bi-pencil"></i></button>' +
+                '<button class="btn btn-sm btn-outline-danger viewer-hide" title="Delete document" onclick="deleteDoc(\'' + d.doc_id + '\')"><i class="bi bi-trash"></i></button>' +
             '</div></td>' +
         '</tr>';
     }).join('');

@@ -63,7 +63,10 @@
                     <option value="Vig-2">Vig-2</option>
                 </select>
             </div>
-            <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#purchaseModal" onclick="resetPurchaseForm()"><i class="bi bi-plus-lg"></i> Add Purchase</button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-warning btn-sm" onclick="downloadGstZip('purchases')" title="Download all input GST invoices for this month as a ZIP"><i class="bi bi-file-earmark-zip"></i> Download ZIP</button>
+                <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#purchaseModal" onclick="resetPurchaseForm()"><i class="bi bi-plus-lg"></i> Add Purchase</button>
+            </div>
         </div>
     </div>
     <div class="glass-card animate-in" style="animation-delay:0.5s">
@@ -76,7 +79,12 @@
     </div>
 </div>
 <div class="tab-pane fade" id="tabSales">
-    <div class="glass-card mb-3"><h6 class="mb-0"><i class="bi bi-receipt"></i> Sales from Billing (auto-calculated)</h6></div>
+    <div class="glass-card mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h6 class="mb-0"><i class="bi bi-receipt"></i> Sales from Billing (auto-calculated)</h6>
+            <button class="btn btn-outline-warning btn-sm" onclick="downloadGstZip('sales')" title="Download all output GST invoices for this month as a ZIP"><i class="bi bi-file-earmark-zip"></i> Download ZIP</button>
+        </div>
+    </div>
     <div class="glass-card">
         <div class="table-responsive">
             <table class="table table-hover glass-table small">
@@ -164,6 +172,32 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function getMonth() { return document.getElementById('gstMonth').value; }
+
+async function downloadGstZip(type) {
+    var month = getMonth();
+    var url = '/gst/api/' + type + '/zip' + (month ? '?month=' + month : '');
+    showToast('Preparing ZIP…', 'warning');
+    try {
+        var res = await fetch(url);
+        if (!res.ok) {
+            var err = {};
+            try { err = await res.json(); } catch(e) {}
+            showToast(err.error || 'No documents to download', 'danger');
+            return;
+        }
+        var blob = await res.blob();
+        var cd = res.headers.get('Content-Disposition') || '';
+        var m = cd.match(/filename="?([^"]+)"?/);
+        var fname = m ? m[1] : (type + '_gst_' + (month || 'all') + '.zip');
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        showToast('Download started', 'success');
+    } catch(e) { showToast('Download failed', 'danger'); }
+}
 
 async function loadAll() {
     await Promise.all([loadSummary(), loadPurchases(), loadSales()]);

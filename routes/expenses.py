@@ -136,7 +136,7 @@ async def update_expense(request: Request, expense_id: str):
     if not for_month:
         for_month = existing.get("ForMonth", str(data.get("ExpenseDate", ""))[:7])
     from services.sheets_service import build_row
-    vals = {**existing, **data, "ExpenseID": expense_id, "ForMonth": for_month, "ExpenseFor": data.get("ExpenseFor", "Vehicle Expense"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": existing.get("CreatedDate", now_str())}
+    vals = {**existing, **data, "ExpenseID": expense_id, "ForMonth": for_month, "ExpenseFor": data.get("ExpenseFor", "Vehicle Expense"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
     row = build_row("Expenses", vals)
     update_row("Expenses", row_num, row)
     add_audit_log("UPDATE", "Expenses", expense_id, f"Expense updated to ₹{data.get('Amount',0)}", user["email"])
@@ -176,7 +176,8 @@ async def export_excel(
     from utils.filters import filter_multi
     expenses = filter_multi(expenses, "VehicleNumber", vehicle)
     expenses = filter_multi(expenses, "Category", category)
-    df = pd.DataFrame(expenses)
+    from utils.exports import to_numeric_df
+    df = to_numeric_df(expenses, ["Amount"])
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
     buf.seek(0)
