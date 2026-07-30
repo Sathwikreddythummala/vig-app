@@ -10,6 +10,36 @@ from utils.templates import templates
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
+def _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, driver_id=""):
+    """Close the vehicle's current open assignment and open a new one for the incoming
+    driver, so each driver's period on the vehicle is preserved (used for pro-rata salary)."""
+    from datetime import datetime, timedelta
+    from services.sheets_service import build_row, SHEET_HEADERS
+    assignments = get_all_records("VehicleAssignments")
+    # close any open assignment for this vehicle (EndDate blank)
+    for idx, a in enumerate(assignments):
+        if str(a.get("VehicleID", "")) == str(vehicle_id) and not str(a.get("EndDate", "")).strip():
+            try:
+                end = (datetime.strptime(changeover_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+            except (ValueError, TypeError):
+                end = changeover_date
+            headers = SHEET_HEADERS["VehicleAssignments"]
+            row = [a.get(h, "") for h in headers]
+            row[headers.index("EndDate")] = end
+            row[headers.index("UpdatedDate")] = now_str()
+            update_row("VehicleAssignments", idx + 2, row)
+    # open a new assignment for the incoming driver
+    if new_driver:
+        aid = gen_id("ASGN")
+        vals = {
+            "AssignmentID": aid, "VehicleID": vehicle_id, "VehicleNumber": vehicle_number,
+            "DriverID": driver_id, "DriverName": new_driver,
+            "StartDate": changeover_date, "EndDate": "",
+            "CreatedDate": now_str(), "UpdatedDate": now_str(),
+        }
+        append_row("VehicleAssignments", build_row("VehicleAssignments", vals))
+
+
 def get_user(request: Request):
     user = request.session.get("user")
     if not user:
@@ -178,6 +208,7 @@ async def assign_driver(request: Request, vehicle_id: str):
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
     new_driver = data.get("driver_name", "").strip()
+    changeover_date = str(data.get("changeover_date", "")).strip() or now_str()[:10]
     result = find_row_by_id("Vehicles", vehicle_id)
     if not result:
         return JSONResponse({"error": "Vehicle not found"}, 404)
@@ -212,7 +243,92 @@ async def assign_driver(request: Request, vehicle_id: str):
                 drv_row[drv_updated_idx] = ns()
                 ur("Drivers", idx + 2, drv_row)
                 break
-    add_audit_log("ASSIGN", "Vehicles", vehicle_id, f"Driver changed from '{old_driver}' to '{new_driver}' on {vehicle_number}", user["email"])
+    # record assignment history (for pro-rata vehicle-wise salary)
+    if str(old_driver).strip() != str(new_driver).strip():
+        new_driver_id = ""
+        for d in all_drivers:
+            if str(d.get("DriverName", "")).strip() == new_driver:
+                new_driver_id = d.get("DriverID", "")
+                break
+        _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, new_driver_id)
+    add_audit_log("ASSIGN", "Vehicles", vehicle_id, f"Driver changed from '{old_driver}' to '{new_driver}' on {vehicle_number} (from {changeover_date})", user["email"])
+    return {"success": True}
+
+
+@router.get("/api/{vehicle_id}/assignments")
+async def list_assignments(request: Request, vehicle_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    result = find_row_by_id("Vehicles", vehicle_id)
+    vnum = result[1].get("VehicleNumber", "") if result else ""
+    asg = [a for a in get_all_records("VehicleAssignments") if str(a.get("VehicleID", "")) == str(vehicle_id)]
+    asg.sort(key=lambda x: str(x.get("StartDate", "")))
+    return {"assignments": asg, "vehicle_number": vnum}
+
+
+@router.post("/api/{vehicle_id}/assignments")
+async def add_assignment(request: Request, vehicle_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    driver_name = str(data.get("driver_name", "")).strip()
+    start = str(data.get("start_date", "")).strip()
+    end = str(data.get("end_date", "")).strip()
+    if not driver_name or not start:
+        return JSONResponse({"error": "Driver and start date are required"}, 400)
+    result = find_row_by_id("Vehicles", vehicle_id)
+    if not result:
+        return JSONResponse({"error": "Vehicle not found"}, 404)
+    vnum = result[1].get("VehicleNumber", "")
+    did = ""
+    for d in get_all_records("Drivers"):
+        if str(d.get("DriverName", "")).strip() == driver_name:
+            did = d.get("DriverID", "")
+            break
+    from services.sheets_service import build_row
+    aid = gen_id("ASGN")
+    vals = {
+        "AssignmentID": aid, "VehicleID": vehicle_id, "VehicleNumber": vnum,
+        "DriverID": did, "DriverName": driver_name,
+        "StartDate": start, "EndDate": end,
+        "CreatedDate": now_str(), "UpdatedDate": now_str(),
+    }
+    append_row("VehicleAssignments", build_row("VehicleAssignments", vals))
+    add_audit_log("CREATE", "VehicleAssignments", aid, f"{driver_name} on {vnum}: {start} to {end or 'open'}", user["email"])
+    return {"success": True, "assignment_id": aid}
+
+
+@router.put("/api/assignments/{assignment_id}")
+async def update_assignment(request: Request, assignment_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    result = find_row_by_id("VehicleAssignments", assignment_id)
+    if not result:
+        return JSONResponse({"error": "Not found"}, 404)
+    row_num, existing = result
+    from services.sheets_service import build_row
+    vals = {**existing, **{k: v for k, v in data.items() if k in ("StartDate", "EndDate", "DriverName")},
+            "AssignmentID": assignment_id, "UpdatedDate": now_str()}
+    update_row("VehicleAssignments", row_num, build_row("VehicleAssignments", vals))
+    add_audit_log("UPDATE", "VehicleAssignments", assignment_id, "Assignment period updated", user["email"])
+    return {"success": True}
+
+
+@router.delete("/api/assignments/{assignment_id}")
+async def delete_assignment(request: Request, assignment_id: str):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    result = find_row_by_id("VehicleAssignments", assignment_id)
+    if not result:
+        return JSONResponse({"error": "Not found"}, 404)
+    row_num, record = result
+    delete_row("VehicleAssignments", row_num)
+    add_audit_log("DELETE", "VehicleAssignments", assignment_id, f"Assignment removed ({record.get('DriverName','')})", user["email"])
     return {"success": True}
 
 

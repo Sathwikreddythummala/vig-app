@@ -4,15 +4,17 @@
 {% block content %}
 <div class="glass-card mb-3 animate-in">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             <input type="month" class="form-control glass-input" id="salaryMonth" style="width:200px" onchange="loadSalaries()">
+            <span class="badge bg-warning text-dark" id="daysBadge"></span>
             <a href="/drivers" class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-left"></i> Back to Employees</a>
         </div>
         <button class="btn btn-outline-warning" onclick="downloadExcel()"><i class="bi bi-file-earmark-excel"></i> Download Excel</button>
     </div>
+    <div class="text-muted small mt-2"><i class="bi bi-info-circle"></i> Salary is per <strong>vehicle</strong>, split across drivers by days worked that month (vehicle salary ÷ calendar days × days on vehicle).</div>
 </div>
 <div class="row g-3 mb-3">
-    <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Total Salary</small><h5 id="statSalary">₹0</h5></div></div></div>
+    <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Total Vehicle Salary</small><h5 id="statSalary">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.05s"><div class="stat-icon bg-driver"><i class="bi bi-fuel-pump"></i></div><div class="stat-info"><small>Total Incentive</small><h5 id="statIncentive">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Total Advance</small><h5 id="statAdvance">₹0</h5></div></div></div>
     <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Total Meals</small><h5 id="statMeals">₹0</h5></div></div></div>
@@ -23,13 +25,13 @@
 </div>
 <div class="glass-card animate-in" style="animation-delay:0.3s">
     <div class="table-responsive">
-        <table class="table table-hover glass-table">
+        <table class="table table-hover glass-table" data-no-sort>
             <thead><tr>
-                <th>#</th><th>Name</th><th>Type</th><th>Vehicle</th>
-                <th>Salary</th><th>Diesel Mileage Incentive</th><th>Paid</th><th>Advance</th><th>Meals</th><th>Deductions</th><th>Other</th><th>Net Payable</th>
+                <th>Driver</th><th>Vehicle</th><th>Vehicle Salary</th><th>Per Day</th><th>Days</th>
+                <th>Gross</th><th>Incentive</th><th>Paid</th><th>Advance</th><th>Meals</th><th>Deductions</th><th>Other</th><th>Net Payable</th>
             </tr></thead>
             <tbody id="salaryTable">
-                <tr><td colspan="11" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
+                <tr><td colspan="13" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
             </tbody>
             <tfoot id="salaryTotals"></tfoot>
         </table>
@@ -50,13 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadSalaries() {
     const month = document.getElementById('salaryMonth').value;
-    const res = await fetch('/drivers/api/salaries?month=' + month);
-    if (!res.ok) { console.error('Salary API error', res.status); document.getElementById('salaryTable').innerHTML = '<tr><td colspan="11" class="text-center text-danger">Failed to load — check console</td></tr>'; return; }
+    const res = await fetch('/drivers/api/vehicle-salaries?month=' + month);
+    if (!res.ok) { console.error('Salary API error', res.status); document.getElementById('salaryTable').innerHTML = '<tr><td colspan="13" class="text-center text-danger">Failed to load — check console</td></tr>'; return; }
     const data = await res.json();
-    const rows = data.salaries || [];
+    const rows = data.rows || [];
     const t = data.totals || {};
+    document.getElementById('daysBadge').textContent = (data.days_in_month || 0) + ' days in month';
 
-    document.getElementById('statSalary').textContent = fmt(t.ProfileSalary);
+    document.getElementById('statSalary').textContent = fmt(t.VehicleSalary);
     document.getElementById('statIncentive').textContent = fmt(t.Incentive);
     document.getElementById('statAdvance').textContent = fmt(t.Advance);
     document.getElementById('statMeals').textContent = fmt(t.Meals);
@@ -67,27 +70,47 @@ async function loadSalaries() {
 
     const tbody = document.getElementById('salaryTable');
     if (rows.length) {
-        tbody.innerHTML = rows.map((r, i) => `<tr>
-            <td>${i+1}</td>
-            <td><a href="/drivers/details/${r.DriverID}" class="text-decoration-none fw-bold">${r.DriverName}</a></td>
-            <td><span class="badge ${r.EmployeeType==='Driver'?'bg-warning text-dark':'bg-info text-dark'}">${r.EmployeeType}</span></td>
-            <td>${r.AssignedVehicle||'-'}</td>
-            <td class="fw-bold">${fmt(r.ProfileSalary)}</td>
-            <td>${fmt(r.Incentive)}</td>
-            <td class="${r.SalaryPaid?'text-danger':''}">${fmt(r.SalaryPaid)}</td>
-            <td class="${r.Advance?'text-danger':''}">${fmt(r.Advance)}</td>
-            <td class="${r.Meals?'text-danger':''}">${fmt(r.Meals)}</td>
-            <td class="${r.Deductions?'text-danger':''}">${fmt(r.Deductions)}</td>
-            <td class="${r.Other?'text-danger':''}">${fmt(r.Other)}</td>
-            <td class="fw-bold ${r.NetPayable>=0?'text-success':'text-danger'}" id="net-${r.DriverID}">${fmt(r.NetPayable)}</td>
-        </tr>`).join('');
+        let lastDrv = null;
+        tbody.innerHTML = rows.map((r) => {
+            const newDrv = r.DriverName !== lastDrv;
+            lastDrv = r.DriverName;
+            // Driver cell — grouped: shows once per driver
+            const drvInactive = r.DriverStatus && r.DriverStatus.toLowerCase() === 'inactive';
+            const drvBadge = drvInactive ? ` <span class="badge bg-secondary" style="font-size:0.62rem">Inactive</span>` : '';
+            const driverLink = r.DriverID ? `<a href="/drivers/details/${r.DriverID}" class="text-decoration-none fw-bold">${r.DriverName}</a>` : `<span class="text-muted">${r.DriverName}</span>`;
+            const driverCell = newDrv ? `<td>${driverLink}${drvBadge}</td>` : `<td></td>`;
+            // Vehicle cell — per row, with assignment-edit shortcut
+            const vehInactive = r.VehicleStatus && r.VehicleStatus !== 'Active';
+            const vehBadge = vehInactive ? ` <span class="badge bg-secondary" style="font-size:0.62rem">${r.VehicleStatus}</span>` : '';
+            const asgBtn = ` <a href="/vehicles/details/${r.VehicleID}" class="btn btn-sm btn-outline-warning viewer-hide py-0 px-1" title="Edit driver assignment periods (split salary)"><i class="bi bi-calendar-range"></i></a>`;
+            const incCell = (canEdit && r.IncentiveEditable)
+                ? `<td><input type="number" class="form-control form-control-sm glass-input" style="width:95px" value="${r.Incentive}" data-driver="${r.DriverID}" onchange="saveIncentive(this)" title="Edit incentive"></td>`
+                : `<td>${fmt(r.Incentive)}</td>`;
+            return `<tr${newDrv?' style="border-top:2px solid rgba(212,160,23,0.35)"':''}>
+                ${driverCell}
+                <td class="fw-bold">${r.VehicleNumber}${vehBadge}${asgBtn}</td>
+                <td>${fmt(r.VehicleSalary)}</td>
+                <td>${fmt(r.PerDay)}</td>
+                <td>${(r.HalfDays||r.AbsentDays)
+                    ? `<span class="badge bg-info text-dark" title="${r.Days} days on vehicle, ${r.HalfDays} half, ${r.AbsentDays} absent">${r.EffectiveDays} paid</span><div class="text-muted" style="font-size:0.66rem">${r.Days}d · ½×${r.HalfDays} · abs ${r.AbsentDays}</div>`
+                    : `<span class="badge bg-info text-dark">${r.Days}</span>`}</td>
+                <td class="fw-bold">${fmt(r.Gross)}</td>
+                ${incCell}
+                <td class="${r.SalaryPaid?'text-danger':''}">${fmt(r.SalaryPaid)}</td>
+                <td class="${r.Advance?'text-danger':''}">${fmt(r.Advance)}</td>
+                <td class="${r.Meals?'text-danger':''}">${fmt(r.Meals)}</td>
+                <td class="${r.Deductions?'text-danger':''}">${fmt(r.Deductions)}</td>
+                <td class="${r.Other?'text-danger':''}">${fmt(r.Other)}</td>
+                <td class="fw-bold ${r.NetPayable>=0?'text-success':'text-danger'}">${fmt(r.NetPayable)}</td>
+            </tr>`;
+        }).join('');
     } else {
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No employees found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">No vehicles with a monthly salary set. Add a salary on each vehicle.</td></tr>';
     }
 
     document.getElementById('salaryTotals').innerHTML = `<tr class="fw-bold" style="background:rgba(212,160,23,0.1)">
-        <td></td><td>TOTAL</td><td></td><td></td>
-        <td>${fmt(t.ProfileSalary)}</td><td>${fmt(t.Incentive)}</td>
+        <td>TOTAL</td><td></td><td>${fmt(t.VehicleSalary)}</td><td></td><td></td>
+        <td>${fmt(t.Gross)}</td><td>${fmt(t.Incentive)}</td>
         <td class="text-danger">${fmt(t.SalaryPaid)}</td>
         <td class="text-danger">${fmt(t.Advance)}</td>
         <td class="text-danger">${fmt(t.Meals)}</td>
@@ -124,7 +147,7 @@ async function saveIncentive(input) {
 
 function downloadExcel() {
     const month = document.getElementById('salaryMonth').value;
-    window.location.href = '/drivers/api/salaries/export?month=' + month;
+    window.location.href = '/drivers/api/vehicle-salaries/export?month=' + month;
 }
 </script>
 {% endblock %}

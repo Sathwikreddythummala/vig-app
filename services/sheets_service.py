@@ -11,6 +11,7 @@ from services.db import execute, initialize_db
 SHEET_HEADERS = {
     "Vehicles": [
         "VehicleID", "VehicleNumber", "VehicleType", "DefaultDriver", "DefaultVendor", "VehicleStatus",
+        "MonthlySalary",
         "RCNumber", "RCExpiry",
         "InsurancePolicyNumber", "InsuranceCompany", "InsuranceStartDate", "InsuranceExpiryDate",
         "PermitNumber", "PermitExpiryDate",
@@ -40,6 +41,10 @@ SHEET_HEADERS = {
     ],
     "Settings": ["Key", "Value", "UpdatedDate"],
     "AuditLogs": ["LogID", "Action", "Module", "EntityID", "Details", "UserEmail", "Timestamp"],
+    "VehicleAssignments": [
+        "AssignmentID", "VehicleID", "VehicleNumber", "DriverID", "DriverName",
+        "StartDate", "EndDate", "CreatedDate", "UpdatedDate",
+    ],
     "OutsideVehicles": [
         "OVID", "VehicleNumber", "OwnerName", "MobileNumber",
         "BankName", "AccountNumber", "IFSCCode",

@@ -10,6 +10,7 @@
         </div>
         <div class="d-flex gap-3 align-items-center">
             <span class="badge bg-success fs-6" id="presentBadge">Present: 0</span>
+            <span class="badge bg-warning text-dark fs-6" id="halfBadge">Half Day: 0</span>
             <span class="badge bg-danger fs-6" id="absentBadge">Absent: 0</span>
             <span class="badge bg-secondary fs-6" id="totalBadge">Total: 0</span>
         </div>
@@ -18,7 +19,7 @@
 <div class="glass-card animate-in" style="animation-delay:0.2s" id="dailyView">
     <div class="table-responsive">
         <table class="table table-hover glass-table">
-            <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Vehicle</th><th>Status</th><th class="viewer-hide">Action</th></tr></thead>
+            <thead><tr><th>#</th><th>Vehicle</th><th>Type</th><th>Driver</th><th>Status</th><th class="viewer-hide">Action</th></tr></thead>
             <tbody id="attTable">
                 <tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr>
             </tbody>
@@ -35,7 +36,7 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover glass-table">
-            <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Absent Days</th><th>Absent Dates</th></tr></thead>
+            <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Absent Days</th><th>Half Days</th><th>Absent / Half Dates</th></tr></thead>
             <tbody id="summaryTable"></tbody>
         </table>
     </div>
@@ -46,9 +47,14 @@
 const userRole = '{{ user.role }}';
 const canEdit = userRole === 'admin' || userRole === 'editor';
 
-document.addEventListener('DOMContentLoaded', () => {
+let allDrivers = [];
+document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('summaryMonth').value = new Date().toISOString().slice(0,7);
+    try {
+        const dres = await fetch('/drivers/api/list');
+        allDrivers = ((await dres.json()).drivers || []).filter(d => (d.EmployeeType||'Driver') === 'Driver');
+    } catch(e) {}
     loadAttendance();
     loadAlerts();
 });
@@ -57,52 +63,78 @@ async function loadAttendance() {
     const date = document.getElementById('attDate').value;
     const res = await fetch('/attendance/api/list?date=' + date);
     const data = await res.json();
-    const rows = data.drivers || [];
+    const rows = data.rows || [];
     document.getElementById('presentBadge').textContent = 'Present: ' + data.present;
+    document.getElementById('halfBadge').textContent = 'Half Day: ' + (data.half_day || 0);
     document.getElementById('absentBadge').textContent = 'Absent: ' + data.absent;
     document.getElementById('totalBadge').textContent = 'Total: ' + data.total;
     const tbody = document.getElementById('attTable');
     if (rows.length) {
         tbody.innerHTML = rows.map((r, i) => {
-            const isAbsent = r.IsAbsent;
-            const statusBadge = isAbsent
-                ? '<span class="badge bg-danger">Absent</span>'
-                : '<span class="badge bg-success">Present</span>';
-            const actionBtn = canEdit ? (isAbsent
-                ? `<button class="btn btn-sm btn-outline-success" onclick="markPresent('${r.AttendanceID}')"><i class="bi bi-check-lg"></i> Undo</button>`
-                : `<button class="btn btn-sm btn-outline-danger" onclick="markAbsent('${r.DriverID}','${r.DriverName.replace(/'/g,"\\'")}')"><i class="bi bi-x-lg"></i> Mark Absent</button>`)
+            const hasDriver = !!r.DriverName;
+            const st = r.Status || (hasDriver ? 'Present' : '');
+            const rowClass = st === 'Absent' ? 'table-danger' : st === 'Half Day' ? 'table-warning' : '';
+            const badgeClass = st === 'Absent' ? 'bg-danger' : st === 'Half Day' ? 'bg-warning text-dark' : 'bg-success';
+            const statusBadge = hasDriver ? `<span class="badge ${badgeClass}">${st}</span>` : '<span class="text-muted">—</span>';
+            const nm = (r.DriverName||'').replace(/'/g,"\\'");
+            const btn = (label, val, cls) => `<button class="btn btn-sm ${st===val?cls:'btn-outline-secondary'}" onclick="markStatus('${r.DriverID}','${nm}','${val}')">${label}</button>`;
+            const actions = (canEdit && hasDriver)
+                ? `<div class="btn-group btn-group-sm">${btn('Present','Present','btn-success')}${btn('Half','Half Day','btn-warning text-dark')}${btn('Absent','Absent','btn-danger')}</div>`
                 : '';
-            return `<tr class="${isAbsent?'table-danger':''}">
+            return `<tr class="${rowClass}">
                 <td>${i+1}</td>
-                <td class="fw-bold">${r.DriverName}</td>
-                <td><span class="badge ${r.EmployeeType==='Driver'?'bg-warning text-dark':'bg-info text-dark'}">${r.EmployeeType}</span></td>
-                <td>${r.AssignedVehicle||'-'}</td>
+                <td class="fw-bold">${r.VehicleNumber}</td>
+                <td><span class="badge bg-warning text-dark">${r.VehicleType||'-'}</span></td>
+                <td>${driverCell(r)}</td>
                 <td>${statusBadge}</td>
-                <td class="viewer-hide">${actionBtn}</td>
+                <td class="viewer-hide">${actions}</td>
             </tr>`;
         }).join('');
     } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No employees found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No vehicles found</td></tr>';
     }
 }
 
-async function markAbsent(driverId, driverName) {
+function driverCell(r) {
+    const curId = r.DriverID || '';
+    const curName = r.DriverName || '';
+    if (!canEdit) return curName ? (curName + (isInactive(r)?' (Inactive)':'')) : '<span class="text-muted">—</span>';
+    // build options; ensure the current driver is present even if inactive
+    let opts = `<option value=""${curName?'':' selected'}>— default —</option>`;
+    let found = false;
+    allDrivers.forEach(d => {
+        const sel = (curId && d.DriverID === curId) || (!curId && d.DriverName === curName);
+        if (sel) found = true;
+        const inact = (d.Status||'').toLowerCase()==='inactive' ? ' (Inactive)' : '';
+        opts += `<option value="${d.DriverID}" data-name="${(d.DriverName||'').replace(/"/g,'&quot;')}"${sel?' selected':''}>${d.DriverName}${inact}</option>`;
+    });
+    if (curName && !found) opts += `<option value="${curId}" data-name="${curName.replace(/"/g,'&quot;')}" selected>${curName}</option>`;
+    const vn = (r.VehicleNumber||'').replace(/'/g,"\\'");
+    return `<select class="form-select form-select-sm glass-input viewer-hide" style="width:200px" title="Change the driver for this vehicle on this day only" onchange="setVehicleDriver('${vn}',this)">${opts}</select>`;
+}
+
+function isInactive(r) { return (r.DriverStatus||'').toLowerCase() === 'inactive'; }
+
+async function setVehicleDriver(vehicleNumber, sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const driverId = opt.value;
+    const driverName = opt.dataset ? (opt.dataset.name || '') : '';
     const date = document.getElementById('attDate').value;
-    const res = await fetch('/attendance/api/mark-absent', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({date: date, driver_id: driverId, driver_name: driverName})
+    const res = await fetch('/attendance/api/set-day-driver', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: date, vehicle_number: vehicleNumber, driver_id: driverId, driver_name: driverName})
     });
     const data = await res.json();
-    if (data.success) loadAttendance();
+    if (data.success) { showToast(vehicleNumber + ' → ' + (driverName||'default') + ' for ' + date + ' (this day only)', 'success'); loadAttendance(); }
     else showToast(data.error || 'Failed', 'danger');
 }
 
-async function markPresent(attendanceId) {
-    const res = await fetch('/attendance/api/mark-present', {
+async function markStatus(driverId, driverName, status) {
+    const date = document.getElementById('attDate').value;
+    const res = await fetch('/attendance/api/mark', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({attendance_id: attendanceId})
+        body: JSON.stringify({date: date, driver_id: driverId, driver_name: driverName, status: status})
     });
     const data = await res.json();
     if (data.success) loadAttendance();
@@ -126,13 +158,19 @@ async function loadSummary() {
     const data = await res.json();
     const rows = data.summary || [];
     const tbody = document.getElementById('summaryTable');
-    tbody.innerHTML = rows.map((r, i) => `<tr class="${r.AbsentDays > 0 ? 'table-warning':''}">
+    tbody.innerHTML = rows.map((r, i) => {
+        const half = r.HalfDays || 0;
+        const halfDates = (r.HalfDates || []).map(d => d + ' (½)');
+        const allDates = [...(r.AbsentDates||[]), ...halfDates];
+        return `<tr class="${(r.AbsentDays > 0 || half > 0) ? 'table-warning':''}">
         <td>${i+1}</td>
         <td class="fw-bold">${r.DriverName}</td>
         <td><span class="badge ${r.EmployeeType==='Driver'?'bg-warning text-dark':'bg-info text-dark'}">${r.EmployeeType}</span></td>
         <td><span class="badge ${r.AbsentDays > 0 ? 'bg-danger':'bg-success'}">${r.AbsentDays}</span></td>
-        <td class="small">${r.AbsentDates.length ? r.AbsentDates.join(', ') : '-'}</td>
-    </tr>`).join('');
+        <td><span class="badge ${half > 0 ? 'bg-warning text-dark':'bg-success'}">${half}</span></td>
+        <td class="small">${allDates.length ? allDates.join(', ') : '-'}</td>
+    </tr>`;
+    }).join('');
 }
 </script>
 {% endblock %}

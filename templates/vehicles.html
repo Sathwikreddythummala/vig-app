@@ -40,6 +40,7 @@
                                 <div class="col-md-4"><label class="form-label">Status</label>
                                     <select class="form-select glass-input" id="vehStatus"><option>Active</option><option>Inactive</option><option>Under Maintenance</option><option>Sold</option></select>
                                 </div>
+                                <div class="col-md-4"><label class="form-label">Monthly Salary (₹) <small class="text-muted">(driver salary for this vehicle)</small></label><input type="number" class="form-control glass-input" id="vehMonthlySalary" min="0" step="0.01" value="0"></div>
                             </div>
                         </div>
                         <div class="tab-pane fade" id="vehRC">
@@ -191,6 +192,7 @@ function editVehicle(vid) {
     document.getElementById('vehDriver').value = v.DefaultDriver||'';
     document.getElementById('vehVendor').value = v.DefaultVendor||'';
     document.getElementById('vehStatus').value = v.VehicleStatus||'Active';
+    document.getElementById('vehMonthlySalary').value = v.MonthlySalary||0;
     document.getElementById('vehRCNumber').value = v.RCNumber||'';
     document.getElementById('vehRCExpiry').value = v.RCExpiry||'';
     document.getElementById('vehInsPolicy').value = v.InsurancePolicyNumber||'';
@@ -220,6 +222,7 @@ async function saveVehicle() {
         DefaultDriver: document.getElementById('vehDriver').value,
         DefaultVendor: document.getElementById('vehVendor').value,
         VehicleStatus: document.getElementById('vehStatus').value,
+        MonthlySalary: document.getElementById('vehMonthlySalary').value,
         RCNumber: document.getElementById('vehRCNumber').value,
         RCExpiry: document.getElementById('vehRCExpiry').value,
         InsurancePolicyNumber: document.getElementById('vehInsPolicy').value,

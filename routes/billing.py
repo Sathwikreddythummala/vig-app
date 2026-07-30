@@ -24,6 +24,9 @@ def next_invoice_number():
     return f"VE-{month}-{count:04d}"
 
 
+SETTLE_THRESHOLD = 10.0  # a remaining balance at/under this (once paid) is auto-marked Paid
+
+
 def recalc_bill(bill_id: str):
     result = find_row_by_id("Billing", bill_id)
     if not result:
@@ -33,7 +36,14 @@ def recalc_bill(bill_id: str):
     paid = sum(float(r.get("Amount", 0) or 0) for r in receivables if str(r.get("BillID", "")) == bill_id)
     total = float(bill.get("TotalAmount", 0) or 0)
     balance = total - paid
-    status = "Paid" if (paid > 0 and balance <= 0) else "Partial" if paid > 0 else "Pending"
+    # A leftover under Rs.10 (rounding / TDS shortfall) is treated as settled
+    if paid > 0 and balance <= SETTLE_THRESHOLD:
+        status = "Paid"
+        balance = 0
+    elif paid > 0:
+        status = "Partial"
+    else:
+        status = "Pending"
     from services.sheets_service import SHEET_HEADERS
     headers = SHEET_HEADERS["Billing"]
     row_data = [str(bill.get(h, "")) for h in headers]
@@ -251,7 +261,9 @@ async def update_bill(request: Request, bill_id: str):
     total = round(sub_total + sgst + cgst - tds, 2)
     paid = float(existing.get("PaidAmount", 0) or 0)
     balance = total - paid
-    status = data.get("_statusOverride") or ("Paid" if (paid > 0 and balance <= 0) else "Partial" if paid > 0 else "Pending")
+    if not data.get("_statusOverride") and paid > 0 and balance <= SETTLE_THRESHOLD:
+        balance = 0
+    status = data.get("_statusOverride") or ("Paid" if (paid > 0 and balance <= SETTLE_THRESHOLD) else "Partial" if paid > 0 else "Pending")
     from services.sheets_service import build_row
     vals = {**existing, **{k: v for k, v in data.items() if not k.startswith("_")}, "BillID": bill_id, "InvoiceNumber": (data.get("InvoiceNumber", existing.get("InvoiceNumber", "")) or "").strip().upper(), "FixedAmount": fixed, "VariableAmount": variable, "TrafficChallan": challan, "Tollgates": tolls, "SubTotal": sub_total, "SGST": sgst, "CGST": cgst, "TDS": tds, "TotalAmount": total, "PaymentStatus": status, "PaidAmount": paid, "BalanceAmount": balance, "CreatedDate": existing.get("CreatedDate", now_str()), "UpdatedDate": now_str()}
     row = build_row("Billing", vals)
@@ -369,6 +381,36 @@ async def add_receivable(request: Request):
     payment_month = data.get("PaymentMonth", "") or str(data.get("ReceiveDate", ""))[:7]
     from services.sheets_service import build_row
     bill_id = data.get("BillID", "")
+
+    # Multi-invoice payment: one payment split across all unpaid bills of the selected invoices
+    invoices = data.get("Invoices") or []
+    invoices = [str(i).strip().upper() for i in invoices if str(i).strip()]
+    if invoices:
+        inv_set = set(invoices)
+        all_bills = get_all_records("Billing")
+        inv_bills = [b for b in all_bills
+                     if str(b.get("InvoiceNumber", "")).strip().upper() in inv_set and b.get("PaymentStatus") != "Paid"]
+        if not inv_bills:
+            return JSONResponse({"error": "No unpaid bills found for the selected invoice(s)"}, 400)
+        total_balance = sum(float(b.get("BalanceAmount", 0) or 0) for b in inv_bills)
+        total_payment = float(data.get("Amount", 0) or 0)
+        created = []
+        for b in inv_bills:
+            bill_balance = float(b.get("BalanceAmount", 0) or 0)
+            proportion = (bill_balance / total_balance) if total_balance > 0 else (1 / len(inv_bills))
+            split_amount = round(total_payment * proportion, 2)
+            rid = gen_id("RCV")
+            vals = {**{k: v for k, v in data.items() if k != "Invoices"},
+                    "ReceivableID": rid, "BillID": b["BillID"], "Amount": split_amount,
+                    "PaymentMonth": payment_month, "PaymentMode": data.get("PaymentMode", "Bank Transfer"),
+                    "Description": (data.get("Description", "") + f" [{b.get('InvoiceNumber','')}]").strip(),
+                    "CreatedDate": now_str()}
+            append_row("Receivables", build_row("Receivables", vals))
+            recalc_bill(b["BillID"])
+            created.append(rid)
+        add_audit_log("CREATE", "Receivables", ",".join(invoices),
+                      f"Payment ₹{total_payment} split across {len(inv_bills)} bill(s) of {len(inv_set)} invoice(s)", user["email"])
+        return {"success": True, "receivable_ids": created, "split_count": len(created), "invoice_count": len(inv_set)}
 
     # Invoice-level payment: split proportionally across all bills under this invoice
     if str(bill_id).startswith("INV:"):

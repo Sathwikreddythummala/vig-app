@@ -10,6 +10,7 @@
             <select class="form-select glass-input" id="filterVehicle" style="width:180px"><option value="">All Vehicles</option></select>
             <select class="form-select glass-input" id="filterCategory" style="width:160px" onchange="updateFilterSubCategories(); loadExpenses()"><option value="">All Categories</option></select>
             <select class="form-select glass-input" id="filterSubCategory" style="width:160px" onchange="loadExpenses()"><option value="">All SubCategories</option></select>
+            <select class="form-select glass-input" id="filterPaidBy" style="width:140px" onchange="loadExpenses()"><option value="">All Paid By</option><option>TSR</option><option>MSR</option><option>Company</option></select>
             <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search..." style="width:180px">
             <button class="btn btn-warning" onclick="loadExpenses()"><i class="bi bi-funnel"></i> Filter</button>
         </div>
@@ -202,6 +203,7 @@ async function loadExpenses(page) {
         vehicle: document.getElementById('filterVehicle').value,
         category: document.getElementById('filterCategory').value,
         subcategory: document.getElementById('filterSubCategory').value,
+        paid_by: document.getElementById('filterPaidBy').value,
         search: document.getElementById('filterSearch').value,
     });
     const res = await fetch('/expenses/api/list?' + params);
@@ -341,6 +343,7 @@ function exportExcel() {
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,
         category: document.getElementById('filterCategory').value,
+        paid_by: document.getElementById('filterPaidBy').value,
     });
     window.open('/expenses/api/export/excel?' + params);
 }
@@ -351,6 +354,7 @@ function exportPDF() {
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,
         category: document.getElementById('filterCategory').value,
+        paid_by: document.getElementById('filterPaidBy').value,
     });
     window.open('/expenses/api/export/pdf?' + params);
 }

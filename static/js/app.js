@@ -265,3 +265,83 @@ async function loadAlerts() {
         console.error('Failed to load alerts:', err);
     }
 }
+
+// ---- Optional click-to-sort on tables ----
+// The server's order (latest entry first) stays the DEFAULT. Clicking a column
+// header sorts the currently shown rows: 1st click ascending, 2nd descending,
+// 3rd restores the default order. Grouped tables (data-no-sort) are excluded,
+// and any table with grouped/subtotal rows (colspan) is skipped safely.
+function _sortCellValue(cell) {
+    var t = (cell ? cell.textContent : '').trim();
+    if (t === '' || t === '-' || t === '—') return { n: null, s: '' };
+    var num = t.replace(/[₹,\s]/g, '');
+    if (/^-?\d+(\.\d+)?$/.test(num)) return { n: parseFloat(num), s: t.toLowerCase() };
+    if (/^\d{4}-\d{2}-\d{2}/.test(t)) { var d = Date.parse(t.slice(0, 10)); if (!isNaN(d)) return { n: d, s: t.toLowerCase() }; }
+    return { n: null, s: t.toLowerCase() };
+}
+
+function sortTableByColumn(table, colIdx, th) {
+    var tbody = table.tBodies[0];
+    if (!tbody) return;
+    var rows = Array.prototype.slice.call(tbody.rows);
+    if (!rows.length) return;
+    var isSpecial = function (r) { return Array.prototype.some.call(r.cells, function (c) { return c.colSpan > 1; }); };
+    var firstSpecial = rows.findIndex(isSpecial);
+    var dataRows = rows.filter(function (r) { return !isSpecial(r); });
+    var trailing = rows.filter(isSpecial);
+    // safe only when special rows (e.g. a totals footer) are all at the very bottom;
+    // interleaved group/subtotal rows mean this is a grouped table — leave it alone
+    if (firstSpecial !== -1 && firstSpecial !== dataRows.length) {
+        if (typeof showToast === 'function') showToast('This grouped table isn’t column-sortable', 'info');
+        return;
+    }
+    if (!tbody._origOrder) tbody._origOrder = rows.slice();
+    var head = th.parentNode;
+    var dir = th.dataset.sortDir === 'asc' ? 'desc' : th.dataset.sortDir === 'desc' ? '' : 'asc';
+    Array.prototype.forEach.call(head.cells, function (c) {
+        c.dataset.sortDir = '';
+        var ar = c.querySelector('.sort-arrow');
+        if (ar) { ar.textContent = ' ⇅'; ar.style.opacity = '0.35'; }
+    });
+    th.dataset.sortDir = dir;
+    var arrow = th.querySelector('.sort-arrow');
+    if (dir === '') {
+        tbody._origOrder.forEach(function (r) { tbody.appendChild(r); });
+        return;
+    }
+    if (arrow) { arrow.textContent = dir === 'asc' ? ' ↑' : ' ↓'; arrow.style.opacity = '1'; }
+    dataRows.slice().sort(function (a, b) {
+        var va = _sortCellValue(a.cells[colIdx]), vb = _sortCellValue(b.cells[colIdx]);
+        var r;
+        if (va.n !== null && vb.n !== null) r = va.n - vb.n;
+        else r = va.s < vb.s ? -1 : va.s > vb.s ? 1 : 0;
+        return dir === 'asc' ? r : -r;
+    }).forEach(function (r) { tbody.appendChild(r); });
+    trailing.forEach(function (r) { tbody.appendChild(r); });  // keep totals row pinned at the bottom
+}
+
+function makeTablesSortable(root) {
+    (root || document).querySelectorAll('table.glass-table:not([data-no-sort])').forEach(function (table) {
+        var thead = table.tHead;
+        if (!thead || !thead.rows.length) return;
+        var headerRow = thead.rows[thead.rows.length - 1];
+        Array.prototype.forEach.call(headerRow.cells, function (th, idx) {
+            if (th.dataset.sortBound) return;
+            var label = th.textContent.trim().toLowerCase();
+            if (!label || label === 'actions' || label === 'action' || 'noSort' in th.dataset) return;
+            th.dataset.sortBound = '1';
+            th.style.cursor = 'pointer';
+            th.style.userSelect = 'none';
+            if (!th.title) th.title = 'Click to sort';
+            var arrow = document.createElement('span');
+            arrow.className = 'sort-arrow';
+            arrow.style.opacity = '0.35';
+            arrow.style.fontSize = '0.85em';
+            arrow.textContent = ' ⇅';
+            th.appendChild(arrow);
+            th.addEventListener('click', function () { sortTableByColumn(table, idx, th); });
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () { makeTablesSortable(); });

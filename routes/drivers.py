@@ -125,6 +125,150 @@ async def salaries_api(request: Request, month: str = ""):
     return {"salaries": result, "totals": totals, "month": month}
 
 
+def _overlap_days(start_str, end_str, month_start, month_end):
+    """Days an assignment [start, end] overlaps the month (inclusive). Blank end = ongoing."""
+    from datetime import datetime
+    try:
+        s = datetime.strptime(str(start_str)[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        s = month_start
+    if str(end_str).strip():
+        try:
+            e = datetime.strptime(str(end_str)[:10], "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            e = month_end
+    else:
+        e = month_end
+    lo = max(s, month_start)
+    hi = min(e, month_end)
+    return (hi - lo).days + 1 if hi >= lo else 0
+
+
+@router.get("/api/vehicle-salaries")
+async def vehicle_salaries_api(request: Request, month: str = ""):
+    """Vehicle-wise salary: each vehicle's monthly salary is split across the drivers who
+    worked it during the month, pro-rated by their assignment days (salary / calendar days)."""
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    import calendar
+    from datetime import datetime, date
+    from collections import defaultdict
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+    y, m = int(month[:4]), int(month[5:7])
+    dim = calendar.monthrange(y, m)[1]
+    month_days = [date(y, m, dd).strftime("%Y-%m-%d") for dd in range(1, dim + 1)]
+
+    vehicles = get_all_records("Vehicles")
+    assignments = get_all_records("VehicleAssignments")
+    drivers = get_all_records("Drivers")
+    expenses = get_all_records("Expenses")
+    incentives = get_all_records("Incentives")
+    driver_by_name = {str(d.get("DriverName", "")).strip(): d for d in drivers}
+    seen_driver = set()  # so a driver's deductions/incentive are counted once even across vehicles
+
+    # Classify assignments: single-day (Start==End) are per-day overrides that take
+    # precedence; everything else is a normal date range. Overrides also mark the
+    # driver "busy" that day so they aren't double-counted on their usual vehicle.
+    override_map = {}                 # (vehicle_number, 'YYYY-MM-DD') -> driver
+    overridden_by_day = defaultdict(set)
+    ranges_by_vehicle = defaultdict(list)
+    for a in assignments:
+        vn = str(a.get("VehicleNumber", "")).strip()
+        drv = str(a.get("DriverName", "")).strip()
+        s, e = str(a.get("StartDate", ""))[:10], str(a.get("EndDate", ""))[:10]
+        if s and e and s == e:
+            override_map[(vn, s)] = drv
+            overridden_by_day[s].add(drv)
+        else:
+            ranges_by_vehicle[vn].append((drv, s, e))
+
+    # attendance: a Half Day pays 0.5, Absent pays 0, anything else (or no record) pays 1
+    att_status = {}   # (driver_id, 'YYYY-MM-DD') -> status
+    for a in get_all_records("Attendance"):
+        if str(a.get("Date", ""))[:7] == month:
+            att_status[(str(a.get("DriverID", "")), str(a.get("Date", ""))[:10])] = str(a.get("Status", ""))
+
+    rows = []
+    for v in vehicles:
+        vsal = float(v.get("MonthlySalary", 0) or 0)
+        if vsal <= 0:
+            continue
+        vid, vnum = v.get("VehicleID", ""), str(v.get("VehicleNumber", "")).strip()
+        per_day = vsal / dim
+        default_driver = str(v.get("DefaultDriver", "")).strip()
+        vranges = ranges_by_vehicle.get(vnum, [])
+        # day-by-day: who drove this vehicle each day of the month, weighted by attendance
+        assigned_days = defaultdict(int)     # calendar days on the vehicle
+        eff_days = defaultdict(float)        # paid days (half=0.5, absent=0)
+        half_ct = defaultdict(int)
+        absent_ct = defaultdict(int)
+        for dstr in month_days:
+            drv_of_day = None
+            if (vnum, dstr) in override_map:
+                drv_of_day = override_map[(vnum, dstr)]
+            else:
+                cover = None
+                for (dname, s, e) in vranges:
+                    if s and s <= dstr and (not e or e >= dstr):
+                        cover = dname
+                        break
+                if cover:
+                    if cover not in overridden_by_day.get(dstr, ()):  # not covering elsewhere that day
+                        drv_of_day = cover
+                elif not vranges and default_driver:
+                    if default_driver not in overridden_by_day.get(dstr, ()):
+                        drv_of_day = default_driver
+            if drv_of_day:
+                assigned_days[drv_of_day] += 1
+                did_d = driver_by_name.get(drv_of_day, {}).get("DriverID", "")
+                st = att_status.get((did_d, dstr), "")
+                if st == "Absent":
+                    absent_ct[drv_of_day] += 1
+                elif st == "Half Day":
+                    half_ct[drv_of_day] += 1
+                    eff_days[drv_of_day] += 0.5
+                else:
+                    eff_days[drv_of_day] += 1.0
+        periods = [(dname, "", assigned_days[dname], eff_days[dname], half_ct[dname], absent_ct[dname]) for dname in assigned_days]
+        for dname, did, days, effdays, halfdays, absentdays in periods:
+            gross = round(effdays * per_day, 2)
+            drv = driver_by_name.get(dname, {})
+            did = did or drv.get("DriverID", "")
+            first = dname not in seen_driver
+            seen_driver.add(dname)
+            drv_exp = [e for e in expenses
+                       if str(e.get("DriverName", "")).strip() == dname
+                       and str(e.get("Category", "")) == "Driver Expense"
+                       and (e.get("ForMonth") or str(e.get("ExpenseDate", ""))[:7]) == month]
+            def s(sub):
+                return sum(float(e.get("Amount", 0) or 0) for e in drv_exp if e.get("SubCategory") == sub) if first else 0.0
+            salary_paid, advance, meals, deductions = s("Salary"), s("Advance"), s("Meals"), s("Deductions")
+            other = (sum(float(e.get("Amount", 0) or 0) for e in drv_exp
+                         if e.get("SubCategory") not in ("Salary", "Advance", "Meals", "Deductions")) if first else 0.0)
+            inc_row = next((i for i in incentives if str(i.get("DriverID", "")) == str(did) and str(i.get("ForMonth", "")) == month), None) if (first and did) else None
+            incentive = float(inc_row.get("Amount", 0) or 0) if inc_row else 0.0
+            net = gross + incentive - salary_paid - advance - meals - deductions - other
+            rows.append({
+                "VehicleNumber": vnum, "VehicleID": vid, "VehicleSalary": vsal, "PerDay": round(per_day, 2),
+                "VehicleStatus": v.get("VehicleStatus", "") or "Active",
+                "DriverName": dname or "Unassigned", "DriverID": did,
+                "Days": days,  # calendar days on the vehicle
+                "EffectiveDays": round(effdays, 2), "HalfDays": halfdays, "AbsentDays": absentdays,
+                "DriverStatus": (drv.get("Status", "") or ("Active" if drv else "")),
+                "IncentiveEditable": bool(first and did),
+                "Gross": gross, "Incentive": incentive, "SalaryPaid": salary_paid,
+                "Advance": advance, "Meals": meals, "Deductions": deductions, "Other": other,
+                "NetPayable": round(net, 2),
+            })
+    rows.sort(key=lambda x: (x["DriverName"] or "zzz", x["VehicleNumber"]))
+    keys = ["VehicleSalary", "Gross", "Incentive", "SalaryPaid", "Advance", "Meals", "Deductions", "Other", "NetPayable"]
+    totals = {k: sum(r[k] for r in rows) for k in keys}
+    totals["VehicleSalary"] = sum({r["VehicleNumber"]: r["VehicleSalary"] for r in rows}.values())  # count each vehicle once
+    return {"rows": rows, "totals": totals, "month": month, "days_in_month": dim}
+
+
 @router.post("/api/incentive")
 async def set_incentive(request: Request):
     user = get_user(request)
@@ -163,6 +307,32 @@ async def set_incentive(request: Request):
         append_row("Incentives", row)
     add_audit_log("UPDATE", "Incentives", iid, f"Incentive ₹{amount} set for {driver_name} ({for_month})", user["email"])
     return {"success": True, "incentive_id": iid}
+
+
+@router.get("/api/vehicle-salaries/export")
+async def export_vehicle_salaries_excel(request: Request, month: str = ""):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    import io
+    body = await vehicle_salaries_api(request, month)
+    rows = body["rows"]
+    from utils.exports import to_numeric_df
+    cols = ["DriverName", "VehicleNumber", "VehicleSalary", "PerDay", "Days", "EffectiveDays", "HalfDays", "AbsentDays",
+            "Gross", "Incentive", "SalaryPaid", "Advance", "Meals", "Deductions", "Other", "NetPayable"]
+    data = [{c: r.get(c, "") for c in cols} for r in rows]
+    df = to_numeric_df(data or [{c: "" for c in cols}],
+                       ["VehicleSalary", "PerDay", "Days", "EffectiveDays", "HalfDays", "AbsentDays", "Gross", "Incentive", "SalaryPaid",
+                        "Advance", "Meals", "Deductions", "Other", "NetPayable"])[cols]
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False, engine="openpyxl", sheet_name=f"Salaries {month or 'All'}")
+    buf.seek(0)
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename=vehicle_salaries_{month or "all"}.xlsx'},
+    )
 
 
 @router.get("/api/salaries/export")

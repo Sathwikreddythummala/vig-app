@@ -34,7 +34,7 @@
 </div>
 <div class="glass-card animate-in" style="animation-delay:0.4s">
     <div class="table-responsive">
-        <table class="table table-hover glass-table small">
+        <table class="table table-hover glass-table small" data-no-sort>
             <thead></thead>
             <tbody id="billTable"><tr><td colspan="15" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
             <tfoot id="billSummary"></tfoot>
@@ -131,7 +131,9 @@
                         <div class="col-md-4"><label class="form-label">Receive Date *</label><input type="date" class="form-control glass-input" id="rDate" required oninput="syncPayMonth()"></div>
                         <div class="col-md-4"><label class="form-label">Payment Month * <small class="text-muted">(attribute to which month)</small></label><input type="month" class="form-control glass-input" id="rPayMonth" required></div>
                         <div class="col-md-4"><label class="form-label">Vendor *</label><select class="form-select glass-input" id="rVendor" required onchange="loadVendorBills()"><option value="">-- Select --</option></select></div>
-                        <div class="col-md-12"><label class="form-label">Against Bill</label><select class="form-select glass-input" id="rBillID"><option value="">-- General Payment --</option></select></div>
+                        <div class="col-md-12"><label class="form-label">Against Invoice(s) <small class="text-muted">(tick one or more — the payment splits across them by balance; leave all unticked for a general payment)</small></label>
+                            <div id="rBillList" class="glass-input" style="max-height:190px;overflow:auto;padding:10px;border-radius:10px"><div class="text-muted small">Select a vendor to load invoices</div></div>
+                        </div>
                         <div class="col-md-3"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="rAmount" required min="0" step="0.01"></div>
                         <div class="col-md-3"><label class="form-label">Payment Mode</label><select class="form-select glass-input" id="rPayMode"><option>Bank Transfer</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></div>
                         <div class="col-md-3"><label class="form-label">Reference No</label><input type="text" class="form-control glass-input" id="rRefNum" placeholder="UTR/Cheque No"></div>
@@ -550,9 +552,8 @@ function resetRecvForm(){
     document.getElementById('recvForm').reset();
     document.getElementById('rDate').value=todayStr();
     document.getElementById('rPayMonth').value=thisMonth();
-    var billSel=document.getElementById('rBillID');
-    billSel.innerHTML='<option value="">-- General Payment --</option>';
-    billSel.disabled=false;
+    invBalanceMap={};
+    document.getElementById('rBillList').innerHTML='<div class="text-muted small">Select a vendor to load invoices</div>';
 }
 
 function editRecv(id){
@@ -573,38 +574,47 @@ function editRecv(id){
     document.getElementById('rPayMode').value=r.PaymentMode||'Bank Transfer';
     document.getElementById('rRefNum').value=r.ReferenceNumber||'';
     document.getElementById('rDesc').value=r.Description||'';
-    var billSel=document.getElementById('rBillID');
-    billSel.innerHTML='<option value="">'+(r.InvoiceNumber?r.InvoiceNumber+' (linked bill kept)':'-- General Payment --')+'</option>';
-    billSel.disabled=true;
+    document.getElementById('rBillList').innerHTML='<div class="text-muted small">'+(r.InvoiceNumber?'Linked to invoice <strong>'+r.InvoiceNumber+'</strong> (kept on edit)':'General payment')+'</div>';
     bootstrap.Modal.getOrCreateInstance(recvModalEl).show();
 }
 
+var invBalanceMap={};
 async function loadVendorBills(){
     var vendor=document.getElementById('rVendor').value;
-    var sel=document.getElementById('rBillID');
-    sel.innerHTML='<option value="">-- General Payment --</option>';
-    if(!vendor) return;
-    sel.innerHTML='<option value="">Loading...</option>';
+    var box=document.getElementById('rBillList');
+    invBalanceMap={};
+    if(!vendor){box.innerHTML='<div class="text-muted small">Select a vendor to load invoices</div>';return;}
+    box.innerHTML='<div class="text-muted small">Loading…</div>';
     var res=await fetch('/billing/api/list?per_page=1000&vendor='+encodeURIComponent(vendor));
     var data=await res.json();
     var bills=data.bills||[];
-    sel.innerHTML='<option value="">-- General Payment --</option>';
     var invGroups={}, invOrder=[];
     bills.forEach(b=>{
         var inv=b.InvoiceNumber||'Unknown';
         if(!invGroups[inv]){invGroups[inv]=[];invOrder.push(inv);}
         invGroups[inv].push(b);
     });
-    if(!invOrder.length){ sel.innerHTML+=''; return; }
+    var html='';
     invOrder.forEach(function(inv){
         var grp=invGroups[inv];
         var totalBal=grp.reduce((s,b)=>s+parseFloat(b.BalanceAmount||0),0);
         var status=grp[0].PaymentStatus||'Pending';
-        var opt=document.createElement('option');
-        opt.value='INV:'+inv;
-        opt.textContent=inv+' | '+status+' | ₹'+totalBal.toLocaleString('en-IN')+' balance ('+grp.length+' vehicle'+(grp.length>1?'s':'')+')';
-        sel.appendChild(opt);
+        invBalanceMap[inv]=totalBal;
+        var cls=status==='Paid'?'bg-success':status==='Partial'?'bg-warning text-dark':'bg-danger';
+        var dis=totalBal<=0?'disabled':'';
+        html+='<label class="d-flex align-items-center gap-2 py-1" style="cursor:pointer">'+
+            '<input type="checkbox" class="rInvChk" value="'+inv+'" '+dis+' onchange="onInvCheck()">'+
+            '<span><strong>'+inv+'</strong> <span class="badge '+cls+'">'+status+'</span> ₹'+totalBal.toLocaleString('en-IN')+' balance ('+grp.length+' vehicle'+(grp.length>1?'s':'')+')</span>'+
+            '</label>';
     });
+    box.innerHTML = html || '<div class="text-muted small">No invoices for this vendor</div>';
+}
+
+// Tick invoices -> auto-fill the Amount with the total balance of those selected (editable)
+function onInvCheck(){
+    var checked=Array.from(document.querySelectorAll('.rInvChk:checked'));
+    var sum=checked.reduce(function(s,c){return s+(invBalanceMap[c.value]||0);},0);
+    if(checked.length) document.getElementById('rAmount').value=Math.round(sum*100)/100;
 }
 
 async function loadRecv(){
@@ -678,12 +688,13 @@ async function loadRecv(){
 }
 
 async function saveRecv(){
-    var payload={ReceiveDate:document.getElementById('rDate').value,PaymentMonth:document.getElementById('rPayMonth').value,VendorName:document.getElementById('rVendor').value,BillID:document.getElementById('rBillID').value,Amount:document.getElementById('rAmount').value,PaymentMode:document.getElementById('rPayMode').value,ReferenceNumber:document.getElementById('rRefNum').value,Description:document.getElementById('rDesc').value};
+    var checked=Array.from(document.querySelectorAll('.rInvChk:checked')).map(function(c){return c.value;});
+    var payload={ReceiveDate:document.getElementById('rDate').value,PaymentMonth:document.getElementById('rPayMonth').value,VendorName:document.getElementById('rVendor').value,Invoices:checked,Amount:document.getElementById('rAmount').value,PaymentMode:document.getElementById('rPayMode').value,ReferenceNumber:document.getElementById('rRefNum').value,Description:document.getElementById('rDesc').value};
     if(!payload.ReceiveDate||!payload.VendorName||!payload.Amount){showToast('Fill required fields','danger');return;}
     try{
         var res, msg;
         if(editingRecvId){
-            delete payload.BillID; // keep existing bill link on edit
+            delete payload.Invoices; // keep existing bill link on edit
             res=await fetch('/billing/api/receivables/'+editingRecvId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
             msg='Payment updated';
         }else{
@@ -691,7 +702,11 @@ async function saveRecv(){
             msg='Payment recorded';
         }
         var data=await res.json();
-        if(data.success){bootstrap.Modal.getInstance(recvModalEl).hide();showToast(msg,'success');loadRecv();loadBills(currentPage);}
+        if(data.success){
+            if(!editingRecvId && data.invoice_count>1) msg='Payment split across '+data.invoice_count+' invoices';
+            else if(!editingRecvId && data.split_count>1) msg='Payment split across '+data.split_count+' bills';
+            bootstrap.Modal.getInstance(recvModalEl).hide();showToast(msg,'success');loadRecv();loadBills(currentPage);
+        }
         else showToast(data.error||'Failed','danger');
     }catch(e){showToast('Network error','danger');}
 }

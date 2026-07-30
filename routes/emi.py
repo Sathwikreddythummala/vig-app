@@ -29,6 +29,7 @@ async def emi_page(request: Request):
 
 def _emi_day_on_or_after(d: date, day: int) -> date:
     """First date with day-of-month `day` that is on or after `d` (clamps to month length)."""
+    day = max(1, min(int(day), 31))  # guard against 0/negative/out-of-range EMI days
     y, m = d.year, d.month
     cand = date(y, m, min(day, calendar.monthrange(y, m)[1]))
     if cand < d:
@@ -42,6 +43,8 @@ def calc_next_due(emi_day_str, start_date_str=""):
     try:
         day = int(emi_day_str)
     except (ValueError, TypeError):
+        return "", None
+    if day < 1 or day > 31:  # no valid EMI day set (e.g. 0/empty) -> no next-due
         return "", None
     next_d = _emi_day_on_or_after(today, day)
     # An EMI can never fall due before the loan actually starts. If the loan

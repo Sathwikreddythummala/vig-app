@@ -56,6 +56,7 @@ async def list_expenses(
     vehicle: str = "",
     category: str = "",
     subcategory: str = "",
+    paid_by: str = "",
     search: str = "",
     page: int = 1,
     per_page: int = 25,
@@ -76,6 +77,7 @@ async def list_expenses(
     expenses = filter_multi(expenses, "VehicleNumber", vehicle)
     expenses = filter_multi(expenses, "Category", category)
     expenses = filter_multi(expenses, "SubCategory", subcategory)
+    expenses = filter_multi(expenses, "PaidBy", paid_by)
     if search:
         s = search.lower()
         expenses = [e for e in expenses if s in str(e.get("ExpenseID", "")).lower() or s in str(e.get("Description", "")).lower() or s in str(e.get("VehicleNumber", "")).lower() or s in str(e.get("DriverName", "")).lower() or s in str(e.get("Category", "")).lower()]
@@ -164,6 +166,7 @@ async def export_excel(
     date_to: str = "",
     vehicle: str = "",
     category: str = "",
+    paid_by: str = "",
 ):
     user = get_user(request)
     if not user:
@@ -176,6 +179,7 @@ async def export_excel(
     from utils.filters import filter_multi
     expenses = filter_multi(expenses, "VehicleNumber", vehicle)
     expenses = filter_multi(expenses, "Category", category)
+    expenses = filter_multi(expenses, "PaidBy", paid_by)
     from utils.exports import to_numeric_df
     df = to_numeric_df(expenses, ["Amount"])
     buf = io.BytesIO()
@@ -195,6 +199,7 @@ async def export_pdf(
     date_to: str = "",
     vehicle: str = "",
     category: str = "",
+    paid_by: str = "",
 ):
     user = get_user(request)
     if not user:
@@ -211,6 +216,7 @@ async def export_pdf(
     from utils.filters import filter_multi
     expenses = filter_multi(expenses, "VehicleNumber", vehicle)
     expenses = filter_multi(expenses, "Category", category)
+    expenses = filter_multi(expenses, "PaidBy", paid_by)
     def safe(v, limit=30):
         return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
 
