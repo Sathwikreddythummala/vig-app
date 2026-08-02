@@ -87,7 +87,7 @@ var vehicles=[], drivers=[], vendors=[], currentPage=1;
 var incModalEl = document.getElementById('incomeModal');
 
 document.addEventListener('DOMContentLoaded', async function() {
-    document.getElementById('incDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('incDate').value = todayLocal();
     var results = await Promise.all([
         fetch('/vehicles/api/list').then(function(r){return r.json()}),
         fetch('/drivers/api/list').then(function(r){return r.json()}),
@@ -162,7 +162,7 @@ function renderPagination(tp,cur) {
     nav.innerHTML=h;
 }
 
-function resetIncomeForm() { document.getElementById('incomeForm').reset(); document.getElementById('incId').value=''; document.getElementById('incomeModalTitle').textContent='Add Income'; document.getElementById('incDate').value=new Date().toISOString().split('T')[0]; }
+function resetIncomeForm() { document.getElementById('incomeForm').reset(); document.getElementById('incId').value=''; document.getElementById('incomeModalTitle').textContent='Add Income'; document.getElementById('incDate').value=todayLocal(); }
 
 var allIncomeCache=[];
 function editIncome(iid) {

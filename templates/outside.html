@@ -122,9 +122,9 @@
 var allOV=[], ovModalEl=document.getElementById('ovModal'), txnModalEl=document.getElementById('txnModal');
 
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('selMonth').value = new Date().toISOString().slice(0,7);
-    document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('txForMonth').value = new Date().toISOString().slice(0,7);
+    document.getElementById('selMonth').value = thisMonthLocal();
+    document.getElementById('txDate').value = todayLocal();
+    document.getElementById('txForMonth').value = thisMonthLocal();
     loadAll();
     loadAlerts();
 });
@@ -187,7 +187,7 @@ async function loadTxns() {
 function resetOVForm() { document.getElementById('ovForm').reset(); document.getElementById('ovId').value=''; document.getElementById('ovModalTitle').textContent='Add Outside Vehicle'; }
 function resetTxnForm() {
     document.getElementById('txnForm').reset();
-    document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('txDate').value = todayLocal();
     document.getElementById('txForMonth').value = document.getElementById('selMonth').value;
 }
 

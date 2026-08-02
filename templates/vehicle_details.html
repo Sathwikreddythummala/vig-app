@@ -243,7 +243,7 @@ async function deleteAssignment(id) {
 
 async function assignDriver() {
     var newDriver = document.getElementById('assignDriverSelect').value;
-    var today = new Date().toISOString().split('T')[0];
+    var today = todayLocal();
     // Ask the changeover date so salary splits correctly between the outgoing and incoming driver
     var changeover = prompt('From which date does ' + (newDriver || 'the new driver') + ' take over this vehicle?\n(The previous driver is paid up to the day before.)\n\nFormat: YYYY-MM-DD', today);
     if (changeover === null) { loadVehicleDetails(); return; }  // cancelled — reset the dropdown

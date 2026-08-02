@@ -155,7 +155,7 @@ async def vehicle_salaries_api(request: Request, month: str = ""):
     from datetime import datetime, date
     from collections import defaultdict
     if not month:
-        month = datetime.now().strftime("%Y-%m")
+        month = now_str()[:7]  # IST, not server-local
     y, m = int(month[:4]), int(month[5:7])
     dim = calendar.monthrange(y, m)[1]
     month_days = [date(y, m, dd).strftime("%Y-%m-%d") for dd in range(1, dim + 1)]

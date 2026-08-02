@@ -124,7 +124,7 @@ let vehicleChartInst, categoryChartInst;
 
 document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
-    document.getElementById('dashMonth').value = now.toISOString().slice(0, 7);
+    document.getElementById('dashMonth').value = thisMonthLocal();
     updateMonthLabel();
     loadAll();
     loadAlerts();

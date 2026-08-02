@@ -19,6 +19,7 @@ CATEGORIES = {
     "Fastag": [],
     "Insurance": [],
     "Permit": [],
+    "Quarterly Tax/Green Tax": ["Quarterly Tax", "Green Tax"],
     "Accident": [],
     "Penalty": [],
     "Helper Expense": [],
@@ -102,16 +103,24 @@ async def add_expense(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
-    from utils.duplicate_check import is_duplicate
-    if is_duplicate("Expenses", {
-        "ExpenseDate": data.get("ExpenseDate", ""),
-        "VehicleNumber": data.get("VehicleNumber", ""),
-        "Category": data.get("Category", ""),
-        "SubCategory": data.get("SubCategory", ""),
-        "Amount": data.get("Amount", 0),
-        "Description": data.get("Description", ""),
-    }):
-        return JSONResponse({"error": "Duplicate expense already exists"}, 400)
+    # Warn on a possible duplicate: same date + vehicle + category + subcategory + amount
+    # (description is intentionally ignored). Unless the user chose to continue (_force).
+    if not data.get("_force"):
+        def _n(x):
+            return str(x or "").strip()
+        def _amt(x):
+            try:
+                return round(float(x or 0), 2)
+            except (ValueError, TypeError):
+                return 0.0
+        for e in get_all_records("Expenses"):
+            if (_n(e.get("ExpenseDate")) == _n(data.get("ExpenseDate"))
+                    and _n(e.get("VehicleNumber")) == _n(data.get("VehicleNumber"))
+                    and _n(e.get("Category")) == _n(data.get("Category"))
+                    and _n(e.get("SubCategory")) == _n(data.get("SubCategory"))
+                    and _amt(e.get("Amount")) == _amt(data.get("Amount"))):
+                return {"duplicate": True,
+                        "message": "A similar expense already exists (same date, vehicle, category, sub-category and amount)."}
     eid = gen_id("EXP")
     for_month = data.get("ForMonth", "")
     if not for_month:

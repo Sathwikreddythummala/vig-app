@@ -165,7 +165,7 @@ function resetFuelForm() {
     document.getElementById('fuelForm').reset();
     document.getElementById('fuelId').value = '';
     document.getElementById('fuelModalTitle').textContent = 'Add Fuel Entry';
-    document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('fDate').value = todayLocal();
 }
 
 function editFuel(fid) {

@@ -116,7 +116,7 @@ let drivers = [];
 let currentPage = 1;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayLocal();
     document.getElementById('expDate').value = today;
     const [catRes, vehRes, drvRes] = await Promise.all([
         fetch('/expenses/api/categories').then(r=>r.json()),
@@ -249,7 +249,7 @@ function resetExpenseForm() {
     document.getElementById('expenseForm').reset();
     document.getElementById('expenseId').value = '';
     document.getElementById('expenseModalTitle').textContent = 'Add Expense';
-    document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('expDate').value = todayLocal();
     toggleVehicleFields();
 }
 
@@ -306,8 +306,18 @@ async function saveExpense() {
     try {
         var url = id ? '/expenses/api/' + id : '/expenses/api/add';
         var method = id ? 'PUT' : 'POST';
-        var res = await fetch(url, { method: method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        var hdr = {'Content-Type':'application/json'};
+        var res = await fetch(url, { method: method, headers: hdr, body: JSON.stringify(payload) });
         var data = await res.json();
+        // Possible duplicate -> ask the user to continue or exit
+        if (data.duplicate) {
+            var proceed = confirm((data.message || 'A similar expense already exists.') +
+                '\n\nPress OK to add it anyway, or Cancel to discard and close the form.');
+            if (!proceed) { hideExpModal(); return; }   // Exit -> close the form
+            payload._force = true;                       // Continue -> save anyway
+            res = await fetch(url, { method: method, headers: hdr, body: JSON.stringify(payload) });
+            data = await res.json();
+        }
         if (data.success) {
             await uploadEntityDoc('expFile', 'Expense', id || data.expense_id, 'Receipt');
             hideExpModal();

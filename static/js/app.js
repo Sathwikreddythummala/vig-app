@@ -1,3 +1,14 @@
+// Local (browser-timezone) date helpers. Never use toISOString() for date defaults —
+// that returns UTC, which shows YESTERDAY between midnight and ~5:30am IST.
+function todayLocal() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function thisMonthLocal() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
     const id = 'toast-' + Date.now();

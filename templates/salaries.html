@@ -45,7 +45,7 @@ let canEdit = (typeof USER_ROLE !== 'undefined') && USER_ROLE !== 'viewer';
 
 document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
-    document.getElementById('salaryMonth').value = now.toISOString().slice(0,7);
+    document.getElementById('salaryMonth').value = thisMonthLocal();
     loadSalaries();
     loadAlerts();
 });

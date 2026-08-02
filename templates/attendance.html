@@ -49,8 +49,8 @@ const canEdit = userRole === 'admin' || userRole === 'editor';
 
 let allDrivers = [];
 document.addEventListener('DOMContentLoaded', async () => {
-    document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('summaryMonth').value = new Date().toISOString().slice(0,7);
+    document.getElementById('attDate').value = todayLocal();
+    document.getElementById('summaryMonth').value = thisMonthLocal();
     try {
         const dres = await fetch('/drivers/api/list');
         allDrivers = ((await dres.json()).drivers || []).filter(d => (d.EmployeeType||'Driver') === 'Driver');

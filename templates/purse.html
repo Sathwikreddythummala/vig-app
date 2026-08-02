@@ -83,7 +83,7 @@
 var purseModalEl = document.getElementById('purseModal');
 
 document.addEventListener('DOMContentLoaded', async function() {
-    document.getElementById('pDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pDate').value = todayLocal();
     try {
         var vRes = await fetch('/vehicles/api/list').then(function(r){return r.json()});
         var vSel = document.getElementById('pVehicle');
@@ -144,7 +144,7 @@ async function loadEntries() {
 
 function resetPurseForm(holder) {
     document.getElementById('purseForm').reset();
-    document.getElementById('pDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pDate').value = todayLocal();
     document.getElementById('pHolder').value = holder || 'TSR';
     document.getElementById('purseModalTitle').textContent = 'Give Money to ' + (holder||'TSR');
 }

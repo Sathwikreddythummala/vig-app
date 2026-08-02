@@ -165,8 +165,8 @@ var purchaseModalEl = document.getElementById('purchaseModal');
 
 document.addEventListener('DOMContentLoaded', function() {
     var now = new Date();
-    document.getElementById('gstMonth').value = now.toISOString().slice(0,7);
-    document.getElementById('gpDate').value = now.toISOString().split('T')[0];
+    document.getElementById('gstMonth').value = thisMonthLocal();
+    document.getElementById('gpDate').value = todayLocal();
     loadAll();
     loadAlerts();
 });
@@ -331,7 +331,7 @@ function resetPurchaseForm() {
     document.getElementById('purchaseForm').reset();
     document.getElementById('gpId').value = '';
     document.getElementById('purchaseModalTitle').textContent = 'Add GST Purchase';
-    document.getElementById('gpDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('gpDate').value = todayLocal();
     document.getElementById('gpTotal').value = '₹0';
 }
 

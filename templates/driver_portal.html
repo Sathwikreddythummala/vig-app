@@ -167,12 +167,15 @@
     <div class="toast-container" id="toastContainer"></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Local-timezone date (never toISOString/UTC — it shows yesterday after midnight IST)
+    function todayLocal(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    function thisMonthLocal(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
     var assignedVehicle = '{{ user.assigned_vehicle }}';
-    document.getElementById('dslDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('dslDate').value = todayLocal();
 
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('dslVehicle').value = assignedVehicle || 'Not assigned';
-        document.getElementById('selectedMonth').value = new Date().toISOString().slice(0,7);
+        document.getElementById('selectedMonth').value = thisMonthLocal();
         loadMyData();
     });
 
