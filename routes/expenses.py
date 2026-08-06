@@ -52,6 +52,7 @@ async def get_categories(request: Request):
 @router.get("/api/list")
 async def list_expenses(
     request: Request,
+    month: str = "",
     date_from: str = "",
     date_to: str = "",
     vehicle: str = "",
@@ -66,6 +67,8 @@ async def list_expenses(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     expenses = get_all_records("Expenses")
+    if month:
+        expenses = [e for e in expenses if (str(e.get("ForMonth", "")) or str(e.get("ExpenseDate", ""))[:7]) == month]
     # Drivers only see their own Driver Expense and Deductions entries
     if user.get("role") == "driver":
         driver_name = user.get("driver_name", "")
@@ -80,8 +83,10 @@ async def list_expenses(
     expenses = filter_multi(expenses, "SubCategory", subcategory)
     expenses = filter_multi(expenses, "PaidBy", paid_by)
     if search:
-        s = search.lower()
-        expenses = [e for e in expenses if s in str(e.get("ExpenseID", "")).lower() or s in str(e.get("Description", "")).lower() or s in str(e.get("VehicleNumber", "")).lower() or s in str(e.get("DriverName", "")).lower() or s in str(e.get("Category", "")).lower()]
+        s = search.lower().strip()
+        _fields = ("ExpenseID", "Description", "VehicleNumber", "DriverName", "Category",
+                   "SubCategory", "PaidBy", "PaymentMode", "Amount", "ExpenseFor", "ForMonth", "ExpenseDate")
+        expenses = [e for e in expenses if any(s in str(e.get(f, "")).lower() for f in _fields)]
     expenses.sort(key=lambda x: str(x.get("CreatedDate", "")), reverse=True)
     total = len(expenses)
     start = (page - 1) * per_page
@@ -171,6 +176,7 @@ async def delete_expense_api(request: Request, expense_id: str):
 @router.get("/api/export/excel")
 async def export_excel(
     request: Request,
+    month: str = "",
     date_from: str = "",
     date_to: str = "",
     vehicle: str = "",
@@ -181,6 +187,8 @@ async def export_excel(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     expenses = get_all_records("Expenses")
+    if month:
+        expenses = [e for e in expenses if (str(e.get("ForMonth", "")) or str(e.get("ExpenseDate", ""))[:7]) == month]
     if date_from:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:
@@ -204,6 +212,7 @@ async def export_excel(
 @router.get("/api/export/pdf")
 async def export_pdf(
     request: Request,
+    month: str = "",
     date_from: str = "",
     date_to: str = "",
     vehicle: str = "",
@@ -218,6 +227,8 @@ async def export_pdf(
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
     expenses = get_all_records("Expenses")
+    if month:
+        expenses = [e for e in expenses if (str(e.get("ForMonth", "")) or str(e.get("ExpenseDate", ""))[:7]) == month]
     if date_from:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:

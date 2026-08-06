@@ -5,13 +5,14 @@
 <div class="glass-card mb-3 animate-in">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="month" class="form-control glass-input" id="filterMonth" style="width:150px" title="Filter by month" onchange="loadExpenses()">
             <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:160px">
             <input type="date" class="form-control glass-input" id="filterDateTo" style="width:160px">
             <select class="form-select glass-input" id="filterVehicle" style="width:180px"><option value="">All Vehicles</option></select>
             <select class="form-select glass-input" id="filterCategory" style="width:160px" onchange="updateFilterSubCategories(); loadExpenses()"><option value="">All Categories</option></select>
             <select class="form-select glass-input" id="filterSubCategory" style="width:160px" onchange="loadExpenses()"><option value="">All SubCategories</option></select>
             <select class="form-select glass-input" id="filterPaidBy" style="width:140px" onchange="loadExpenses()"><option value="">All Paid By</option><option>TSR</option><option>MSR</option><option>Company</option></select>
-            <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search..." style="width:180px">
+            <input type="text" class="form-control glass-input" id="filterSearch" placeholder="Search... (live)" style="width:180px" autocomplete="off">
             <button class="btn btn-warning" onclick="loadExpenses()"><i class="bi bi-funnel"></i> Filter</button>
         </div>
         <div class="d-flex gap-2">
@@ -145,6 +146,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     drivers.forEach(d => {
         drvSel.innerHTML += `<option value="${d.DriverName}">${d.DriverName}</option>`;
     });
+    // Live search — updates as you type (debounced), no Filter click needed
+    var searchEl = document.getElementById('filterSearch');
+    searchEl.addEventListener('input', debouncedExpenseSearch);
+    searchEl.addEventListener('keyup', function (e) { if (e.key === 'Enter') { clearTimeout(_expSearchTimer); loadExpenses(1); } });
     loadExpenses();
     loadAlerts();
 });
@@ -194,10 +199,17 @@ function toggleForMonth() {
     }
 }
 
+var _expSearchTimer;
+function debouncedExpenseSearch() {
+    clearTimeout(_expSearchTimer);
+    _expSearchTimer = setTimeout(function () { loadExpenses(1); }, 300);
+}
+
 async function loadExpenses(page) {
     currentPage = page || 1;
     const params = new URLSearchParams({
         page: currentPage,
+        month: document.getElementById('filterMonth').value,
         date_from: document.getElementById('filterDateFrom').value,
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,
@@ -349,6 +361,7 @@ async function deleteExpense(id) {
 
 function exportExcel() {
     const params = new URLSearchParams({
+        month: document.getElementById('filterMonth').value,
         date_from: document.getElementById('filterDateFrom').value,
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,
@@ -360,6 +373,7 @@ function exportExcel() {
 
 function exportPDF() {
     const params = new URLSearchParams({
+        month: document.getElementById('filterMonth').value,
         date_from: document.getElementById('filterDateFrom').value,
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,

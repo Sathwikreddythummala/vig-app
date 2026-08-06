@@ -90,7 +90,8 @@
       "PowerShell(python \"C:\\\\Users\\\\SATHWI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\E--vig-app\\\\63c8554d-cd93-4209-a043-1b10b763f6ab\\\\scratchpad\\\\all_tables_dups.py\")",
       "PowerShell(node --check \"E:\\\\vig-app\\\\static\\\\js\\\\app.js\"; if \\($?\\) { Write-Output \"app.js OK\" }; python -c \"import ast; ast.parse\\(open\\(r'E:\\\\vig-app\\\\routes\\\\drivers.py',encoding='utf-8'\\).read\\(\\)\\); print\\('drivers.py OK'\\)\"; foreach \\($f in @\\('fuel','expenses','vehicle_details','income','purse','attendance','outside','gst','salaries','dashboard','driver_portal'\\)\\) { python -c \"from jinja2 import Environment, FileSystemLoader; Environment\\(loader=FileSystemLoader\\(r'E:\\\\vig-app\\\\templates'\\)\\).get_template\\('$f.html'\\)\" }; if \\($?\\) { Write-Output \"all templates compile OK\" })",
       "PowerShell(Start-Sleep -Seconds 9; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/static/js/app.js?v=9\" -UseBasicParsing -TimeoutSec 12; $has = $r.Content -match 'todayLocal'; Write-Output \"app.js v9: $\\($r.StatusCode\\), helper present: $has\" } catch { Write-Output \"err\" })",
-      "PowerShell(git -C E:\\\\vig-app status --short)"
+      "PowerShell(git -C E:\\\\vig-app status --short)",
+      "PowerShell(python -c \"from jinja2 import Environment, FileSystemLoader; Environment\\(loader=FileSystemLoader\\(r'E:\\\\vig-app\\\\templates'\\)\\).get_template\\('expenses.html'\\); print\\('OK'\\)\"; $c = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -Confirm:$false }; Start-Sleep 1 }; Write-Output \"stopped\")"
     ]
   }
 }
