@@ -113,9 +113,20 @@ function render(docs) {
             '<td><div class="d-flex gap-1">' +
                 '<a href="/documents/api/view/' + d.doc_id + '" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i> View</a>' +
                 '<a href="/documents/api/download/' + d.doc_id + '" class="btn btn-sm btn-warning"><i class="bi bi-download"></i> Download</a>' +
+                '<button class="btn btn-sm btn-outline-danger viewer-hide" title="Delete document" onclick="deleteDocument(\'' + d.doc_id + '\',\'' + (d.file_name||'').replace(/'/g,"\\'") + '\')"><i class="bi bi-trash"></i></button>' +
             '</div></td>' +
         '</tr>';
     }).join('');
+}
+
+async function deleteDocument(docId, fileName) {
+    if (!confirm('Delete this document?' + (fileName ? '\n\n' + fileName : '') + '\n\nThis cannot be undone.')) return;
+    try {
+        var res = await fetch('/documents/api/' + docId, { method: 'DELETE' });
+        var data = await res.json();
+        if (data.success) { showToast('Document deleted', 'success'); load(); }
+        else { showToast(data.error || 'Delete failed', 'danger'); }
+    } catch (e) { showToast('Delete failed', 'danger'); }
 }
 
 load();

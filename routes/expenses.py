@@ -108,11 +108,12 @@ async def add_expense(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
-    # Warn on a possible duplicate: same date + vehicle + category + subcategory + amount
-    # (description is intentionally ignored). Unless the user chose to continue (_force).
+    # Warn on a possible duplicate: same date + expense-for (Vehicle/Company) + vehicle + amount.
+    # Category, sub-category and description are intentionally ignored.
+    # Unless the user chose to continue (_force).
     if not data.get("_force"):
         def _n(x):
-            return str(x or "").strip()
+            return str(x or "").strip().lower()
         def _amt(x):
             try:
                 return round(float(x or 0), 2)
@@ -120,12 +121,23 @@ async def add_expense(request: Request):
                 return 0.0
         for e in get_all_records("Expenses"):
             if (_n(e.get("ExpenseDate")) == _n(data.get("ExpenseDate"))
+                    and _n(e.get("ExpenseFor")) == _n(data.get("ExpenseFor", "Vehicle Expense"))
                     and _n(e.get("VehicleNumber")) == _n(data.get("VehicleNumber"))
-                    and _n(e.get("Category")) == _n(data.get("Category"))
-                    and _n(e.get("SubCategory")) == _n(data.get("SubCategory"))
                     and _amt(e.get("Amount")) == _amt(data.get("Amount"))):
                 return {"duplicate": True,
-                        "message": "A similar expense already exists (same date, vehicle, category, sub-category and amount)."}
+                        "message": "A matching expense already exists (same date, type, vehicle and amount).",
+                        "existing": {
+                            "ExpenseDate": e.get("ExpenseDate", ""),
+                            "ExpenseFor": e.get("ExpenseFor", ""),
+                            "VehicleNumber": e.get("VehicleNumber", ""),
+                            "DriverName": e.get("DriverName", ""),
+                            "Category": e.get("Category", ""),
+                            "SubCategory": e.get("SubCategory", ""),
+                            "Amount": e.get("Amount", ""),
+                            "Description": e.get("Description", ""),
+                            "PaidBy": e.get("PaidBy", ""),
+                            "PaymentMode": e.get("PaymentMode", ""),
+                        }}
     eid = gen_id("EXP")
     for_month = data.get("ForMonth", "")
     if not for_month:

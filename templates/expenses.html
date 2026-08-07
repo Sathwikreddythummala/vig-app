@@ -321,10 +321,22 @@ async function saveExpense() {
         var hdr = {'Content-Type':'application/json'};
         var res = await fetch(url, { method: method, headers: hdr, body: JSON.stringify(payload) });
         var data = await res.json();
-        // Possible duplicate -> ask the user to continue or exit
+        // Possible duplicate -> show the matching record and ask to continue or exit
         if (data.duplicate) {
-            var proceed = confirm((data.message || 'A similar expense already exists.') +
-                '\n\nPress OK to add it anyway, or Cancel to discard and close the form.');
+            var ex = data.existing || {};
+            var cat = (ex.Category || '') + (ex.SubCategory ? ' / ' + ex.SubCategory : '');
+            var details = (data.message || 'A matching expense already exists.') +
+                '\n\n— Existing record —' +
+                '\nDate: ' + (ex.ExpenseDate || '-') +
+                '\nType: ' + (ex.ExpenseFor || '-') +
+                '\nVehicle: ' + (ex.VehicleNumber || '-') +
+                '\nDriver: ' + (ex.DriverName || '-') +
+                '\nCategory: ' + (cat || '-') +
+                '\nAmount: ₹' + (ex.Amount || '-') +
+                '\nDescription: ' + (ex.Description || '-') +
+                '\nPaid By: ' + (ex.PaidBy || '-') + '  |  Mode: ' + (ex.PaymentMode || '-') +
+                '\n\nPress OK to add this anyway, or Cancel to discard and close the form.';
+            var proceed = confirm(details);
             if (!proceed) { hideExpModal(); return; }   // Exit -> close the form
             payload._force = true;                       // Continue -> save anyway
             res = await fetch(url, { method: method, headers: hdr, body: JSON.stringify(payload) });

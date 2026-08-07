@@ -16,6 +16,7 @@
 <div class="glass-card mb-3 animate-in" style="animation-delay:0.7s">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="month" class="form-control glass-input" id="filterMonth" style="width:150px" title="Filter by month" onchange="loadFuel()">
             <input type="date" class="form-control glass-input" id="filterDateFrom" style="width:150px">
             <input type="date" class="form-control glass-input" id="filterDateTo" style="width:150px">
             <select class="form-select glass-input" id="filterVehicle" style="width:160px"><option value="">All Vehicles</option></select>
@@ -119,7 +120,7 @@ async function loadStats() {
 
 async function loadFuel(page) {
     currentPage = page||1;
-    var params = new URLSearchParams({page:currentPage,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,driver:document.getElementById('filterDriver').value,fuel_type:document.getElementById('filterFuelType').value});
+    var params = new URLSearchParams({page:currentPage,month:document.getElementById('filterMonth').value,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,driver:document.getElementById('filterDriver').value,fuel_type:document.getElementById('filterFuelType').value});
     var res = await fetch('/fuel/api/list?'+params); var data = await res.json();
     document.getElementById('totalAmount').textContent = '₹'+Number(data.total_amount||0).toLocaleString('en-IN');
     document.getElementById('totalLitres').textContent = Number(data.total_litres||0).toLocaleString('en-IN');
@@ -228,6 +229,7 @@ async function deleteFuel(id) {
 
 function fuelExportParams() {
     return new URLSearchParams({
+        month: document.getElementById('filterMonth').value,
         date_from: document.getElementById('filterDateFrom').value,
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,

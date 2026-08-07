@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Reports - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Profit &amp; Loss Report{% endblock %}
+{% block content %}
+<div class="glass-card mb-3 animate-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div class="d-flex flex-wrap gap-3 align-items-end">
+            <div>
+                <label class="form-label mb-1"><i class="bi bi-cash-stack"></i> Expenses month</label>
+                <input type="month" class="form-control glass-input" id="expMonth" style="width:170px" onchange="syncBilling();loadReport()">
+            </div>
+            <div>
+                <label class="form-label mb-1"><i class="bi bi-receipt"></i> Billing month <small class="text-muted">(excl. GST)</small></label>
+                <input type="month" class="form-control glass-input" id="billMonth" style="width:170px" onchange="loadReport()">
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning" onclick="exportReport('excel')"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+            <button class="btn btn-outline-warning" onclick="exportReport('pdf')"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+        </div>
+    </div>
+    <div class="text-muted small mt-2"><i class="bi bi-info-circle"></i> Revenue = billing <strong>without GST</strong> for the billing month. Profit/Loss = revenue &minus; that vehicle's expenses for the expenses month.</div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-receipt"></i></div><div class="stat-info"><small>Total Revenue (excl GST)</small><h4 id="tRevenue">₹0</h4></div></div></div>
+    <div class="col-md-3"><div class="glass-card stat-card animate-in" style="animation-delay:.1s"><div class="stat-icon bg-expense"><i class="bi bi-cash-stack"></i></div><div class="stat-info"><small>Total Expense</small><h4 id="tExpense">₹0</h4></div></div></div>
+    <div class="col-md-3"><div class="glass-card stat-card animate-in" style="animation-delay:.2s"><div class="stat-icon bg-driver"><i class="bi bi-graph-up-arrow"></i></div><div class="stat-info"><small>Net Profit / Loss</small><h4 id="tPL">₹0</h4></div></div></div>
+    <div class="col-md-3"><div class="glass-card stat-card animate-in" style="animation-delay:.3s"><div class="stat-icon bg-vehicle"><i class="bi bi-percent"></i></div><div class="stat-info"><small>Overall Margin</small><h4 id="tMargin">0%</h4></div></div></div>
+</div>
+
+<div class="glass-card animate-in" style="animation-delay:.3s">
+    <div class="table-responsive">
+        <table class="table table-hover glass-table" data-no-sort>
+            <thead><tr>
+                <th>Vehicle</th><th class="text-end">Revenue (excl GST)</th>
+                <th class="text-end">Fuel</th><th class="text-end">Driver</th><th class="text-end">EMI</th><th class="text-end">Other</th>
+                <th class="text-end">Total Expense</th><th class="text-end">Profit / Loss</th><th class="text-end">Margin</th>
+            </tr></thead>
+            <tbody id="plTable"><tr><td colspan="9" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            <tfoot id="plTotals"></tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const fmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
+
+function shiftMonth(ym, delta){
+    var y=parseInt(ym.slice(0,4)), m=parseInt(ym.slice(5,7));
+    var idx=(y*12+(m-1))+delta;
+    return String(Math.floor(idx/12)).padStart(4,'0')+'-'+String(idx%12+1).padStart(2,'0');
+}
+function syncBilling(){
+    document.getElementById('billMonth').value = shiftMonth(document.getElementById('expMonth').value, 1);
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    var prev = shiftMonth(thisMonthLocal(), -1);
+    document.getElementById('expMonth').value = prev;
+    document.getElementById('billMonth').value = thisMonthLocal();
+    loadReport();
+    loadAlerts();
+});
+
+async function loadReport(){
+    var em=document.getElementById('expMonth').value, bm=document.getElementById('billMonth').value;
+    var res=await fetch('/reports/api/vehicle-pl?expense_month='+em+'&billing_month='+bm);
+    var data=await res.json();
+    var rows=data.rows||[], t=data.totals||{};
+    document.getElementById('tRevenue').textContent=fmt(t.revenue);
+    document.getElementById('tExpense').textContent=fmt(t.total_exp);
+    var plEl=document.getElementById('tPL');
+    plEl.textContent=fmt(t.pl);
+    plEl.className = (t.pl>=0?'text-success':'text-danger');
+    document.getElementById('tMargin').textContent=(t.margin||0).toFixed(1)+'%';
+
+    var tb=document.getElementById('plTable');
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">No vehicle activity for these months</td></tr>'; document.getElementById('plTotals').innerHTML=''; return; }
+    tb.innerHTML = rows.map(function(r){
+        var plCls = r.pl>=0 ? 'text-success' : 'text-danger';
+        return '<tr>'+
+            '<td class="fw-bold">'+r.vehicle+'</td>'+
+            '<td class="text-end fw-bold">'+fmt(r.revenue)+'</td>'+
+            '<td class="text-end">'+fmt(r.fuel)+'</td>'+
+            '<td class="text-end">'+fmt(r.driver)+'</td>'+
+            '<td class="text-end">'+fmt(r.emi)+'</td>'+
+            '<td class="text-end">'+fmt(r.other)+'</td>'+
+            '<td class="text-end fw-bold">'+fmt(r.total_exp)+'</td>'+
+            '<td class="text-end fw-bold '+plCls+'">'+fmt(r.pl)+'</td>'+
+            '<td class="text-end '+plCls+'">'+(r.margin).toFixed(1)+'%</td>'+
+            '</tr>';
+    }).join('');
+    document.getElementById('plTotals').innerHTML =
+        '<tr class="fw-bold" style="background:rgba(212,160,23,0.18)">'+
+        '<td>TOTAL</td>'+
+        '<td class="text-end">'+fmt(t.revenue)+'</td>'+
+        '<td class="text-end">'+fmt(t.fuel)+'</td>'+
+        '<td class="text-end">'+fmt(t.driver)+'</td>'+
+        '<td class="text-end">'+fmt(t.emi)+'</td>'+
+        '<td class="text-end">'+fmt(t.other)+'</td>'+
+        '<td class="text-end">'+fmt(t.total_exp)+'</td>'+
+        '<td class="text-end '+(t.pl>=0?'text-success':'text-danger')+'">'+fmt(t.pl)+'</td>'+
+        '<td class="text-end '+(t.pl>=0?'text-success':'text-danger')+'">'+(t.margin||0).toFixed(1)+'%</td>'+
+        '</tr>';
+}
+
+function exportReport(kind){
+    var em=document.getElementById('expMonth').value, bm=document.getElementById('billMonth').value;
+    window.open('/reports/api/vehicle-pl/'+kind+'?expense_month='+em+'&billing_month='+bm);
+}
+</script>
+{% endblock %}

@@ -31,6 +31,7 @@ async def fuel_page(request: Request):
 @router.get("/api/list")
 async def list_fuel(
     request: Request,
+    month: str = "",
     date_from: str = "",
     date_to: str = "",
     vehicle: str = "",
@@ -43,6 +44,8 @@ async def list_fuel(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = get_all_records("FuelEntries")
+    if month:
+        records = [r for r in records if str(r.get("EntryDate", ""))[:7] == month]
     if date_from:
         records = [r for r in records if str(r.get("EntryDate", "")) >= date_from]
     if date_to:
@@ -103,8 +106,10 @@ async def fuel_stats(request: Request):
     }
 
 
-def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel_type: str) -> list[dict]:
+def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel_type: str, month: str = "") -> list[dict]:
     records = get_all_records("FuelEntries")
+    if month:
+        records = [r for r in records if str(r.get("EntryDate", ""))[:7] == month]
     if date_from:
         records = [r for r in records if str(r.get("EntryDate", "")) >= date_from]
     if date_to:
@@ -120,6 +125,7 @@ def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel
 @router.get("/api/export/excel")
 async def export_excel(
     request: Request,
+    month: str = "",
     date_from: str = "",
     date_to: str = "",
     vehicle: str = "",
@@ -129,7 +135,7 @@ async def export_excel(
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type)
+    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month)
     from utils.exports import to_numeric_df
     df = to_numeric_df(records, ["Litres", "Amount", "Kilometre"])
     buf = io.BytesIO()
@@ -145,6 +151,7 @@ async def export_excel(
 @router.get("/api/export/pdf")
 async def export_pdf(
     request: Request,
+    month: str = "",
     date_from: str = "",
     date_to: str = "",
     vehicle: str = "",
@@ -158,7 +165,7 @@ async def export_pdf(
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
-    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type)
+    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month)
 
     def safe(v, limit=30):
         return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
