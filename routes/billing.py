@@ -200,6 +200,13 @@ async def add_invoice_bills(request: Request):
     if dups:
         return JSONResponse({"error": f"Already billed in {inv_num}: {', '.join(dups)}. Edit the existing bill instead."}, 400)
     from services.sheets_service import build_row
+    # Optional invoice-level GST override -> split across items in proportion to their subtotal
+    def _ov(key):
+        v = data.get(key, "")
+        return float(v) if str(v).strip() != "" else None
+    sgst_override, cgst_override = _ov("SGSTOverride"), _ov("CGSTOverride")
+    grand_sub = sum(float(i.get("FixedAmount", 0) or 0) + float(i.get("VariableAmount", 0) or 0)
+                    + float(i.get("TrafficChallan", 0) or 0) + float(i.get("Tollgates", 0) or 0) for i in items)
     created = []
     for it in items:
         fixed = float(it.get("FixedAmount", 0) or 0)
@@ -207,8 +214,9 @@ async def add_invoice_bills(request: Request):
         challan = float(it.get("TrafficChallan", 0) or 0)
         tolls = float(it.get("Tollgates", 0) or 0)
         sub_total = fixed + variable + tolls + challan
-        sgst = round(sub_total * 0.09, 2)
-        cgst = round(sub_total * 0.09, 2)
+        prop = (sub_total / grand_sub) if grand_sub > 0 else (1 / len(items))
+        sgst = round(sgst_override * prop, 2) if sgst_override is not None else round(sub_total * 0.09, 2)
+        cgst = round(cgst_override * prop, 2) if cgst_override is not None else round(sub_total * 0.09, 2)
         tds = float(it.get("TDS", 0) or 0)
         total = round(sub_total + sgst + cgst - tds, 2)
         bid = gen_id("BILL")
@@ -255,8 +263,9 @@ async def update_bill(request: Request, bill_id: str):
     challan = float(data.get("TrafficChallan", 0) or 0)
     tolls = float(data.get("Tollgates", 0) or 0)
     sub_total = fixed + variable + tolls + challan
-    sgst = round(sub_total * 0.09, 2)
-    cgst = round(sub_total * 0.09, 2)
+    # SGST/CGST default to 9% but can be overridden from the form
+    sgst = round(float(data["SGST"]), 2) if str(data.get("SGST", "")).strip() != "" else round(sub_total * 0.09, 2)
+    cgst = round(float(data["CGST"]), 2) if str(data.get("CGST", "")).strip() != "" else round(sub_total * 0.09, 2)
     tds = float(data.get("TDS", 0) or 0)
     total = round(sub_total + sgst + cgst - tds, 2)
     paid = float(existing.get("PaidAmount", 0) or 0)
