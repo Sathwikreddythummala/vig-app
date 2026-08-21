@@ -45,6 +45,10 @@ SHEET_HEADERS = {
         "AssignmentID", "VehicleID", "VehicleNumber", "DriverID", "DriverName",
         "StartDate", "EndDate", "CreatedDate", "UpdatedDate",
     ],
+    "MileageReports": [
+        "MileageID", "Month", "VehicleNumber", "ApprovedKm", "Litres",
+        "UpdatedBy", "UpdatedDate",
+    ],
     "OutsideVehicles": [
         "OVID", "VehicleNumber", "OwnerName", "MobileNumber",
         "BankName", "AccountNumber", "IFSCCode",
