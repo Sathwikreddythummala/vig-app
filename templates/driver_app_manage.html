@@ -9,10 +9,10 @@
                 <h6 class="mb-0"><i class="bi bi-key text-warning"></i> Driver PINs</h6>
                 <input type="search" class="form-control glass-input" id="pinSearch" placeholder="Search driver..." style="max-width:200px" oninput="renderPins()">
             </div>
-            <p class="text-muted small">Each driver signs in by choosing their name and entering their own PIN (4–6 digits). Set or reset a PIN here, then tell that driver. Leave blank and Save to remove a PIN (that driver can't sign in until it's set again).</p>
+            <p class="text-muted small">Each driver signs in with their <b>mobile number + their PIN</b> (4–6 digits). Set or reset a PIN here, then tell that driver. Leave blank and Save to remove a PIN (that driver can't sign in until it's set again). A driver with no mobile number on file can't sign in — add it on the Drivers page.</p>
             <div class="table-responsive">
                 <table class="table table-hover glass-table align-middle">
-                    <thead><tr><th>Driver</th><th>Vehicle</th><th style="width:150px">PIN</th><th style="width:90px"></th></tr></thead>
+                    <thead><tr><th>Driver</th><th>Mobile</th><th>Vehicle</th><th style="width:150px">PIN</th><th style="width:90px"></th></tr></thead>
                     <tbody id="pinTable"><tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
                 </table>
             </div>
@@ -55,13 +55,15 @@ async function loadPins(){
 
 function renderPins(){
     var q = (document.getElementById('pinSearch').value||'').toLowerCase();
-    var rows = allDrivers.filter(function(d){ return !q || (d.name||'').toLowerCase().indexOf(q)>=0 || (d.vehicle||'').toLowerCase().indexOf(q)>=0; });
+    var rows = allDrivers.filter(function(d){ return !q || (d.name||'').toLowerCase().indexOf(q)>=0 || (d.vehicle||'').toLowerCase().indexOf(q)>=0 || (d.mobile||'').indexOf(q)>=0; });
     var tb = document.getElementById('pinTable');
-    if(!rows.length){ tb.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No drivers</td></tr>'; return; }
+    if(!rows.length){ tb.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No drivers</td></tr>'; return; }
     tb.innerHTML = rows.map(function(d){
         var set = d.pin ? '<span class="badge bg-success ms-1">set</span>' : '<span class="badge bg-secondary ms-1">not set</span>';
+        var mob = d.mobile ? d.mobile : '<span class="text-danger">no mobile</span>';
         return '<tr>' +
             '<td class="fw-bold">'+d.name+set+'</td>' +
+            '<td>'+mob+'</td>' +
             '<td>'+(d.vehicle||'-')+'</td>' +
             '<td><input type="text" inputmode="numeric" maxlength="6" class="form-control form-control-sm glass-input" id="pin_'+d.id+'" value="'+(d.pin||'')+'" placeholder="4–6 digits"></td>' +
             '<td><button class="btn btn-sm btn-warning" onclick="savePin(\''+d.id+'\')"><i class="bi bi-check-lg"></i></button></td>' +

@@ -45,8 +45,8 @@
         <p class="sub">Driver Sign In</p>
 
         <div id="loginForm">
-            <label class="form-label">Who are you?</label>
-            <select class="form-select glass-input name-select" id="nameSelect"><option value="">-- Select your name --</option></select>
+            <label class="form-label">Mobile Number</label>
+            <input type="tel" inputmode="numeric" autocomplete="off" maxlength="10" class="form-control glass-input name-select" id="mobileInput" placeholder="10-digit mobile">
             <label class="form-label mt-3">Your PIN</label>
             <input type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" class="form-control glass-input" id="pinInput" placeholder="• • • •">
             <button class="btn-gold mt-3" id="loginBtn" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Sign In</button>
@@ -59,25 +59,14 @@
     <script>
     function setErr(m){ document.getElementById('errBox').textContent = m || ''; }
 
-    async function loadRoster(){
-        try{
-            var res = await fetch('/driver-portal/api/roster');
-            var data = await res.json();
-            var sel = document.getElementById('nameSelect');
-            sel.innerHTML = '<option value="">-- Select your name --</option>' + (data.drivers||[]).map(function(d){
-                return '<option value="'+d.id+'">'+d.name+(d.vehicle?' ('+d.vehicle+')':'')+'</option>';
-            }).join('');
-        }catch(e){ setErr('Could not load names — check your connection'); }
-    }
-
     async function doLogin(){
-        var driverId = document.getElementById('nameSelect').value;
+        var mobile = document.getElementById('mobileInput').value.replace(/\D/g,'');
         var pin = document.getElementById('pinInput').value.trim();
-        if(!driverId){ setErr('Select your name'); return; }
+        if(!mobile){ setErr('Enter your mobile number'); return; }
         if(!pin){ setErr('Enter your PIN'); return; }
         var btn = document.getElementById('loginBtn'); btn.disabled = true;
         try{
-            var res = await fetch('/driver-portal/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_id:driverId,pin:pin})});
+            var res = await fetch('/driver-portal/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:mobile,pin:pin})});
             var data = await res.json();
             if(data.success){ window.location.href = '/driver-portal'; return; }
             setErr(data.error || 'Sign in failed');
@@ -86,7 +75,6 @@
     }
 
     document.getElementById('pinInput').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
-    loadRoster();
 
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/driver-portal/sw.js', {scope:'/driver-portal/'}).catch(function(){}); }
     </script>

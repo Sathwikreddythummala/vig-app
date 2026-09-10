@@ -163,7 +163,29 @@
       "Bash(bash /c/vigapk/build_apk.sh)",
       "Bash(bash /c/vigapk/sdk36.sh)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('main.py',encoding='utf-8'\\).read\\(\\)\\); print\\('main.py OK'\\)\")",
-      "Bash(git commit -q -m 'Add Digital Asset Links for Android driver app \\(TWA\\) *)"
+      "Bash(git commit -q -m 'Add Digital Asset Links for Android driver app \\(TWA\\) *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://vig-app.onrender.com/driver-portal/login)",
+      "Bash(sed -i 's|bubblewrap build --skipPwaValidation 2>&1|printf \"no\\\\\\\\nno\\\\\\\\n\" | bubblewrap build --skipPwaValidation 2>\\\\&1|' /c/vigapk/build_apk.sh *)",
+      "Bash(curl -s -o /dev/null -w \"prod login:%{http_code}\\\\n\" https://vig-app.onrender.com/driver-portal/login)",
+      "Bash(curl -s -o /dev/null -w \"prod assetlinks:%{http_code}\\\\n\" https://vig-app.onrender.com/.well-known/assetlinks.json)",
+      "Bash(printf 'sdk.dir=C\\\\\\\\:\\\\\\\\\\\\\\\\vigapk\\\\\\\\\\\\\\\\android-sdk\\\\n')",
+      "Bash(bash /c/vigapk/gradle_build.sh)",
+      "Bash(mkdir -p /c/vigapk/t)",
+      "Bash(printf 'org.gradle.jvmargs=-Djava.io.tmpdir=C\\\\\\\\:\\\\\\\\\\\\\\\\vigapk\\\\\\\\\\\\\\\\t -Xmx1536m\\\\norg.gradle.daemon=false\\\\n')",
+      "Bash(bash /c/vigapk/gradle_diag.sh)",
+      "Bash(printf 'sdk.dir=C:/vigapk/android-sdk\\\\n')",
+      "Bash(bash /c/vigapk/sign.sh)",
+      "Bash(/c/vigapk/android-sdk/build-tools/36.1.0/aapt2.exe dump *)",
+      "Bash(curl -s -o /dev/null -w \"driver-portal/login: %{http_code}\\\\n\" https://vig-app.onrender.com/driver-portal/login)",
+      "Bash(curl -s -o /dev/null -w \"assetlinks.json:    %{http_code}\\\\n\" https://vig-app.onrender.com/.well-known/assetlinks.json)",
+      "Bash(curl -s -o /dev/null -w \"icon PNG:           %{http_code}\\\\n\" https://vig-app.onrender.com/static/img/driver-icon-512.png)",
+      "Bash(curl -s -o /dev/null -w \"redirects to: %{redirect_url}\\\\n\" https://vig-app.onrender.com/driver-portal)",
+      "Bash(curl -s -o /dev/null -w \"redirects to: %{redirect_url}\\\\n\" http://localhost:8000/driver-portal)",
+      "Bash(curl -s -o /dev/null -w \"PROD  /driver-portal/login: %{http_code}\\\\n\" https://vig-app.onrender.com/driver-portal/login)",
+      "Bash(curl -s -o /dev/null -w \"LOCAL /driver-portal/login: %{http_code}\\\\n\" http://localhost:8000/driver-portal/login)",
+      "Bash(curl -s -o /dev/null -w \"assetlinks.json: %{http_code}\\\\n\" https://vig-app.onrender.com/.well-known/assetlinks.json)",
+      "Bash(curl -s https://vig-app.onrender.com/driver-portal/login)",
+      "Bash(curl -s https://vig-app.onrender.com/driver-portal/api/roster)"
     ]
   }
 }

@@ -54,6 +54,12 @@ def _active_drivers() -> list[dict]:
     return out
 
 
+def _norm_mobile(s: str) -> str:
+    """Digits only, last 10 (so +91 / spaces / 0-prefix all match)."""
+    digits = "".join(c for c in str(s or "") if c.isdigit())
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
 # ---------------------------------------------------------------------------
 # Per-driver PIN login flow
 # ---------------------------------------------------------------------------
@@ -65,32 +71,21 @@ async def portal_login_page(request: Request):
     return templates.TemplateResponse(request=request, name="driver_login.html", context={})
 
 
-@router.get("/api/roster")
-async def portal_roster(request: Request):
-    """Public list of active drivers (names only) for the login dropdown.
-    PINs are never included here."""
-    drivers = [
-        {"id": d.get("DriverID", ""), "name": d.get("DriverName", ""),
-         "vehicle": d.get("AssignedVehicle", "")}
-        for d in _active_drivers() if d.get("DriverName", "")
-    ]
-    return {"drivers": drivers}
-
-
 @router.post("/api/login")
 async def portal_login(request: Request):
+    """Driver signs in with mobile number + PIN."""
     data = await request.json()
-    driver_id = str(data.get("driver_id", "")).strip()
+    mobile = _norm_mobile(data.get("mobile", ""))
     pin = str(data.get("pin", "")).strip()
-    if not driver_id or not pin:
-        return JSONResponse({"error": "Select your name and enter your PIN"}, 400)
+    if not mobile or not pin:
+        return JSONResponse({"error": "Enter your mobile number and PIN"}, 400)
     driver = None
     for d in _active_drivers():
-        if str(d.get("DriverID", "")).strip() == driver_id:
+        if _norm_mobile(d.get("MobileNumber", "")) and _norm_mobile(d.get("MobileNumber", "")) == mobile:
             driver = d
             break
     if not driver:
-        return JSONResponse({"error": "Driver not found"}, 404)
+        return JSONResponse({"error": "Mobile number not found. Ask the office."}, 404)
     saved_pin = str(driver.get("PortalPIN", "")).strip()
     if not saved_pin:
         return JSONResponse({"error": "Your PIN is not set yet. Ask the office to set it."}, 400)
@@ -183,7 +178,8 @@ async def portal_pins(request: Request):
         return JSONResponse({"error": "Admins only"}, 403)
     drivers = [
         {"id": d.get("DriverID", ""), "name": d.get("DriverName", ""),
-         "vehicle": d.get("AssignedVehicle", ""), "pin": str(d.get("PortalPIN", "")).strip()}
+         "vehicle": d.get("AssignedVehicle", ""), "mobile": str(d.get("MobileNumber", "")).strip(),
+         "pin": str(d.get("PortalPIN", "")).strip()}
         for d in _active_drivers() if d.get("DriverID", "")
     ]
     return {"drivers": drivers}
