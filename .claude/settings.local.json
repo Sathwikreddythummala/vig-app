@@ -112,7 +112,15 @@
       "PowerShell(python \"C:\\\\Users\\\\SATHWI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\E--vig-app\\\\63c8554d-cd93-4209-a043-1b10b763f6ab\\\\scratchpad\\\\check_col.py\" 2>&1)",
       "PowerShell(python -c \"import sys; sys.path.insert\\(0, r'E:\\\\vig-app'\\); from services.db import execute; c=[r['column_name'] for r in execute\\('SELECT column_name FROM information_schema.columns WHERE table_name=%s', ['Billing'], fetch=True\\)]; print\\('WorkingMonth column:', 'WorkingMonth' in c\\)\")",
       "PowerShell(node --check \"C:\\\\Users\\\\SATHWI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\E--vig-app\\\\63c8554d-cd93-4209-a043-1b10b763f6ab\\\\scratchpad\\\\b2.js\" 2>&1)",
-      "PowerShell(python \"C:\\\\Users\\\\SATHWI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\E--vig-app\\\\63c8554d-cd93-4209-a043-1b10b763f6ab\\\\scratchpad\\\\backfill_work.py\")"
+      "PowerShell(python \"C:\\\\Users\\\\SATHWI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\E--vig-app\\\\63c8554d-cd93-4209-a043-1b10b763f6ab\\\\scratchpad\\\\backfill_work.py\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/fuel.py',encoding='utf-8'\\).read\\(\\)\\); print\\('fuel.py OK'\\)\")",
+      "Bash(python -)",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/b790c56a-429d-4c2c-9c78-b70d885d1fba/scratchpad/fuel_check.js\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/auth/login-page)",
+      "Bash(curl -s -o /dev/null -w \"login:%{http_code} \" http://localhost:8000/auth/login-page)",
+      "Bash(curl -s -o /dev/null -w \"credit:%{http_code}\\\\n\" http://localhost:8000/fuel/api/credit)",
+      "Bash(curl -s -o /dev/null -w \"login:%{http_code}\\\\n\" http://localhost:8000/auth/login-page)",
+      "Bash(curl -s -w \"\\\\ncredit_status:%{http_code}\\\\n\" http://localhost:8000/fuel/api/credit)"
     ]
   }
 }

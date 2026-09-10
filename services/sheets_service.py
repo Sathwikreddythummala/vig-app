@@ -98,7 +98,8 @@ SHEET_HEADERS = {
     "FuelEntries": [
         "FuelID", "EntryDate", "VehicleNumber", "DriverName",
         "FuelType", "Litres", "Amount", "Kilometre",
-        "FuelStation", "PaymentMode", "CreatedDate",
+        "FuelStation", "PaymentMode", "PaymentStatus", "PaidDate",
+        "CreatedDate",
     ],
     "OtherEMIs": [
         "EMIID", "EMIName", "Category", "Description", "VehicleNumber",

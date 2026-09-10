@@ -3,16 +3,22 @@
 {% block page_title %}Fuel Management{% endblock %}
 {% block content %}
 <div class="row g-3 mb-4">
-    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-fuel-pump"></i></div><div class="stat-info"><small>Today's Fuel</small><h3 id="statToday">₹0</h3></div></div></div>
-    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-month"><i class="bi bi-calendar-check"></i></div><div class="stat-info"><small>This Month</small><h3 id="statMonth">₹0</h3></div></div></div>
-    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-vehicle"><i class="bi bi-droplet"></i></div><div class="stat-info"><small>Month Litres</small><h3 id="statLitres">0</h3></div></div></div>
-    <div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-receipt"></i></div><div class="stat-info"><small>Month Entries</small><h3 id="statEntries">0</h3></div></div></div>
+    <div class="col-xl col-lg-4 col-md-6"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-expense"><i class="bi bi-fuel-pump"></i></div><div class="stat-info"><small>Today's Fuel</small><h3 id="statToday">₹0</h3></div></div></div>
+    <div class="col-xl col-lg-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-month"><i class="bi bi-calendar-check"></i></div><div class="stat-info"><small>This Month</small><h3 id="statMonth">₹0</h3></div></div></div>
+    <div class="col-xl col-lg-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-vehicle"><i class="bi bi-droplet"></i></div><div class="stat-info"><small>Month Litres</small><h3 id="statLitres">0</h3></div></div></div>
+    <div class="col-xl col-lg-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-receipt"></i></div><div class="stat-info"><small>Month Entries</small><h3 id="statEntries">0</h3></div></div></div>
+    <div class="col-xl col-lg-4 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.4s;cursor:pointer" onclick="showCreditTab()"><div class="stat-icon" style="background:linear-gradient(135deg,#f44336,#e57373)"><i class="bi bi-hourglass-split"></i></div><div class="stat-info"><small>Credit Outstanding</small><h3 id="statCredit" class="text-danger">₹0</h3></div></div></div>
 </div>
 <div class="row g-3 mb-4">
     <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.4s"><h6><i class="bi bi-bar-chart"></i> Vehicle Wise Fuel</h6><div id="vehicleChart"></div></div></div>
     <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.5s"><h6><i class="bi bi-pie-chart"></i> Driver Wise Fuel</h6><div id="driverChart"></div></div></div>
     <div class="col-lg-4"><div class="glass-card chart-card animate-in" style="animation-delay:0.6s"><h6><i class="bi bi-graph-up"></i> Monthly Trend</h6><div id="trendChart"></div></div></div>
 </div>
+<ul class="nav nav-pills mb-3 animate-in" style="animation-delay:0.65s">
+    <li class="nav-item"><button class="nav-link active" id="tabBtnAll" onclick="switchFuelTab('all')"><i class="bi bi-list-ul"></i> All Entries</button></li>
+    <li class="nav-item"><button class="nav-link" id="tabBtnCredit" onclick="switchFuelTab('credit')"><i class="bi bi-hourglass-split"></i> Credit Ledger <span class="badge bg-danger ms-1" id="creditTabBadge" style="display:none">0</span></button></li>
+</ul>
+<div id="tabAll">
 <div class="glass-card mb-3 animate-in" style="animation-delay:0.7s">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -22,6 +28,7 @@
             <select class="form-select glass-input" id="filterVehicle" style="width:160px"><option value="">All Vehicles</option></select>
             <select class="form-select glass-input" id="filterDriver" style="width:160px"><option value="">All Drivers</option></select>
             <select class="form-select glass-input" id="filterFuelType" style="width:140px"><option value="">All Types</option><option>Diesel</option><option>AdBlue</option><option>Engine Oil</option><option>Coolant</option></select>
+            <select class="form-select glass-input" id="filterPaymentStatus" style="width:140px" onchange="loadFuel()"><option value="">Paid &amp; Unpaid</option><option>Paid</option><option>Unpaid</option></select>
             <button class="btn btn-warning btn-sm" onclick="loadFuel()"><i class="bi bi-funnel"></i> Filter</button>
         </div>
         <div class="d-flex gap-2">
@@ -38,11 +45,27 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover glass-table">
-            <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Fuel Type</th><th>Litres</th><th>Amount</th><th>KM Reading</th><th>Station</th><th>Payment</th><th>Actions</th></tr></thead>
-            <tbody id="fuelTable"><tr><td colspan="9" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Fuel Type</th><th>Litres</th><th>Amount</th><th>KM Reading</th><th>Station</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="fuelTable"><tr><td colspan="11" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
         </table>
     </div>
     <nav id="pagination" class="d-flex justify-content-center mt-3"></nav>
+</div>
+</div>
+<div id="tabCredit" style="display:none">
+    <div class="glass-card mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h6 class="mb-0"><i class="bi bi-hourglass-split text-danger"></i> Diesel / Fuel bought on credit — unpaid by station</h6>
+                <small class="text-muted">Entries marked <b>Unpaid</b> are shown here. Settle them once you pay the fuel station.</small>
+            </div>
+            <div class="text-end">
+                <small class="text-muted d-block">Total Outstanding</small>
+                <h4 class="text-danger mb-0" id="creditTotal">₹0</h4>
+            </div>
+        </div>
+    </div>
+    <div id="creditStations"><div class="text-center py-4"><div class="spinner-border spinner-border-sm text-warning"></div></div></div>
 </div>
 <div class="modal fade" id="fuelModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg">
@@ -61,10 +84,14 @@
                         <div class="col-md-3"><label class="form-label">Litres</label><input type="number" class="form-control glass-input" id="fLitres" min="0" step="0.01"></div>
                         <div class="col-md-3"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="fAmount" required min="0" step="0.01"></div>
                         <div class="col-md-3"><label class="form-label">KM Reading</label><input type="number" class="form-control glass-input" id="fKM" min="0"></div>
+                        <div class="col-md-3"><label class="form-label">Payment Status</label>
+                            <select class="form-select glass-input" id="fPayStatus" onchange="onPayStatusChange()"><option>Paid</option><option>Unpaid</option></select>
+                        </div>
                         <div class="col-md-3"><label class="form-label">Payment Mode</label>
                             <select class="form-select glass-input" id="fPayMode"><option>Cash</option><option>UPI</option><option>Card</option><option>Company Account</option></select>
                         </div>
-                        <div class="col-md-6"><label class="form-label">Fuel Station</label><input type="text" class="form-control glass-input" id="fStation"></div>
+                        <div class="col-md-6"><label class="form-label" id="fStationLabel">Fuel Station</label><input type="text" class="form-control glass-input" id="fStation" placeholder="Which fuel station / bunk"></div>
+                        <div class="col-md-12" id="creditHint" style="display:none"><div class="alert alert-warning py-2 mb-0"><i class="bi bi-info-circle"></i> This entry is on <b>credit (unpaid)</b>. Enter the fuel station so you can track what is owed. It will appear in the Credit Ledger until settled.</div></div>
                         <div class="col-md-12"><label class="form-label">Fuel Bill Document</label><input type="file" class="form-control glass-input" id="fFile" accept="image/*,.pdf"><small class="text-muted">Optional — attach fuel bill copy (PDF/image)</small></div>
                     </div>
                 </form>
@@ -80,6 +107,7 @@
 {% block scripts %}
 <script>
 var currentPage = 1;
+var currentTab = 'all';
 var allVehicles = [], allDrivers = [], allFuelData = [];
 var fuelModalEl = document.getElementById('fuelModal');
 
@@ -98,6 +126,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     allDrivers.forEach(function(d){ fDrv.innerHTML += '<option value="'+d.DriverName+'">'+d.DriverName+'</option>'; mDrv.innerHTML += '<option value="'+d.DriverName+'">'+d.DriverName+'</option>'; });
     loadFuel();
     loadStats();
+    loadCredit();
     loadAlerts();
 });
 
@@ -107,6 +136,7 @@ async function loadStats() {
     document.getElementById('statMonth').textContent = '₹'+Number(s.total_month||0).toLocaleString('en-IN');
     document.getElementById('statLitres').textContent = Number(s.month_litres||0).toLocaleString('en-IN');
     document.getElementById('statEntries').textContent = s.month_entries||0;
+    document.getElementById('statCredit').textContent = '₹'+Number(s.credit_outstanding||0).toLocaleString('en-IN');
     if (s.vehicle_wise && s.vehicle_wise.labels.length) {
         new ApexCharts(document.getElementById('vehicleChart'),{chart:{type:'bar',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel ₹',data:s.vehicle_wise.values}],xaxis:{categories:s.vehicle_wise.labels},colors:['#FFD54F'],plotOptions:{bar:{borderRadius:6,columnWidth:'50%'}}}).render();
     } else { document.getElementById('vehicleChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
@@ -120,7 +150,7 @@ async function loadStats() {
 
 async function loadFuel(page) {
     currentPage = page||1;
-    var params = new URLSearchParams({page:currentPage,month:document.getElementById('filterMonth').value,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,driver:document.getElementById('filterDriver').value,fuel_type:document.getElementById('filterFuelType').value});
+    var params = new URLSearchParams({page:currentPage,month:document.getElementById('filterMonth').value,date_from:document.getElementById('filterDateFrom').value,date_to:document.getElementById('filterDateTo').value,vehicle:document.getElementById('filterVehicle').value,driver:document.getElementById('filterDriver').value,fuel_type:document.getElementById('filterFuelType').value,payment_status:document.getElementById('filterPaymentStatus').value});
     var res = await fetch('/fuel/api/list?'+params); var data = await res.json();
     document.getElementById('totalAmount').textContent = '₹'+Number(data.total_amount||0).toLocaleString('en-IN');
     document.getElementById('totalLitres').textContent = Number(data.total_litres||0).toLocaleString('en-IN');
@@ -138,11 +168,12 @@ async function loadFuel(page) {
                 '<td>'+(e.Kilometre||'-')+'</td>' +
                 '<td>'+(e.FuelStation||'-')+'</td>' +
                 '<td>'+(e.PaymentMode||'-')+'</td>' +
+                '<td>'+statusBadge(e.PaymentStatus)+'</td>' +
                 '<td><button class="btn btn-sm btn-outline-warning" onclick="editFuel(\''+e.FuelID+'\')"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteFuel(\''+e.FuelID+'\')"><i class="bi bi-trash"></i></button></td>' +
                 '</tr>';
         }).join('');
     } else {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No fuel entries yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No fuel entries yet</td></tr>';
     }
     renderPagination(data.total_pages||1, currentPage);
 }
@@ -167,6 +198,8 @@ function resetFuelForm() {
     document.getElementById('fuelId').value = '';
     document.getElementById('fuelModalTitle').textContent = 'Add Fuel Entry';
     document.getElementById('fDate').value = todayLocal();
+    document.getElementById('fPayStatus').value = 'Paid';
+    onPayStatusChange();
 }
 
 function editFuel(fid) {
@@ -184,6 +217,8 @@ function editFuel(fid) {
         document.getElementById('fKM').value = e.Kilometre||'';
         document.getElementById('fStation').value = e.FuelStation||'';
         document.getElementById('fPayMode').value = e.PaymentMode||'Cash';
+        document.getElementById('fPayStatus').value = (e.PaymentStatus||'Paid')==='Unpaid'?'Unpaid':'Paid';
+        onPayStatusChange();
         bootstrap.Modal.getOrCreateInstance(fuelModalEl).show();
     });
 }
@@ -205,14 +240,16 @@ async function saveFuel() {
         Kilometre: document.getElementById('fKM').value,
         FuelStation: document.getElementById('fStation').value,
         PaymentMode: document.getElementById('fPayMode').value,
+        PaymentStatus: document.getElementById('fPayStatus').value,
     };
     if (!payload.EntryDate || !payload.VehicleNumber || !payload.Amount) { showToast('Fill required fields','danger'); return; }
+    if (payload.PaymentStatus==='Unpaid' && !payload.FuelStation.trim()) { showToast('Enter the fuel station for credit (unpaid) fuel','danger'); return; }
     try {
         var url = id ? '/fuel/api/'+id : '/fuel/api/add';
         var method = id ? 'PUT' : 'POST';
         var res = await fetch(url, { method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
         var data = await res.json();
-        if (data.success) { await uploadEntityDoc('fFile','Fuel', id||data.fuel_id, 'Receipt'); hideFuelModal(); showToast(id?'Updated':'Added','success'); loadFuel(currentPage); }
+        if (data.success) { await uploadEntityDoc('fFile','Fuel', id||data.fuel_id, 'Receipt'); hideFuelModal(); showToast(id?'Updated':'Added','success'); loadFuel(currentPage); loadStats(); if(currentTab==='credit') loadCredit(); }
         else { showToast(data.error||'Failed','danger'); }
     } catch(err) { showToast('Network error','danger'); }
 }
@@ -222,7 +259,86 @@ async function deleteFuel(id) {
     try {
         var res = await fetch('/fuel/api/'+id, { method:'DELETE' });
         var data = await res.json();
-        if (data.success) { showToast('Deleted','success'); loadFuel(currentPage); }
+        if (data.success) { showToast('Deleted','success'); loadFuel(currentPage); loadStats(); if(currentTab==='credit') loadCredit(); }
+        else { showToast(data.error||'Failed','danger'); }
+    } catch(err) { showToast('Network error','danger'); }
+}
+
+function statusBadge(st) {
+    if ((st||'')==='Unpaid') return '<span class="badge bg-danger"><i class="bi bi-hourglass-split"></i> Unpaid</span>';
+    return '<span class="badge bg-success">Paid</span>';
+}
+
+function onPayStatusChange() {
+    var unpaid = document.getElementById('fPayStatus').value === 'Unpaid';
+    document.getElementById('creditHint').style.display = unpaid ? 'block' : 'none';
+    document.getElementById('fStationLabel').innerHTML = unpaid ? 'Fuel Station <span class="text-danger">*</span>' : 'Fuel Station';
+}
+
+function switchFuelTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabAll').style.display = tab==='all' ? 'block' : 'none';
+    document.getElementById('tabCredit').style.display = tab==='credit' ? 'block' : 'none';
+    document.getElementById('tabBtnAll').classList.toggle('active', tab==='all');
+    document.getElementById('tabBtnCredit').classList.toggle('active', tab==='credit');
+    if (tab==='credit') loadCredit();
+}
+
+function showCreditTab() { switchFuelTab('credit'); }
+
+async function loadCredit() {
+    var box = document.getElementById('creditStations');
+    box.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-warning"></div></div>';
+    var res = await fetch('/fuel/api/credit'); var data = await res.json();
+    document.getElementById('creditTotal').textContent = '₹'+Number(data.total_outstanding||0).toLocaleString('en-IN');
+    var badge = document.getElementById('creditTabBadge');
+    if (data.total_entries) { badge.style.display='inline-block'; badge.textContent = data.total_entries; }
+    else { badge.style.display='none'; }
+    if (!data.stations || !data.stations.length) {
+        box.innerHTML = '<div class="glass-card text-center text-muted py-5"><i class="bi bi-check2-circle fs-1 text-success"></i><p class="mt-2 mb-0">No unpaid fuel. All credit is settled.</p></div>';
+        return;
+    }
+    box.innerHTML = data.stations.map(function(s) {
+        var rows = s.entries.map(function(e) {
+            return '<tr>' +
+                '<td>'+e.EntryDate+'</td>' +
+                '<td class="fw-bold">'+e.VehicleNumber+'</td>' +
+                '<td>'+(e.DriverName||'-')+'</td>' +
+                '<td><span class="badge bg-warning text-dark">'+(e.FuelType||'Diesel')+'</span></td>' +
+                '<td>'+(e.Litres||'-')+'</td>' +
+                '<td class="fw-bold text-danger">₹'+Number(e.Amount||0).toLocaleString('en-IN')+'</td>' +
+                '<td><button class="btn btn-sm btn-success" onclick="settleEntry(\''+e.FuelID+'\')"><i class="bi bi-cash-coin"></i> Mark Paid</button></td>' +
+                '</tr>';
+        }).join('');
+        return '<div class="glass-card mb-3">' +
+            '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">' +
+                '<h6 class="mb-0"><i class="bi bi-shop text-warning"></i> '+s.station+' <span class="text-muted">('+s.count+' entr'+(s.count===1?'y':'ies')+')</span></h6>' +
+                '<div class="d-flex align-items-center gap-3">' +
+                    '<span class="fw-bold">Owed: <span class="text-danger">₹'+Number(s.total||0).toLocaleString('en-IN')+'</span></span>' +
+                    '<button class="btn btn-sm btn-success" onclick="settleStation(\''+s.station.replace(/\x27/g,"\\\x27")+'\','+s.total+')"><i class="bi bi-check2-all"></i> Settle All</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="table-responsive"><table class="table table-sm table-hover glass-table mb-0" data-no-sort>' +
+            '<thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Type</th><th>Litres</th><th>Amount</th><th>Action</th></tr></thead>' +
+            '<tbody>'+rows+'</tbody></table></div></div>';
+    }).join('');
+}
+
+async function settleEntry(fid) {
+    if (!confirm('Mark this fuel entry as Paid?')) return;
+    await settleRequest({fuel_ids:[fid]});
+}
+
+async function settleStation(station, total) {
+    if (!confirm('Mark ALL unpaid fuel for "'+station+'" as Paid?\nTotal: ₹'+Number(total||0).toLocaleString('en-IN'))) return;
+    await settleRequest({station:station});
+}
+
+async function settleRequest(body) {
+    try {
+        var res = await fetch('/fuel/api/settle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        var data = await res.json();
+        if (data.success) { showToast('Settled '+data.settled+' entr'+(data.settled===1?'y':'ies'),'success'); loadCredit(); loadStats(); loadFuel(currentPage); }
         else { showToast(data.error||'Failed','danger'); }
     } catch(err) { showToast('Network error','danger'); }
 }
@@ -235,6 +351,7 @@ function fuelExportParams() {
         vehicle: document.getElementById('filterVehicle').value,
         driver: document.getElementById('filterDriver').value,
         fuel_type: document.getElementById('filterFuelType').value,
+        payment_status: document.getElementById('filterPaymentStatus').value,
     });
 }
 
