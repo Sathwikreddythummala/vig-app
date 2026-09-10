@@ -121,6 +121,24 @@ async def company_profile_page(request: Request):
     return _templates.TemplateResponse(request=request, name="company_profile.html", context={"user": user})
 
 
+@app.get("/.well-known/assetlinks.json")
+async def assetlinks():
+    """Digital Asset Links so the Android driver app (TWA) opens without a URL bar."""
+    from fastapi.responses import JSONResponse as _JSON
+    return _JSON([
+        {
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+                "namespace": "android_app",
+                "package_name": "com.vigneshwara.fleetdriver",
+                "sha256_cert_fingerprints": [
+                    "3B:C2:0D:86:BC:B2:3C:06:57:13:31:08:CB:EC:F9:D6:6F:DB:7C:25:AC:19:87:9A:02:07:E9:98:A3:03:73:4A"
+                ],
+            },
+        }
+    ])
+
+
 @app.get("/company/logo")
 async def company_logo(request: Request):
     """Streams the current company logo (latest uploaded), used by the sidebar app-wide."""
