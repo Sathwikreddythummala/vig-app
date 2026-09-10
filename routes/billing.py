@@ -69,6 +69,7 @@ async def list_bills(
     date_from: str = "",
     date_to: str = "",
     month: str = "",
+    working_month: str = "",
     vehicle: str = "",
     vendor: str = "",
     status: str = "",
@@ -82,6 +83,8 @@ async def list_bills(
     records = list(all_records)
     if month:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) == month]
+    if working_month:
+        records = [r for r in records if str(r.get("WorkingMonth", "")) == working_month]
     if date_from:
         records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) >= date_from[:7]]
     if date_to:
@@ -225,6 +228,7 @@ async def add_invoice_bills(request: Request):
             "BillType": data.get("BillType", ""),
             "InvoiceDate": data.get("InvoiceDate", ""),
             "PaymentMonth": data.get("PaymentMonth", ""),
+            "WorkingMonth": data.get("WorkingMonth", ""),
             "VehicleNumber": it.get("VehicleNumber", ""),
             "VendorName": it.get("VendorName", ""),
             "FixedAmount": fixed, "VariableAmount": variable,
@@ -409,9 +413,11 @@ async def add_receivable(request: Request):
             proportion = (bill_balance / total_balance) if total_balance > 0 else (1 / len(inv_bills))
             split_amount = round(total_payment * proportion, 2)
             rid = gen_id("RCV")
+            # attribute the receivable to the invoice's own payment month (form no longer asks it)
+            bill_pay_month = str(b.get("PaymentMonth", "")).strip() or str(b.get("InvoiceDate", ""))[:7] or payment_month
             vals = {**{k: v for k, v in data.items() if k != "Invoices"},
                     "ReceivableID": rid, "BillID": b["BillID"], "Amount": split_amount,
-                    "PaymentMonth": payment_month, "PaymentMode": data.get("PaymentMode", "Bank Transfer"),
+                    "PaymentMonth": bill_pay_month, "PaymentMode": data.get("PaymentMode", "Bank Transfer"),
                     "Description": (data.get("Description", "") + f" [{b.get('InvoiceNumber','')}]").strip(),
                     "CreatedDate": now_str()}
             append_row("Receivables", build_row("Receivables", vals))

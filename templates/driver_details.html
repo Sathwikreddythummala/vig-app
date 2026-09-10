@@ -48,15 +48,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadDriverDetails() {
     const monthParam = selectedMonth ? `?month=${selectedMonth}` : '';
-    const [detRes, incRes] = await Promise.all([
+    const [detRes, vsRes] = await Promise.all([
         fetch(`/drivers/api/${driverId}`),
-        fetch(`/drivers/api/salaries${monthParam}`)
+        fetch(`/drivers/api/vehicle-salaries${monthParam}`)   // vehicle-wise salary (same as Salaries page)
     ]);
     const data = await detRes.json();
     if (data.error) { document.getElementById('driverDetailsContent').innerHTML = '<div class="alert alert-danger">Driver not found</div>'; return; }
-    const salData = await incRes.json();
-    const salRow = (salData.salaries || []).find(r => r.DriverID === driverId);
-    data.incentive = salRow ? salRow.Incentive : 0;
+    const vs = await vsRes.json();
+    const dname = (data.driver && data.driver.DriverName) || '';
+    const myRows = (vs.rows || []).filter(r => (r.DriverID && r.DriverID === driverId) || r.DriverName === dname);
+    // gross salary = sum across the vehicles this driver ran that month; incentive sits on the driver's first row
+    data.vehicleGross = myRows.reduce((s, r) => s + parseFloat(r.Gross || 0), 0);
+    data.incentive = myRows.reduce((s, r) => s + parseFloat(r.Incentive || 0), 0);
     allDriverData = data;
     renderDriverDetails();
 }
@@ -106,7 +109,7 @@ function filterByMonth(expenses, month) {
 
 function onMonthChange() {
     selectedMonth = document.getElementById('drvMonthFilter').value;
-    renderDriverDetails();
+    loadDriverDetails();   // re-fetch so the vehicle-wise salary matches the chosen month
 }
 
 function renderDriverDetails() {
@@ -127,8 +130,9 @@ function renderDriverDetails() {
     const totalDeductions = deductions.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
     const totalOther = otherExp.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
     const totalExp = expenses.reduce((s,e) => s + parseFloat(e.Amount||0), 0);
-    const profileSalary = parseFloat(d.Salary || 0);
-    const effectiveSalary = selectedMonth ? profileSalary : 0;
+    // Salary is vehicle-wise now (from the vehicles this driver ran), not the old profile Salary field
+    const vehicleGross = parseFloat(allDriverData.vehicleGross || 0);
+    const effectiveSalary = selectedMonth ? vehicleGross : 0;
     // Incentive from allDriverData (fetched separately per month)
     const totalIncentive = parseFloat(allDriverData.incentive || 0);
     const netPayable = effectiveSalary + totalIncentive - totalAdvance - totalMeals - totalDeductions - totalOther;
@@ -153,7 +157,7 @@ function renderDriverDetails() {
         </div>
     </div>
     <div class="row g-3 mb-3">
-        <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Salary (₹${profileSalary.toLocaleString('en-IN')}/mo)</small><h4>₹${effectiveSalary.toLocaleString('en-IN')}</h4></div></div></div>
+        <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in"><div class="stat-icon bg-month"><i class="bi bi-cash"></i></div><div class="stat-info"><small>Salary (vehicle)</small><h4>₹${effectiveSalary.toLocaleString('en-IN')}</h4></div></div></div>
         <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.05s"><div class="stat-icon bg-driver"><i class="bi bi-star"></i></div><div class="stat-info"><small>Incentive ${selectedMonth?`<button class="btn btn-link btn-sm p-0 ms-1" style="font-size:11px;vertical-align:middle" onclick="editIncentive()" title="Edit"><i class="bi bi-pencil"></i></button>`:''}</small><h4 class="text-success" id="incentiveDisplay">₹${totalIncentive.toLocaleString('en-IN')}</h4></div></div></div>
         <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-arrow-up-circle"></i></div><div class="stat-info"><small>Advance</small><h4 class="text-danger">₹${totalAdvance.toLocaleString('en-IN')}</h4></div></div></div>
         <div class="col-xl-2 col-md-4"><div class="glass-card stat-card animate-in" style="animation-delay:0.15s"><div class="stat-icon bg-driver"><i class="bi bi-cup-hot"></i></div><div class="stat-info"><small>Meals</small><h4 class="text-danger">₹${totalMeals.toLocaleString('en-IN')}</h4></div></div></div>
@@ -169,7 +173,7 @@ function renderDriverDetails() {
     <div class="glass-card mb-3 animate-in" style="animation-delay:0.35s">
         <h6><i class="bi bi-calculator"></i> Monthly Summary — ${monthLabel}</h6><hr>
         <div style="max-width:400px">
-            <div class="d-flex justify-content-between py-1"><span>Salary (profile)</span><strong class="text-success">₹${profileSalary.toLocaleString('en-IN')}</strong></div>
+            <div class="d-flex justify-content-between py-1"><span>Salary (vehicle)</span><strong class="text-success">₹${effectiveSalary.toLocaleString('en-IN')}</strong></div>
             <div class="d-flex justify-content-between py-1"><span>+ Incentive</span><strong class="${totalIncentive>0?'text-success':'text-muted'}">${totalIncentive>0?'₹'+totalIncentive.toLocaleString('en-IN'):'-'}</strong></div>
             <div class="d-flex justify-content-between py-1"><span>− Advance</span><strong class="text-danger">₹${totalAdvance.toLocaleString('en-IN')}</strong></div>
             <div class="d-flex justify-content-between py-1"><span>− Meals</span><strong class="text-danger">₹${totalMeals.toLocaleString('en-IN')}</strong></div>
