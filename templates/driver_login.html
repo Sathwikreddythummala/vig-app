@@ -44,19 +44,12 @@
         <h4>Vigneshwara Fleet</h4>
         <p class="sub">Driver Sign In</p>
 
-        <!-- Step 1: access code -->
-        <div class="step active" id="step1">
-            <label class="form-label">Enter Access Code</label>
-            <input type="text" inputmode="text" autocomplete="off" class="form-control glass-input" id="codeInput" placeholder="• • • •" autofocus>
-            <button class="btn-gold mt-3" id="codeBtn" onclick="checkCode()"><i class="bi bi-arrow-right-circle"></i> Continue</button>
-        </div>
-
-        <!-- Step 2: choose driver -->
-        <div class="step" id="step2">
+        <div id="loginForm">
             <label class="form-label">Who are you?</label>
             <select class="form-select glass-input name-select" id="nameSelect"><option value="">-- Select your name --</option></select>
+            <label class="form-label mt-3">Your PIN</label>
+            <input type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" class="form-control glass-input" id="pinInput" placeholder="• • • •">
             <button class="btn-gold mt-3" id="loginBtn" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Sign In</button>
-            <a href="#" class="backlink" onclick="backToCode();return false"><i class="bi bi-chevron-left"></i> Back</a>
         </div>
 
         <div class="err" id="errBox"></div>
@@ -64,39 +57,27 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    var savedCode = '';
     function setErr(m){ document.getElementById('errBox').textContent = m || ''; }
-    function showStep(n){
-        document.getElementById('step1').classList.toggle('active', n===1);
-        document.getElementById('step2').classList.toggle('active', n===2);
-        setErr('');
-    }
-    function backToCode(){ showStep(1); document.getElementById('codeInput').focus(); }
 
-    async function checkCode(){
-        var code = document.getElementById('codeInput').value.trim();
-        if(!code){ setErr('Enter the access code'); return; }
-        var btn = document.getElementById('codeBtn'); btn.disabled = true;
+    async function loadRoster(){
         try{
-            var res = await fetch('/driver-portal/api/verify-code', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
+            var res = await fetch('/driver-portal/api/roster');
             var data = await res.json();
-            if(!res.ok || data.error){ setErr(data.error || 'Wrong code'); btn.disabled=false; return; }
-            savedCode = code;
             var sel = document.getElementById('nameSelect');
             sel.innerHTML = '<option value="">-- Select your name --</option>' + (data.drivers||[]).map(function(d){
-                return '<option value="'+d.name.replace(/"/g,'&quot;')+'">'+d.name+(d.vehicle?' ('+d.vehicle+')':'')+'</option>';
+                return '<option value="'+d.id+'">'+d.name+(d.vehicle?' ('+d.vehicle+')':'')+'</option>';
             }).join('');
-            showStep(2);
-        }catch(e){ setErr('Network error'); }
-        btn.disabled = false;
+        }catch(e){ setErr('Could not load names — check your connection'); }
     }
 
     async function doLogin(){
-        var name = document.getElementById('nameSelect').value;
-        if(!name){ setErr('Select your name'); return; }
+        var driverId = document.getElementById('nameSelect').value;
+        var pin = document.getElementById('pinInput').value.trim();
+        if(!driverId){ setErr('Select your name'); return; }
+        if(!pin){ setErr('Enter your PIN'); return; }
         var btn = document.getElementById('loginBtn'); btn.disabled = true;
         try{
-            var res = await fetch('/driver-portal/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:savedCode,name:name})});
+            var res = await fetch('/driver-portal/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_id:driverId,pin:pin})});
             var data = await res.json();
             if(data.success){ window.location.href = '/driver-portal'; return; }
             setErr(data.error || 'Sign in failed');
@@ -104,7 +85,8 @@
         btn.disabled = false;
     }
 
-    document.getElementById('codeInput').addEventListener('keydown', function(e){ if(e.key==='Enter') checkCode(); });
+    document.getElementById('pinInput').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+    loadRoster();
 
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/driver-portal/sw.js', {scope:'/driver-portal/'}).catch(function(){}); }
     </script>

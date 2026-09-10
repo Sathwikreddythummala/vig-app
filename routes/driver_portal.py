@@ -12,8 +12,6 @@ _IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter(prefix="/driver-portal", tags=["driver-portal"])
 
-PORTAL_CODE_KEY = "DriverPortalCode"
-
 
 # ---------------------------------------------------------------------------
 # Identity: a driver may arrive two ways —
@@ -56,30 +54,8 @@ def _active_drivers() -> list[dict]:
     return out
 
 
-def get_portal_code() -> str:
-    for s in get_all_records("Settings"):
-        if str(s.get("Key", "")) == PORTAL_CODE_KEY:
-            return str(s.get("Value", "")).strip()
-    return ""
-
-
-def set_portal_code(code: str):
-    code = str(code).strip()
-    existing = None
-    for s in get_all_records("Settings"):
-        if str(s.get("Key", "")) == PORTAL_CODE_KEY:
-            existing = s
-            break
-    if existing:
-        row = build_row("Settings", {"Key": PORTAL_CODE_KEY, "Value": code, "UpdatedDate": now_str()})
-        update_row("Settings", PORTAL_CODE_KEY, row)
-    else:
-        row = build_row("Settings", {"Key": PORTAL_CODE_KEY, "Value": code, "UpdatedDate": now_str()})
-        append_row("Settings", row)
-
-
 # ---------------------------------------------------------------------------
-# Shared-code login flow
+# Per-driver PIN login flow
 # ---------------------------------------------------------------------------
 @router.get("/login")
 async def portal_login_page(request: Request):
@@ -89,54 +65,51 @@ async def portal_login_page(request: Request):
     return templates.TemplateResponse(request=request, name="driver_login.html", context={})
 
 
-@router.post("/api/verify-code")
-async def verify_code(request: Request):
-    data = await request.json()
-    code = str(data.get("code", "")).strip()
-    portal_code = get_portal_code()
-    if not portal_code:
-        return JSONResponse({"error": "Driver app access code is not set yet. Ask the office to set it."}, 400)
-    if code != portal_code:
-        return JSONResponse({"error": "Wrong access code"}, 401)
-    # Code ok -> allow fetching the roster for this attempt.
-    request.session["portal_code_ok"] = True
+@router.get("/api/roster")
+async def portal_roster(request: Request):
+    """Public list of active drivers (names only) for the login dropdown.
+    PINs are never included here."""
     drivers = [
-        {"name": d.get("DriverName", ""), "vehicle": d.get("AssignedVehicle", "")}
+        {"id": d.get("DriverID", ""), "name": d.get("DriverName", ""),
+         "vehicle": d.get("AssignedVehicle", "")}
         for d in _active_drivers() if d.get("DriverName", "")
     ]
-    return {"success": True, "drivers": drivers}
+    return {"drivers": drivers}
 
 
 @router.post("/api/login")
 async def portal_login(request: Request):
     data = await request.json()
-    code = str(data.get("code", "")).strip()
-    name = str(data.get("name", "")).strip()
-    portal_code = get_portal_code()
-    if not portal_code or code != portal_code:
-        return JSONResponse({"error": "Wrong access code"}, 401)
+    driver_id = str(data.get("driver_id", "")).strip()
+    pin = str(data.get("pin", "")).strip()
+    if not driver_id or not pin:
+        return JSONResponse({"error": "Select your name and enter your PIN"}, 400)
     driver = None
     for d in _active_drivers():
-        if str(d.get("DriverName", "")).strip() == name:
+        if str(d.get("DriverID", "")).strip() == driver_id:
             driver = d
             break
     if not driver:
-        return JSONResponse({"error": "Select your name"}, 400)
-    request.session.pop("portal_code_ok", None)
+        return JSONResponse({"error": "Driver not found"}, 404)
+    saved_pin = str(driver.get("PortalPIN", "")).strip()
+    if not saved_pin:
+        return JSONResponse({"error": "Your PIN is not set yet. Ask the office to set it."}, 400)
+    if pin != saved_pin:
+        return JSONResponse({"error": "Wrong PIN"}, 401)
     request.session["portal_driver"] = {
+        "id": driver.get("DriverID", ""),
         "name": driver.get("DriverName", ""),
         "vehicle": driver.get("AssignedVehicle", ""),
     }
     add_audit_log("LOGIN", "DriverPortal", driver.get("DriverID", ""),
-                  f"Driver {driver.get('DriverName','')} signed in via access code", "driver-portal")
+                  f"Driver {driver.get('DriverName','')} signed in", "driver-portal")
     return {"success": True}
 
 
 @router.get("/logout")
 async def portal_logout(request: Request):
-    # Clear both the shared-code session and (if present) a Google driver session.
+    # Clear both the PIN session and (if present) a Google driver session.
     request.session.pop("portal_driver", None)
-    request.session.pop("portal_code_ok", None)
     if request.session.get("user"):
         request.session.clear()
     return RedirectResponse("/driver-portal/login")
@@ -199,23 +172,42 @@ async def portal_manage(request: Request):
     if user.get("role") not in ("admin", "editor"):
         return RedirectResponse("/driver-portal")
     return templates.TemplateResponse(
-        request=request, name="driver_app_manage.html",
-        context={"user": user, "code": get_portal_code()},
+        request=request, name="driver_app_manage.html", context={"user": user},
     )
 
 
-@router.post("/api/set-code")
-async def portal_set_code(request: Request):
+@router.get("/api/pins")
+async def portal_pins(request: Request):
+    """Admin view: active drivers and their current PIN, so the office can set/reset them."""
+    if not _is_admin_user(request):
+        return JSONResponse({"error": "Admins only"}, 403)
+    drivers = [
+        {"id": d.get("DriverID", ""), "name": d.get("DriverName", ""),
+         "vehicle": d.get("AssignedVehicle", ""), "pin": str(d.get("PortalPIN", "")).strip()}
+        for d in _active_drivers() if d.get("DriverID", "")
+    ]
+    return {"drivers": drivers}
+
+
+@router.post("/api/set-pin")
+async def portal_set_pin(request: Request):
     if not _is_admin_user(request):
         return JSONResponse({"error": "Admins only"}, 403)
     data = await request.json()
-    code = str(data.get("code", "")).strip()
-    if len(code) < 4:
-        return JSONResponse({"error": "Use at least 4 characters"}, 400)
-    set_portal_code(code)
+    driver_id = str(data.get("driver_id", "")).strip()
+    pin = str(data.get("pin", "")).strip()
+    if pin and (not pin.isdigit() or len(pin) < 4 or len(pin) > 6):
+        return JSONResponse({"error": "PIN must be 4 to 6 digits"}, 400)
+    result = find_row_by_id("Drivers", driver_id)
+    if not result:
+        return JSONResponse({"error": "Driver not found"}, 404)
+    row_id, existing = result
+    vals = {**existing, "PortalPIN": pin, "UpdatedDate": now_str()}
+    update_row("Drivers", row_id, build_row("Drivers", vals))
     user = request.session.get("user", {})
-    add_audit_log("UPDATE", "DriverPortal", PORTAL_CODE_KEY,
-                  "Driver app access code changed", user.get("email", ""))
+    add_audit_log("UPDATE", "DriverPortal", driver_id,
+                  ("PIN set" if pin else "PIN cleared") + f" for driver {existing.get('DriverName','')}",
+                  user.get("email", ""))
     return {"success": True}
 
 

@@ -28,6 +28,7 @@ SHEET_HEADERS = {
         "BankName", "AccountNumber", "IFSCCode",
         "Salary", "JoiningDate",
         "Status", "ExitDate", "AssignedVehicle",
+        "PortalPIN",
         "CreatedDate", "UpdatedDate",
     ],
     "Expenses": [

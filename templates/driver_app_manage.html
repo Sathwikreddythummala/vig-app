@@ -3,21 +3,22 @@
 {% block page_title %}Driver App{% endblock %}
 {% block content %}
 <div class="row g-3">
-    <div class="col-lg-6">
+    <div class="col-lg-7">
         <div class="glass-card animate-in">
-            <h6 class="mb-3"><i class="bi bi-key text-warning"></i> Driver App Access Code</h6>
-            <p class="text-muted small">Drivers open the app and enter this code once, then pick their name. Share it only with your drivers. Change it anytime (e.g. when someone leaves).</p>
-            <label class="form-label">Access Code</label>
-            <div class="input-group" style="max-width:320px">
-                <input type="text" class="form-control glass-input" id="codeField" value="{{ code }}" placeholder="Not set yet">
-                <button class="btn btn-warning" onclick="saveCode()"><i class="bi bi-check-lg"></i> Save</button>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="bi bi-key text-warning"></i> Driver PINs</h6>
+                <input type="search" class="form-control glass-input" id="pinSearch" placeholder="Search driver..." style="max-width:200px" oninput="renderPins()">
             </div>
-            <div class="small text-muted mt-2">Minimum 4 characters. Current status:
-                <span id="codeStatus" class="fw-bold">{{ 'Set' if code else 'Not set — drivers cannot sign in yet' }}</span>
+            <p class="text-muted small">Each driver signs in by choosing their name and entering their own PIN (4–6 digits). Set or reset a PIN here, then tell that driver. Leave blank and Save to remove a PIN (that driver can't sign in until it's set again).</p>
+            <div class="table-responsive">
+                <table class="table table-hover glass-table align-middle">
+                    <thead><tr><th>Driver</th><th>Vehicle</th><th style="width:150px">PIN</th><th style="width:90px"></th></tr></thead>
+                    <tbody id="pinTable"><tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
+                </table>
             </div>
         </div>
     </div>
-    <div class="col-lg-6">
+    <div class="col-lg-5">
         <div class="glass-card animate-in" style="animation-delay:.1s">
             <h6 class="mb-3"><i class="bi bi-phone text-warning"></i> Share &amp; Install</h6>
             <label class="form-label">Driver app link</label>
@@ -39,16 +40,46 @@
 {% endblock %}
 {% block scripts %}
 <script>
+var allDrivers = [];
 document.getElementById('appLink').value = window.location.origin + '/driver-portal/login';
 
-async function saveCode(){
-    var code = document.getElementById('codeField').value.trim();
-    if(code.length < 4){ showToast('Use at least 4 characters','danger'); return; }
+async function loadPins(){
     try{
-        var res = await fetch('/driver-portal/api/set-code', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
+        var res = await fetch('/driver-portal/api/pins');
         var data = await res.json();
-        if(data.success){ showToast('Access code saved','success'); document.getElementById('codeStatus').textContent = 'Set'; }
-        else { showToast(data.error||'Failed','danger'); }
+        if(data.error){ showToast(data.error,'danger'); return; }
+        allDrivers = data.drivers || [];
+        renderPins();
+    }catch(e){ showToast('Failed to load drivers','danger'); }
+}
+
+function renderPins(){
+    var q = (document.getElementById('pinSearch').value||'').toLowerCase();
+    var rows = allDrivers.filter(function(d){ return !q || (d.name||'').toLowerCase().indexOf(q)>=0 || (d.vehicle||'').toLowerCase().indexOf(q)>=0; });
+    var tb = document.getElementById('pinTable');
+    if(!rows.length){ tb.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No drivers</td></tr>'; return; }
+    tb.innerHTML = rows.map(function(d){
+        var set = d.pin ? '<span class="badge bg-success ms-1">set</span>' : '<span class="badge bg-secondary ms-1">not set</span>';
+        return '<tr>' +
+            '<td class="fw-bold">'+d.name+set+'</td>' +
+            '<td>'+(d.vehicle||'-')+'</td>' +
+            '<td><input type="text" inputmode="numeric" maxlength="6" class="form-control form-control-sm glass-input" id="pin_'+d.id+'" value="'+(d.pin||'')+'" placeholder="4–6 digits"></td>' +
+            '<td><button class="btn btn-sm btn-warning" onclick="savePin(\''+d.id+'\')"><i class="bi bi-check-lg"></i></button></td>' +
+            '</tr>';
+    }).join('');
+}
+
+async function savePin(id){
+    var pin = (document.getElementById('pin_'+id).value||'').trim();
+    if(pin && !/^[0-9]{4,6}$/.test(pin)){ showToast('PIN must be 4–6 digits','danger'); return; }
+    try{
+        var res = await fetch('/driver-portal/api/set-pin', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_id:id,pin:pin})});
+        var data = await res.json();
+        if(data.success){
+            showToast(pin?'PIN saved':'PIN cleared','success');
+            var d = allDrivers.find(function(x){return x.id===id}); if(d) d.pin = pin;
+            renderPins();
+        } else { showToast(data.error||'Failed','danger'); }
     }catch(e){ showToast('Network error','danger'); }
 }
 
@@ -57,5 +88,7 @@ function copyLink(){
     el.select(); el.setSelectionRange(0,99999);
     navigator.clipboard.writeText(el.value).then(function(){ showToast('Link copied','success'); }, function(){ showToast('Copy failed — select manually','danger'); });
 }
+
+loadPins();
 </script>
 {% endblock %}
