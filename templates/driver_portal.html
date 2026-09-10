@@ -136,7 +136,7 @@
                         <label class="form-label">Payment</label>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn flex-fill pay-pill active" data-kind="paid" id="payPaidBtn" onclick="setPayStatus('Paid')"><i class="bi bi-cash"></i> Paid now</button>
-                            <button type="button" class="btn flex-fill pay-pill" data-kind="unpaid" id="payUnpaidBtn" onclick="setPayStatus('Unpaid')"><i class="bi bi-hourglass-split"></i> On credit</button>
+                            <button type="button" class="btn flex-fill pay-pill" data-kind="unpaid" id="payUnpaidBtn" onclick="setPayStatus('Unpaid')"><i class="bi bi-hourglass-split"></i> Katha</button>
                         </div>
                     </div>
                     <div class="col-12">
@@ -192,7 +192,7 @@
         document.getElementById('payPaidBtn').classList.toggle('active', s==='Paid');
         document.getElementById('payUnpaidBtn').classList.toggle('active', s==='Unpaid');
         document.getElementById('dslStationLabel').innerHTML = (s==='Unpaid')
-            ? 'Fuel Station <span style="color:#E53935">*</span> <small class="text-muted">(credit — who is it owed to)</small>'
+            ? 'Fuel Station <span style="color:#E53935">*</span> <small class="text-muted">(katha — who is it owed to)</small>'
             : 'Fuel Station (optional)';
     }
 
@@ -247,7 +247,7 @@
             if (e.Litres) details.push(e.Litres + 'L');
             if (e.Kilometre) details.push('KM: ' + e.Kilometre);
             if (e.FuelStation) details.push(e.FuelStation);
-            var credit = (e.PaymentStatus==='Unpaid') ? '<span class="entry-credit">CREDIT</span>' : '';
+            var credit = (e.PaymentStatus==='Unpaid') ? '<span class="entry-credit">KATHA</span>' : '';
             return '<div class="entry-row">' +
                 '<div><div class="entry-desc">' + (e.FuelType||'Diesel') + ' | ' + (e.VehicleNumber||'-') + credit + '</div>' +
                 '<div class="entry-date">' + (e.EntryDate||'') + (details.length ? ' | ' + details.join(', ') : '') + '</div></div>' +

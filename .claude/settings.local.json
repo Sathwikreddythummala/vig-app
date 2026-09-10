@@ -185,7 +185,9 @@
       "Bash(curl -s -o /dev/null -w \"LOCAL /driver-portal/login: %{http_code}\\\\n\" http://localhost:8000/driver-portal/login)",
       "Bash(curl -s -o /dev/null -w \"assetlinks.json: %{http_code}\\\\n\" https://vig-app.onrender.com/.well-known/assetlinks.json)",
       "Bash(curl -s https://vig-app.onrender.com/driver-portal/login)",
-      "Bash(curl -s https://vig-app.onrender.com/driver-portal/api/roster)"
+      "Bash(curl -s https://vig-app.onrender.com/driver-portal/api/roster)",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/b790c56a-429d-4c2c-9c78-b70d885d1fba/scratchpad/dp.js\")",
+      "Bash(git commit -q -m 'Driver app: label credit fuel as '\\\\''Katha'\\\\'' *)"
     ]
   }
 }
