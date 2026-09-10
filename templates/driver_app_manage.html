@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Driver App - Vigneshwara Enterprises{% endblock %}
+{% block page_title %}Driver App{% endblock %}
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="glass-card animate-in">
+            <h6 class="mb-3"><i class="bi bi-key text-warning"></i> Driver App Access Code</h6>
+            <p class="text-muted small">Drivers open the app and enter this code once, then pick their name. Share it only with your drivers. Change it anytime (e.g. when someone leaves).</p>
+            <label class="form-label">Access Code</label>
+            <div class="input-group" style="max-width:320px">
+                <input type="text" class="form-control glass-input" id="codeField" value="{{ code }}" placeholder="Not set yet">
+                <button class="btn btn-warning" onclick="saveCode()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+            <div class="small text-muted mt-2">Minimum 4 characters. Current status:
+                <span id="codeStatus" class="fw-bold">{{ 'Set' if code else 'Not set — drivers cannot sign in yet' }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-card animate-in" style="animation-delay:.1s">
+            <h6 class="mb-3"><i class="bi bi-phone text-warning"></i> Share &amp; Install</h6>
+            <label class="form-label">Driver app link</label>
+            <div class="input-group mb-3">
+                <input type="text" class="form-control glass-input" id="appLink" readonly>
+                <button class="btn btn-outline-warning" onclick="copyLink()"><i class="bi bi-clipboard"></i> Copy</button>
+            </div>
+            <div class="glass-card p-3 mb-2" style="background:rgba(255,193,7,0.08)">
+                <div class="fw-bold mb-1"><i class="bi bi-android2 text-success"></i> Android (Chrome)</div>
+                <div class="small text-muted">Open the link → menu (⋮) → <b>Add to Home screen</b> → Install. A Fleet Driver icon appears like a real app.</div>
+            </div>
+            <div class="glass-card p-3" style="background:rgba(255,193,7,0.08)">
+                <div class="fw-bold mb-1"><i class="bi bi-apple"></i> iPhone (Safari)</div>
+                <div class="small text-muted">Open the link in Safari → Share → <b>Add to Home Screen</b> → Add.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('appLink').value = window.location.origin + '/driver-portal/login';
+
+async function saveCode(){
+    var code = document.getElementById('codeField').value.trim();
+    if(code.length < 4){ showToast('Use at least 4 characters','danger'); return; }
+    try{
+        var res = await fetch('/driver-portal/api/set-code', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
+        var data = await res.json();
+        if(data.success){ showToast('Access code saved','success'); document.getElementById('codeStatus').textContent = 'Set'; }
+        else { showToast(data.error||'Failed','danger'); }
+    }catch(e){ showToast('Network error','danger'); }
+}
+
+function copyLink(){
+    var el = document.getElementById('appLink');
+    el.select(); el.setSelectionRange(0,99999);
+    navigator.clipboard.writeText(el.value).then(function(){ showToast('Link copied','success'); }, function(){ showToast('Copy failed — select manually','danger'); });
+}
+</script>
+{% endblock %}

@@ -120,7 +120,13 @@
       "Bash(curl -s -o /dev/null -w \"login:%{http_code} \" http://localhost:8000/auth/login-page)",
       "Bash(curl -s -o /dev/null -w \"credit:%{http_code}\\\\n\" http://localhost:8000/fuel/api/credit)",
       "Bash(curl -s -o /dev/null -w \"login:%{http_code}\\\\n\" http://localhost:8000/auth/login-page)",
-      "Bash(curl -s -w \"\\\\ncredit_status:%{http_code}\\\\n\" http://localhost:8000/fuel/api/credit)"
+      "Bash(curl -s -w \"\\\\ncredit_status:%{http_code}\\\\n\" http://localhost:8000/fuel/api/credit)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/driver_portal.py',encoding='utf-8'\\).read\\(\\)\\); print\\('driver_portal.py OK'\\)\")",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/b790c56a-429d-4c2c-9c78-b70d885d1fba/scratchpad/driver_portal.html.js\")",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/b790c56a-429d-4c2c-9c78-b70d885d1fba/scratchpad/driver_login.html.js\")",
+      "Bash(curl -s -o /dev/null -w \"login:%{http_code}\\\\n\" http://localhost:8000/driver-portal/login)",
+      "Bash(curl -s -o /dev/null -w \"sw:%{http_code}\\\\n\" http://localhost:8000/driver-portal/sw.js)",
+      "Bash(curl -s -o /dev/null -w \"manifest:%{http_code}\\\\n\" http://localhost:8000/static/driver.webmanifest)"
     ]
   }
 }

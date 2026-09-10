@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE082"/>
+      <stop offset="1" stop-color="#FFB300"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="104" fill="url(#g)"/>
+  <g fill="#3E2723">
+    <!-- truck body -->
+    <path d="M96 176h176v128H96a16 16 0 0 1-16-16V192a16 16 0 0 1 16-16z"/>
+    <path d="M272 208h88l56 56v40a16 16 0 0 1-16 16h-128z"/>
+    <!-- wheels -->
+    <circle cx="168" cy="332" r="34" fill="#3E2723"/>
+    <circle cx="168" cy="332" r="15" fill="#FFE082"/>
+    <circle cx="360" cy="332" r="34" fill="#3E2723"/>
+    <circle cx="360" cy="332" r="15" fill="#FFE082"/>
+  </g>
+</svg>

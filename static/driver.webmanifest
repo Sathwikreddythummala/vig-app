@@ -1,0 +1,19 @@
+{
+  "name": "Vigneshwara Fleet - Driver",
+  "short_name": "Fleet Driver",
+  "description": "Driver app for Vigneshwara Enterprises - log diesel, view salary and expenses.",
+  "start_url": "/driver-portal",
+  "scope": "/driver-portal",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF9C4",
+  "theme_color": "#FFD54F",
+  "icons": [
+    {
+      "src": "/static/img/driver-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

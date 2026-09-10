@@ -8,7 +8,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Driver Portal - Vigneshwara Enterprises</title>
-    <link rel="icon" href="/company/logo">
+    <meta name="apple-mobile-web-app-title" content="Fleet Driver">
+    <link rel="manifest" href="/static/driver.webmanifest">
+    <link rel="icon" href="/static/img/driver-app-icon.svg">
     <link rel="apple-touch-icon" href="/company/logo">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -43,6 +45,10 @@
         .entry-desc{color:#5D4C41;font-size:0.8rem}
         .form-label{font-weight:500;font-size:0.8rem;color:#6D4C41;margin-bottom:4px}
         .vehicle-badge{background:linear-gradient(135deg,#FFD54F,#FFC107);color:#3E2723;padding:4px 12px;border-radius:20px;font-weight:600;font-size:0.8rem;display:inline-block}
+        .pay-pill{border:1.5px solid rgba(255,213,79,0.5);background:rgba(255,255,255,0.35);border-radius:12px;font-weight:600;font-size:0.85rem;color:#6D4C41;padding:12px 8px}
+        .pay-pill.active[data-kind="paid"]{background:linear-gradient(135deg,#66BB6A,#43A047);color:#fff;border-color:#43A047}
+        .pay-pill.active[data-kind="unpaid"]{background:linear-gradient(135deg,#EF5350,#E53935);color:#fff;border-color:#E53935}
+        .entry-credit{background:#E53935;color:#fff;font-size:0.68rem;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600}
         .toast-container{position:fixed;top:0;right:0;padding:12px;z-index:9999}
         .toast{background:rgba(255,253,231,0.95)!important;border-radius:12px!important;border:1px solid rgba(255,255,255,0.4)!important}
         @media(min-width:768px){.stat-row{grid-template-columns:repeat(4,1fr)}}
@@ -65,9 +71,9 @@
             <h5 class="mb-0">Vigneshwara Fleet</h5>
         </div>
         <div class="user-info">
-            <img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">{% endif %}
             <span style="font-size:0.85rem;font-weight:500">{{ user.driver_name }}</span>
-            <a href="/auth/logout" class="btn btn-sm btn-outline-danger ms-2" style="border-radius:8px;font-size:0.75rem"><i class="bi bi-box-arrow-left"></i></a>
+            <a href="/driver-portal/logout" class="btn btn-sm btn-outline-danger ms-2" style="border-radius:8px;font-size:0.75rem"><i class="bi bi-box-arrow-left"></i></a>
         </div>
     </div>
     <div class="container-p">
@@ -127,7 +133,14 @@
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Fuel Station (optional)</label>
+                        <label class="form-label">Payment</label>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn flex-fill pay-pill active" data-kind="paid" id="payPaidBtn" onclick="setPayStatus('Paid')"><i class="bi bi-cash"></i> Paid now</button>
+                            <button type="button" class="btn flex-fill pay-pill" data-kind="unpaid" id="payUnpaidBtn" onclick="setPayStatus('Unpaid')"><i class="bi bi-hourglass-split"></i> On credit</button>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" id="dslStationLabel">Fuel Station (optional)</label>
                         <input type="text" class="form-control glass-input" id="dslStation" placeholder="Station name">
                     </div>
                     <div class="col-12">
@@ -171,7 +184,19 @@
     function todayLocal(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     function thisMonthLocal(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
     var assignedVehicle = '{{ user.assigned_vehicle }}';
+    var payStatus = 'Paid';
     document.getElementById('dslDate').value = todayLocal();
+
+    function setPayStatus(s){
+        payStatus = s;
+        document.getElementById('payPaidBtn').classList.toggle('active', s==='Paid');
+        document.getElementById('payUnpaidBtn').classList.toggle('active', s==='Unpaid');
+        document.getElementById('dslStationLabel').innerHTML = (s==='Unpaid')
+            ? 'Fuel Station <span style="color:#E53935">*</span> <small class="text-muted">(credit — who is it owed to)</small>'
+            : 'Fuel Station (optional)';
+    }
+
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('/driver-portal/sw.js', {scope:'/driver-portal/'}).catch(function(){}); }
 
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('dslVehicle').value = assignedVehicle || 'Not assigned';
@@ -222,8 +247,9 @@
             if (e.Litres) details.push(e.Litres + 'L');
             if (e.Kilometre) details.push('KM: ' + e.Kilometre);
             if (e.FuelStation) details.push(e.FuelStation);
+            var credit = (e.PaymentStatus==='Unpaid') ? '<span class="entry-credit">CREDIT</span>' : '';
             return '<div class="entry-row">' +
-                '<div><div class="entry-desc">' + (e.FuelType||'Diesel') + ' | ' + (e.VehicleNumber||'-') + '</div>' +
+                '<div><div class="entry-desc">' + (e.FuelType||'Diesel') + ' | ' + (e.VehicleNumber||'-') + credit + '</div>' +
                 '<div class="entry-date">' + (e.EntryDate||'') + (details.length ? ' | ' + details.join(', ') : '') + '</div></div>' +
                 '<div class="entry-amt">₹' + Number(e.Amount||0).toLocaleString('en-IN') + '</div></div>';
         }).join('');
@@ -250,6 +276,8 @@
     async function submitDiesel() {
         var amount = document.getElementById('dslAmount').value;
         if (!amount || parseFloat(amount) <= 0) { showToast('Enter amount','danger'); return; }
+        var station = document.getElementById('dslStation').value.trim();
+        if (payStatus === 'Unpaid' && !station) { showToast('Enter the fuel station for credit diesel','danger'); return; }
         var payload = {
             Date: document.getElementById('dslDate').value,
             VehicleNumber: document.getElementById('dslVehicle').value,
@@ -258,7 +286,8 @@
             Kilometre: document.getElementById('dslKM').value,
             FuelType: document.getElementById('dslFuelType').value,
             PaymentMode: document.getElementById('dslPayMode').value,
-            FuelStation: document.getElementById('dslStation').value,
+            FuelStation: station,
+            PaymentStatus: payStatus,
         };
         try {
             var res = await fetch('/driver-portal/api/diesel', {
@@ -271,6 +300,7 @@
                 document.getElementById('dslLitres').value = '';
                 document.getElementById('dslKM').value = '';
                 document.getElementById('dslStation').value = '';
+                setPayStatus('Paid');
                 loadMyData();
             } else { showToast(data.error||'Failed','danger'); }
         } catch(err) { showToast('Network error','danger'); }

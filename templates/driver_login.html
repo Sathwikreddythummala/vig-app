@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#FFD54F">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Fleet Driver">
+    <title>Driver Sign In - Vigneshwara Fleet</title>
+    <link rel="manifest" href="/static/driver.webmanifest">
+    <link rel="icon" href="/static/img/driver-app-icon.svg">
+    <link rel="apple-touch-icon" href="/company/logo">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
+        html{-webkit-text-size-adjust:100%}
+        body{background:linear-gradient(135deg,#FFF9C4 0%,#FFFDE7 50%,#FFF9C4 100%);background-attachment:fixed;min-height:100vh;color:#3E2723;display:flex;align-items:center;justify-content:center;padding:20px;padding-top:calc(20px + env(safe-area-inset-top))}
+        .login-card{background:rgba(255,255,255,0.3);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.4);border-radius:22px;padding:28px 22px;box-shadow:0 8px 32px rgba(255,193,7,0.2);width:100%;max-width:400px}
+        .logo-circle{width:84px;height:84px;border-radius:24px;background:linear-gradient(135deg,#FFE082,#FFB300);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 16px rgba(255,193,7,0.35)}
+        .logo-circle i{font-size:2.2rem;color:#3E2723}
+        h4{font-weight:700;text-align:center;margin-bottom:4px}
+        .sub{text-align:center;color:#6D4C41;font-size:0.85rem;margin-bottom:22px}
+        .form-label{font-weight:500;font-size:0.85rem;color:#6D4C41;margin-bottom:6px}
+        .glass-input{background:rgba(255,255,255,0.5)!important;border:1px solid rgba(255,213,79,0.4)!important;border-radius:12px!important;font-size:16px;min-height:50px;padding:10px 14px;text-align:center;font-weight:600;letter-spacing:2px}
+        .glass-input.name-select{letter-spacing:normal;text-align:left}
+        .glass-input:focus{background:rgba(255,255,255,0.7)!important;border-color:#FFC107!important;box-shadow:0 0 0 3px rgba(255,193,7,0.2)!important}
+        .btn-gold{background:linear-gradient(135deg,#FFD54F,#FFC107);border:none;color:#3E2723;font-weight:600;border-radius:12px;padding:14px;font-size:1rem;width:100%;box-shadow:0 2px 10px rgba(255,193,7,0.3)}
+        .btn-gold:active{transform:translateY(1px)}
+        .btn-gold:disabled{opacity:0.6}
+        .step{display:none}
+        .step.active{display:block;animation:fade .25s ease}
+        @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+        .err{color:#E53935;font-size:0.82rem;text-align:center;margin-top:12px;min-height:18px;font-weight:500}
+        .backlink{display:block;text-align:center;margin-top:16px;font-size:0.8rem;color:#6D4C41;text-decoration:none}
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="logo-circle"><i class="bi bi-truck"></i></div>
+        <h4>Vigneshwara Fleet</h4>
+        <p class="sub">Driver Sign In</p>
+
+        <!-- Step 1: access code -->
+        <div class="step active" id="step1">
+            <label class="form-label">Enter Access Code</label>
+            <input type="text" inputmode="text" autocomplete="off" class="form-control glass-input" id="codeInput" placeholder="• • • •" autofocus>
+            <button class="btn-gold mt-3" id="codeBtn" onclick="checkCode()"><i class="bi bi-arrow-right-circle"></i> Continue</button>
+        </div>
+
+        <!-- Step 2: choose driver -->
+        <div class="step" id="step2">
+            <label class="form-label">Who are you?</label>
+            <select class="form-select glass-input name-select" id="nameSelect"><option value="">-- Select your name --</option></select>
+            <button class="btn-gold mt-3" id="loginBtn" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Sign In</button>
+            <a href="#" class="backlink" onclick="backToCode();return false"><i class="bi bi-chevron-left"></i> Back</a>
+        </div>
+
+        <div class="err" id="errBox"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    var savedCode = '';
+    function setErr(m){ document.getElementById('errBox').textContent = m || ''; }
+    function showStep(n){
+        document.getElementById('step1').classList.toggle('active', n===1);
+        document.getElementById('step2').classList.toggle('active', n===2);
+        setErr('');
+    }
+    function backToCode(){ showStep(1); document.getElementById('codeInput').focus(); }
+
+    async function checkCode(){
+        var code = document.getElementById('codeInput').value.trim();
+        if(!code){ setErr('Enter the access code'); return; }
+        var btn = document.getElementById('codeBtn'); btn.disabled = true;
+        try{
+            var res = await fetch('/driver-portal/api/verify-code', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
+            var data = await res.json();
+            if(!res.ok || data.error){ setErr(data.error || 'Wrong code'); btn.disabled=false; return; }
+            savedCode = code;
+            var sel = document.getElementById('nameSelect');
+            sel.innerHTML = '<option value="">-- Select your name --</option>' + (data.drivers||[]).map(function(d){
+                return '<option value="'+d.name.replace(/"/g,'&quot;')+'">'+d.name+(d.vehicle?' ('+d.vehicle+')':'')+'</option>';
+            }).join('');
+            showStep(2);
+        }catch(e){ setErr('Network error'); }
+        btn.disabled = false;
+    }
+
+    async function doLogin(){
+        var name = document.getElementById('nameSelect').value;
+        if(!name){ setErr('Select your name'); return; }
+        var btn = document.getElementById('loginBtn'); btn.disabled = true;
+        try{
+            var res = await fetch('/driver-portal/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:savedCode,name:name})});
+            var data = await res.json();
+            if(data.success){ window.location.href = '/driver-portal'; return; }
+            setErr(data.error || 'Sign in failed');
+        }catch(e){ setErr('Network error'); }
+        btn.disabled = false;
+    }
+
+    document.getElementById('codeInput').addEventListener('keydown', function(e){ if(e.key==='Enter') checkCode(); });
+
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('/driver-portal/sw.js', {scope:'/driver-portal/'}).catch(function(){}); }
+    </script>
+</body>
+</html>
