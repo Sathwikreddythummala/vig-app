@@ -28,6 +28,34 @@ async def fuel_page(request: Request):
     return templates.TemplateResponse(request=request, name="fuel.html", context={"user": user})
 
 
+def _is_admin(user) -> bool:
+    return bool(user and str(user.get("role", "")) == "admin")
+
+
+def _km_run_map(all_records: list[dict]) -> dict:
+    """FuelID -> distance run since the previous odometer reading for the SAME vehicle
+    (this Kilometre minus the previous one, chronologically). Blank when it can't be
+    computed (first reading, missing reading, or an odometer that went backwards)."""
+    by_vehicle = defaultdict(list)
+    for r in all_records:
+        try:
+            kmv = float(str(r.get("Kilometre", "")).strip())
+        except (ValueError, TypeError):
+            kmv = None
+        if kmv is None or kmv <= 0:
+            continue
+        by_vehicle[str(r.get("VehicleNumber", "")).strip()].append((r, kmv))
+    result = {}
+    for _vn, items in by_vehicle.items():
+        items.sort(key=lambda t: (str(t[0].get("EntryDate", "")), str(t[0].get("CreatedDate", ""))))
+        prev = None
+        for r, kmv in items:
+            if prev is not None and kmv >= prev:
+                result[r.get("FuelID", "")] = round(kmv - prev)
+            prev = kmv
+    return result
+
+
 @router.get("/api/list")
 async def list_fuel(
     request: Request,
@@ -44,7 +72,10 @@ async def list_fuel(
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    records = get_all_records("FuelEntries")
+    all_records = get_all_records("FuelEntries")
+    is_admin = _is_admin(user)
+    km_map = _km_run_map(all_records) if is_admin else {}
+    records = all_records
     if month:
         records = [r for r in records if str(r.get("EntryDate", ""))[:7] == month]
     if date_from:
@@ -63,6 +94,8 @@ async def list_fuel(
     total_litres = sum(float(r.get("Litres", 0) or 0) for r in records)
     start = (page - 1) * per_page
     paginated = records[start:start + per_page]
+    if is_admin:
+        paginated = [{**e, "KmRun": km_map.get(e.get("FuelID", ""), "")} for e in paginated]
     return {
         "entries": paginated,
         "total": total,
@@ -71,6 +104,7 @@ async def list_fuel(
         "total_pages": (total + per_page - 1) // per_page if total else 1,
         "total_amount": total_amount,
         "total_litres": total_litres,
+        "show_km_run": is_admin,
     }
 
 
@@ -144,8 +178,13 @@ async def export_excel(
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month)
+    num_cols = ["Litres", "Amount", "Kilometre"]
+    if _is_admin(user):
+        km_map = _km_run_map(get_all_records("FuelEntries"))
+        records = [{**r, "Km Run": km_map.get(r.get("FuelID", ""), "")} for r in records]
+        num_cols.append("Km Run")
     from utils.exports import to_numeric_df
-    df = to_numeric_df(records, ["Litres", "Amount", "Kilometre"])
+    df = to_numeric_df(records, num_cols)
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
     buf.seek(0)
@@ -182,7 +221,10 @@ async def export_pdf(
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4))
     styles = getSampleStyleSheet()
     elements = [Paragraph("Vigneshwara Enterprises - Fuel Report", styles["Title"]), Spacer(1, 20)]
-    header = ["Date", "Vehicle", "Driver", "Fuel Type", "Litres", "Amount", "KM Reading", "Station", "Mode", "Status"]
+    is_admin = _is_admin(user)
+    km_map = _km_run_map(get_all_records("FuelEntries")) if is_admin else {}
+    header = ["Date", "Vehicle", "Driver", "Fuel Type", "Litres", "Amount", "KM Reading"] \
+        + (["Km Run"] if is_admin else []) + ["Station", "Mode", "Status"]
     data = [header]
     total_amount = 0.0
     total_litres = 0.0
@@ -191,7 +233,7 @@ async def export_pdf(
         litres = float(r.get("Litres", 0) or 0)
         total_amount += amt
         total_litres += litres
-        data.append([
+        row = [
             safe(r.get("EntryDate")),
             safe(r.get("VehicleNumber")),
             safe(r.get("DriverName")),
@@ -199,11 +241,21 @@ async def export_pdf(
             f"{litres:,.2f}" if litres else "",
             f"Rs.{amt:,.0f}",
             safe(r.get("Kilometre")),
+        ]
+        if is_admin:
+            kmr = km_map.get(r.get("FuelID", ""), "")
+            row.append(f"{int(kmr):,}" if kmr != "" else "")
+        row += [
             safe(r.get("FuelStation")),
             safe(r.get("PaymentMode")),
             str(r.get("PaymentStatus", "")).strip() or "Paid",
-        ])
-    data.append(["", "", "", "Total", f"{total_litres:,.2f}", f"Rs.{total_amount:,.0f}", "", "", "", ""])
+        ]
+        data.append(row)
+    totals_row = ["", "", "", "Total", f"{total_litres:,.2f}", f"Rs.{total_amount:,.0f}", ""]
+    if is_admin:
+        totals_row.append("")
+    totals_row += ["", "", ""]
+    data.append(totals_row)
     table = Table(data, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FFD54F")),
