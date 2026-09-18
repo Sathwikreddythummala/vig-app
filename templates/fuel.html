@@ -136,22 +136,41 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadAlerts();
 });
 
+// Keep one ApexCharts instance per container; destroy + clear before redrawing so
+// repeated loadStats() calls (after add/delete/settle) never stack duplicate charts.
+var chartInstances = {};
+function drawChart(id, opts) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (chartInstances[id]) { try { chartInstances[id].destroy(); } catch(e){} }
+    el.innerHTML = '';
+    chartInstances[id] = new ApexCharts(el, opts);
+    chartInstances[id].render();
+}
+function clearChart(id, msg) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (chartInstances[id]) { try { chartInstances[id].destroy(); } catch(e){} chartInstances[id] = null; }
+    el.innerHTML = '<p class="text-muted text-center py-4">'+(msg||'No data')+'</p>';
+}
+function inr(v){ return '₹'+Number(v||0).toLocaleString('en-IN'); }
+
 async function loadStats() {
     var res = await fetch('/fuel/api/stats'); var s = await res.json();
-    document.getElementById('statToday').textContent = '₹'+Number(s.total_today||0).toLocaleString('en-IN');
-    document.getElementById('statMonth').textContent = '₹'+Number(s.total_month||0).toLocaleString('en-IN');
+    document.getElementById('statToday').textContent = inr(s.total_today);
+    document.getElementById('statMonth').textContent = inr(s.total_month);
     document.getElementById('statLitres').textContent = Number(s.month_litres||0).toLocaleString('en-IN');
     document.getElementById('statEntries').textContent = s.month_entries||0;
-    document.getElementById('statCredit').textContent = '₹'+Number(s.credit_outstanding||0).toLocaleString('en-IN');
+    document.getElementById('statCredit').textContent = inr(s.credit_outstanding);
     if (s.vehicle_wise && s.vehicle_wise.labels.length) {
-        new ApexCharts(document.getElementById('vehicleChart'),{chart:{type:'bar',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel ₹',data:s.vehicle_wise.values}],xaxis:{categories:s.vehicle_wise.labels},colors:['#FFD54F'],plotOptions:{bar:{borderRadius:6,columnWidth:'50%'}}}).render();
-    } else { document.getElementById('vehicleChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+        drawChart('vehicleChart',{chart:{type:'bar',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel ₹',data:s.vehicle_wise.values}],xaxis:{categories:s.vehicle_wise.labels},yaxis:{labels:{formatter:function(v){return inr(Math.round(v))}}},colors:['#FFD54F'],plotOptions:{bar:{borderRadius:6,columnWidth:'50%'}},dataLabels:{enabled:false}});
+    } else { clearChart('vehicleChart'); }
     if (s.driver_wise && s.driver_wise.labels.length) {
-        new ApexCharts(document.getElementById('driverChart'),{chart:{type:'donut',height:220,background:'transparent'},series:s.driver_wise.values,labels:s.driver_wise.labels,colors:['#FFD54F','#FFC107','#FFB300','#FFA000','#FF8F00','#FF6F00','#F9A825','#FFCA28'],legend:{position:'bottom',fontSize:'10px'}}).render();
-    } else { document.getElementById('driverChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+        drawChart('driverChart',{chart:{type:'donut',height:220,background:'transparent'},series:s.driver_wise.values,labels:s.driver_wise.labels,colors:['#FFD54F','#FFC107','#FFB300','#FFA000','#FF8F00','#FF6F00','#F9A825','#FFCA28'],legend:{position:'bottom',fontSize:'10px'}});
+    } else { clearChart('driverChart'); }
     if (s.monthly_trend && s.monthly_trend.labels.length) {
-        new ApexCharts(document.getElementById('trendChart'),{chart:{type:'area',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel',data:s.monthly_trend.values}],xaxis:{categories:s.monthly_trend.labels},colors:['#FF8F00'],fill:{type:'gradient',gradient:{opacityFrom:0.5,opacityTo:0.1}},stroke:{curve:'smooth',width:3},dataLabels:{enabled:false}}).render();
-    } else { document.getElementById('trendChart').innerHTML='<p class="text-muted text-center py-4">No data</p>'; }
+        drawChart('trendChart',{chart:{type:'area',height:220,background:'transparent',toolbar:{show:false}},series:[{name:'Fuel',data:s.monthly_trend.values}],xaxis:{categories:s.monthly_trend.labels},yaxis:{labels:{formatter:function(v){return inr(Math.round(v))}}},colors:['#FF8F00'],fill:{type:'gradient',gradient:{opacityFrom:0.5,opacityTo:0.1}},stroke:{curve:'smooth',width:3},dataLabels:{enabled:false}});
+    } else { clearChart('trendChart'); }
 }
 
 async function loadFuel(page) {
