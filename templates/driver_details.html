@@ -30,6 +30,7 @@
         </div>
     </div>
 </div>
+{% include "_slip_modals.html" %}
 {% endblock %}
 {% block scripts %}
 <script>
@@ -114,6 +115,7 @@ function onMonthChange() {
 
 function renderDriverDetails() {
     const d = allDriverData.driver;
+    const dnm = (d.DriverName||'').replace(/'/g,"\\'");
     const docs = allDriverData.documents || [];
     const allExpenses = allDriverData.expenses || [];
     const expenses = filterByMonth(allExpenses, selectedMonth);
@@ -152,6 +154,8 @@ function renderDriverDetails() {
                 <option value="">All Months</option>
                 ${monthOptions.map(m => `<option value="${m}" ${m===selectedMonth?'selected':''}>${m}</option>`).join('')}
             </select>
+            <button class="btn btn-outline-warning btn-sm viewer-hide" onclick="openPayslip(driverId, selectedMonth||thisMonthLocal(), '${dnm}')"><i class="bi bi-receipt"></i> Payslip</button>
+            <button class="btn btn-outline-warning btn-sm viewer-hide" onclick="openDieselSlip(driverId, selectedMonth||thisMonthLocal(), '${dnm}')"><i class="bi bi-fuel-pump"></i> Diesel</button>
             <button class="btn btn-warning btn-sm" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadDrvDocModal')).show()"><i class="bi bi-upload"></i> Upload Doc</button>
             <a href="/drivers" class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
         </div>

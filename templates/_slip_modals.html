@@ -1,0 +1,224 @@
+<!-- Shared Payslip + Diesel-statement modals. Include on Salaries + Driver detail pages. -->
+<div class="modal fade" id="payslipModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0">
+        <h5 class="modal-title"><i class="bi bi-receipt text-warning"></i> Payslip — <span id="psTitleName"></span> <span class="text-muted" id="psTitleMonth" style="font-size:.9rem"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-muted mb-2">Edit anything below, then <b>Generate PDF</b>. Amounts update the Net live.</div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6"><label class="form-label small">Company Name</label><input class="form-control form-control-sm glass-input" id="psCoName"></div>
+          <div class="col-md-6"><label class="form-label small">Address</label><input class="form-control form-control-sm glass-input" id="psCoAddr" placeholder="Company address"></div>
+          <div class="col-md-6"><label class="form-label small">Phone</label><input class="form-control form-control-sm glass-input" id="psCoPhone" placeholder="Phone"></div>
+          <div class="col-md-6"><label class="form-label small">GSTIN</label><input class="form-control form-control-sm glass-input" id="psCoGST" placeholder="GSTIN"></div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6"><label class="form-label small">Employee</label><input class="form-control form-control-sm glass-input" id="psEmpName"></div>
+          <div class="col-md-6"><label class="form-label small">Vehicle(s)</label><input class="form-control form-control-sm glass-input" id="psEmpVehicle"></div>
+          <div class="col-md-12"><label class="form-label small">Days</label><input class="form-control form-control-sm glass-input" id="psEmpDays"></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="d-flex justify-content-between align-items-center mb-1"><b class="text-success">Earnings</b><button type="button" class="btn btn-sm btn-outline-success py-0 px-2" onclick="addSlipRow('psEarnings')">+ Add</button></div>
+            <div id="psEarnings"></div>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex justify-content-between align-items-center mb-1"><b class="text-danger">Deductions</b><button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="addSlipRow('psDeductions')">+ Add</button></div>
+            <div id="psDeductions"></div>
+          </div>
+        </div>
+        <div class="glass-card mt-3 d-flex justify-content-between align-items-center" style="padding:12px 16px;background:rgba(62,39,35,0.06)">
+          <b style="font-size:1.05rem">NET PAYABLE</b>
+          <b style="font-size:1.25rem" class="text-success" id="psNet">₹0</b>
+        </div>
+        <label class="form-label small mt-3">Remarks</label>
+        <textarea class="form-control form-control-sm glass-input" id="psRemarks" rows="2" placeholder="Optional note printed on the slip"></textarea>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="psGenBtn" onclick="generatePayslip()"><i class="bi bi-file-earmark-pdf"></i> Confirm &amp; Generate PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="dieselSlipModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0">
+        <h5 class="modal-title"><i class="bi bi-fuel-pump text-warning"></i> Diesel Statement — <span id="dsTitleName"></span> <span class="text-muted" id="dsTitleMonth" style="font-size:.9rem"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-6"><label class="form-label small">Company Name</label><input class="form-control form-control-sm glass-input" id="dsCoName"></div>
+          <div class="col-md-6"><label class="form-label small">Address</label><input class="form-control form-control-sm glass-input" id="dsCoAddr" placeholder="Company address"></div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <b class="text-warning">Diesel / Fuel entries</b>
+          <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" onclick="addDieselRow()">+ Add row</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm glass-table mb-1">
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Type</th><th style="width:90px">Litres</th><th style="width:110px">Amount ₹</th><th>Station</th><th>Status</th><th></th></tr></thead>
+            <tbody id="dsRows"></tbody>
+            <tfoot><tr class="fw-bold"><td colspan="3" class="text-end">TOTAL</td><td id="dsTotLitres">0</td><td id="dsTotAmount">₹0</td><td colspan="3"></td></tr></tfoot>
+          </table>
+        </div>
+        <label class="form-label small mt-2">Remarks</label>
+        <textarea class="form-control form-control-sm glass-input" id="dsRemarks" rows="2" placeholder="Optional note"></textarea>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="dsGenBtn" onclick="generateDiesel()"><i class="bi bi-file-earmark-pdf"></i> Confirm &amp; Generate PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var _psMeta = {};   // driver meta carried through to the PDF
+var _dsMeta = {};
+
+function _slipRowHtml(box, label, amount){
+  var cls = box === 'psEarnings' ? 'success' : 'danger';
+  return '<div class="input-group input-group-sm mb-2 slip-row">' +
+    '<input class="form-control glass-input slip-label" placeholder="Label" value="'+(label||'')+'">' +
+    '<input type="number" step="0.01" class="form-control glass-input slip-amt" style="max-width:120px" value="'+(amount!=null?amount:'')+'" oninput="recalcPayslip()">' +
+    '<button type="button" class="btn btn-outline-'+cls+'" onclick="this.closest(\'.slip-row\').remove();recalcPayslip()"><i class="bi bi-x"></i></button>' +
+    '</div>';
+}
+function addSlipRow(box){ document.getElementById(box).insertAdjacentHTML('beforeend', _slipRowHtml(box,'',null)); }
+function _fillRows(box, items){
+  document.getElementById(box).innerHTML = (items||[]).map(function(i){return _slipRowHtml(box, i.label, i.amount);}).join('');
+}
+function _sumRows(box){
+  var t=0; document.getElementById(box).querySelectorAll('.slip-amt').forEach(function(a){ t += parseFloat(a.value)||0; }); return t;
+}
+function recalcPayslip(){
+  var net = _sumRows('psEarnings') - _sumRows('psDeductions');
+  document.getElementById('psNet').textContent = '₹'+Number(net).toLocaleString('en-IN');
+  return net;
+}
+function _rowsPayload(box){
+  var out=[]; document.getElementById(box).querySelectorAll('.slip-row').forEach(function(r){
+    var l=r.querySelector('.slip-label').value.trim(); var a=parseFloat(r.querySelector('.slip-amt').value)||0;
+    if(l) out.push({label:l, amount:a});
+  }); return out;
+}
+
+async function openPayslip(driverId, month, name){
+  document.getElementById('psTitleName').textContent = name||'';
+  var m = bootstrap.Modal.getOrCreateInstance(document.getElementById('payslipModal'));
+  document.getElementById('psEarnings').innerHTML = '<div class="text-muted small">Loading…</div>';
+  document.getElementById('psDeductions').innerHTML = '';
+  m.show();
+  try{
+    var res = await fetch('/payslip/api/payslip-data?driver_id='+encodeURIComponent(driverId)+'&month='+encodeURIComponent(month));
+    var d = await res.json();
+    if(d.error){ showToast(d.error,'danger'); return; }
+    _psMeta = {driverId:driverId, month:month, month_label:d.month_label, driver:d.driver, days:d.days};
+    document.getElementById('psTitleMonth').textContent = d.month_label||'';
+    document.getElementById('psCoName').value = d.company.name||'';
+    document.getElementById('psCoAddr').value = d.company.address||'';
+    document.getElementById('psCoPhone').value = d.company.phone||'';
+    document.getElementById('psCoGST').value = d.company.gst||'';
+    document.getElementById('psEmpName').value = d.driver.name||'';
+    document.getElementById('psEmpVehicle').value = d.driver.vehicle||'';
+    document.getElementById('psEmpDays').value = (d.days.paid+' paid of '+d.days.worked+' days · half '+d.days.half+' · absent '+d.days.absent);
+    _fillRows('psEarnings', d.earnings);
+    _fillRows('psDeductions', d.deductions);
+    document.getElementById('psRemarks').value = '';
+    recalcPayslip();
+  }catch(e){ showToast('Failed to load payslip','danger'); }
+}
+
+async function generatePayslip(){
+  var btn=document.getElementById('psGenBtn'); btn.disabled=true;
+  var payload = {
+    company:{name:val('psCoName'),address:val('psCoAddr'),phone:val('psCoPhone'),gst:val('psCoGST')},
+    driver:{id:_psMeta.driverId, name:val('psEmpName'), vehicle:val('psEmpVehicle'),
+            mobile:_psMeta.driver.mobile, bank:_psMeta.driver.bank, account:_psMeta.driver.account, ifsc:_psMeta.driver.ifsc},
+    month:_psMeta.month, month_label:_psMeta.month_label, days:_psMeta.days,
+    earnings:_rowsPayload('psEarnings'), deductions:_rowsPayload('psDeductions'),
+    net:recalcPayslip(), remarks:val('psRemarks')
+  };
+  try{ await _downloadPdf('/payslip/api/payslip-pdf', payload, 'payslip'); }
+  finally{ btn.disabled=false; }
+}
+
+/* ---- Diesel ---- */
+function _dieselRowHtml(r){
+  r=r||{};
+  return '<tr class="ds-row">'+
+    '<td><input type="date" class="form-control form-control-sm glass-input ds-date" value="'+(r.date||'')+'"></td>'+
+    '<td><input class="form-control form-control-sm glass-input ds-veh" value="'+(r.vehicle||'')+'"></td>'+
+    '<td><input class="form-control form-control-sm glass-input ds-type" value="'+(r.fuel_type||'Diesel')+'"></td>'+
+    '<td><input type="number" step="0.01" class="form-control form-control-sm glass-input ds-lit" value="'+(r.litres!=null?r.litres:'')+'" oninput="recalcDiesel()"></td>'+
+    '<td><input type="number" step="0.01" class="form-control form-control-sm glass-input ds-amt" value="'+(r.amount!=null?r.amount:'')+'" oninput="recalcDiesel()"></td>'+
+    '<td><input class="form-control form-control-sm glass-input ds-stn" value="'+(r.station||'')+'"></td>'+
+    '<td><input class="form-control form-control-sm glass-input ds-stat" value="'+(r.status||'Paid')+'"></td>'+
+    '<td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest(\'.ds-row\').remove();recalcDiesel()"><i class="bi bi-x"></i></button></td>'+
+    '</tr>';
+}
+function addDieselRow(){ document.getElementById('dsRows').insertAdjacentHTML('beforeend', _dieselRowHtml({})); }
+function recalcDiesel(){
+  var tl=0, ta=0;
+  document.getElementById('dsRows').querySelectorAll('.ds-row').forEach(function(r){
+    tl += parseFloat(r.querySelector('.ds-lit').value)||0;
+    ta += parseFloat(r.querySelector('.ds-amt').value)||0;
+  });
+  document.getElementById('dsTotLitres').textContent = Number(tl).toLocaleString('en-IN');
+  document.getElementById('dsTotAmount').textContent = '₹'+Number(ta).toLocaleString('en-IN');
+}
+async function openDieselSlip(driverId, month, name){
+  document.getElementById('dsTitleName').textContent = name||'';
+  var m = bootstrap.Modal.getOrCreateInstance(document.getElementById('dieselSlipModal'));
+  document.getElementById('dsRows').innerHTML='<tr><td colspan="8" class="text-muted small">Loading…</td></tr>';
+  m.show();
+  try{
+    var res = await fetch('/payslip/api/diesel-data?driver_id='+encodeURIComponent(driverId)+'&month='+encodeURIComponent(month));
+    var d = await res.json();
+    if(d.error){ showToast(d.error,'danger'); return; }
+    _dsMeta = {driverId:driverId, month:month, month_label:d.month_label, driver:d.driver};
+    document.getElementById('dsTitleMonth').textContent = d.month_label||'';
+    document.getElementById('dsCoName').value = d.company.name||'';
+    document.getElementById('dsCoAddr').value = d.company.address||'';
+    document.getElementById('dsRows').innerHTML = (d.rows||[]).map(_dieselRowHtml).join('') || _dieselRowHtml({});
+    document.getElementById('dsRemarks').value='';
+    recalcDiesel();
+  }catch(e){ showToast('Failed to load diesel data','danger'); }
+}
+async function generateDiesel(){
+  var btn=document.getElementById('dsGenBtn'); btn.disabled=true;
+  var rows=[];
+  document.getElementById('dsRows').querySelectorAll('.ds-row').forEach(function(r){
+    rows.push({date:r.querySelector('.ds-date').value, vehicle:r.querySelector('.ds-veh').value,
+      fuel_type:r.querySelector('.ds-type').value, litres:parseFloat(r.querySelector('.ds-lit').value)||0,
+      amount:parseFloat(r.querySelector('.ds-amt').value)||0, station:r.querySelector('.ds-stn').value,
+      status:r.querySelector('.ds-stat').value});
+  });
+  var payload={company:{name:val('dsCoName'),address:val('dsCoAddr')},
+    driver:_dsMeta.driver, month:_dsMeta.month, month_label:_dsMeta.month_label,
+    rows:rows, remarks:val('dsRemarks')};
+  try{ await _downloadPdf('/payslip/api/diesel-pdf', payload, 'diesel'); }
+  finally{ btn.disabled=false; }
+}
+
+/* ---- shared ---- */
+function val(id){ return document.getElementById(id).value; }
+async function _downloadPdf(url, payload, kind){
+  try{
+    var res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    if(!res.ok){ showToast('Could not generate PDF','danger'); return; }
+    var blob = await res.blob();
+    var cd = res.headers.get('Content-Disposition')||'';
+    var fn = (cd.match(/filename=([^;]+)/)||[])[1] || (kind+'.pdf');
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fn.trim();
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+    showToast('PDF generated','success');
+  }catch(e){ showToast('Network error','danger'); }
+}
+</script>

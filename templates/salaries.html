@@ -37,6 +37,7 @@
         </table>
     </div>
 </div>
+{% include "_slip_modals.html" %}
 {% endblock %}
 {% block scripts %}
 <script>
@@ -78,7 +79,12 @@ async function loadSalaries() {
             const drvInactive = r.DriverStatus && r.DriverStatus.toLowerCase() === 'inactive';
             const drvBadge = drvInactive ? ` <span class="badge bg-secondary" style="font-size:0.62rem">Inactive</span>` : '';
             const driverLink = r.DriverID ? `<a href="/drivers/details/${r.DriverID}" class="text-decoration-none fw-bold">${r.DriverName}</a>` : `<span class="text-muted">${r.DriverName}</span>`;
-            const driverCell = newDrv ? `<td>${driverLink}${drvBadge}</td>` : `<td></td>`;
+            const nm = (r.DriverName||'').replace(/'/g,"\\'");
+            const slipBtns = (newDrv && r.DriverID) ? `<div class="mt-1 viewer-hide d-flex gap-1">
+                <button class="btn btn-sm btn-outline-warning py-0 px-1" title="Generate payslip" onclick="openPayslip('${r.DriverID}', document.getElementById('salaryMonth').value, '${nm}')"><i class="bi bi-receipt"></i> Payslip</button>
+                <button class="btn btn-sm btn-outline-warning py-0 px-1" title="Generate diesel statement" onclick="openDieselSlip('${r.DriverID}', document.getElementById('salaryMonth').value, '${nm}')"><i class="bi bi-fuel-pump"></i></button>
+            </div>` : '';
+            const driverCell = newDrv ? `<td>${driverLink}${drvBadge}${slipBtns}</td>` : `<td></td>`;
             // Vehicle cell — per row, with assignment-edit shortcut
             const vehInactive = r.VehicleStatus && r.VehicleStatus !== 'Active';
             const vehBadge = vehInactive ? ` <span class="badge bg-secondary" style="font-size:0.62rem">${r.VehicleStatus}</span>` : '';
