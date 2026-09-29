@@ -35,7 +35,6 @@
                                 <div class="col-md-4"><label class="form-label">Vehicle Type *</label>
                                     <select class="form-select glass-input" id="vehType"><option>Campor</option><option>RMC Truck</option><option>Car</option></select>
                                 </div>
-                                <div class="col-md-4"><label class="form-label">Default Driver</label><select class="form-select glass-input" id="vehDriver"><option value="">-- Select --</option></select></div>
                                 <div class="col-md-4"><label class="form-label">Default Vendor</label><select class="form-select glass-input" id="vehVendor"><option value="">-- Select --</option></select></div>
                                 <div class="col-md-4"><label class="form-label">Status</label>
                                     <select class="form-select glass-input" id="vehStatus"><option>Active</option><option>Inactive</option><option>Under Maintenance</option><option>Sold</option></select>
@@ -113,8 +112,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         allVehicles = results[0].vehicles || [];
         allDrivers = results[1].drivers || [];
         allVendors = results[2].vendors || [];
-        var drvSel = document.getElementById('vehDriver');
-        allDrivers.forEach(function(d){ drvSel.innerHTML += '<option value="'+d.DriverName+'">'+d.DriverName+'</option>'; });
         var vndSel = document.getElementById('vehVendor');
         allVendors.filter(function(v){return v.Status==='Active'}).forEach(function(v){ vndSel.innerHTML += '<option value="'+v.VendorName+'">'+v.VendorName+'</option>'; });
         renderVehicles(allVehicles);
@@ -191,7 +188,6 @@ function editVehicle(vid) {
     document.getElementById('vehicleModalTitle').textContent = 'Edit Vehicle';
     document.getElementById('vehNumber').value = v.VehicleNumber||'';
     document.getElementById('vehType').value = v.VehicleType||'Truck';
-    document.getElementById('vehDriver').value = v.DefaultDriver||'';
     document.getElementById('vehVendor').value = v.DefaultVendor||'';
     document.getElementById('vehStatus').value = v.VehicleStatus||'Active';
     document.getElementById('vehMonthlySalary').value = v.MonthlySalary||0;
@@ -223,7 +219,6 @@ async function saveVehicle() {
     var payload = {
         VehicleNumber: document.getElementById('vehNumber').value.trim().toUpperCase(),
         VehicleType: document.getElementById('vehType').value,
-        DefaultDriver: document.getElementById('vehDriver').value,
         DefaultVendor: document.getElementById('vehVendor').value,
         VehicleStatus: document.getElementById('vehStatus').value,
         MonthlySalary: document.getElementById('vehMonthlySalary').value,
