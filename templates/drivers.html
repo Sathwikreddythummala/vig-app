@@ -44,7 +44,7 @@
                                 <div class="col-md-4"><label class="form-label">Status</label>
                                     <select class="form-select glass-input" id="drvStatus"><option>Active</option><option>Inactive</option><option>On Leave</option></select>
                                 </div>
-                                <div class="col-md-4"><label class="form-label">Assigned Vehicle</label><select class="form-select glass-input" id="drvVehicle"><option value="">-- None --</option></select></div>
+                                <div class="col-md-4"><label class="form-label">Assigned Vehicle <small class="text-muted">(set on the vehicle → Change Driver)</small></label><input type="text" class="form-control glass-input" id="drvVehicle" readonly placeholder="None" title="Assign a driver from the vehicle page (Change Driver) — kept in sync automatically" style="background:rgba(0,0,0,0.04)"></div>
                                 <div class="col-md-4"><label class="form-label">Joining Date</label><input type="date" class="form-control glass-input" id="drvJoining"></div>
                                 <div class="col-md-4"><label class="form-label">Exit Date</label><input type="date" class="form-control glass-input" id="drvExitDate" onchange="if(this.value){document.getElementById('drvStatus').value='Inactive'}"></div>
                             </div>
@@ -125,8 +125,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         var users = results[2].users || [];
         allDrivers = all.filter(function(d){return (d.EmployeeType||'Driver')==='Driver'});
         allEmployees = users;
-        var vSel = document.getElementById('drvVehicle');
-        allVehicles.forEach(function(v){ vSel.innerHTML += '<option value="'+v.VehicleNumber+'">'+v.VehicleNumber+'</option>'; });
         renderAll();
     } catch(err) {
         console.error(err);
