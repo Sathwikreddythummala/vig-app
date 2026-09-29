@@ -19,19 +19,23 @@
           </div>
         </details>
         <div class="row g-2 mb-3">
-          <div class="col-md-6"><label class="form-label small">Driver Name</label><input class="form-control form-control-sm glass-input" id="psEmpName"></div>
-          <div class="col-md-6"><label class="form-label small">Vehicle Number</label><input class="form-control form-control-sm glass-input" id="psVehicle"></div>
+          <div class="col-md-5"><label class="form-label small">Driver Name</label><input class="form-control form-control-sm glass-input" id="psEmpName"></div>
           <div class="col-md-3"><label class="form-label small">Designation</label><input class="form-control form-control-sm glass-input" id="psDesignation"></div>
-          <div class="col-md-3"><label class="form-label small">Days in Month</label><input type="number" class="form-control form-control-sm glass-input" id="psDaysInMonth"></div>
-          <div class="col-md-3"><label class="form-label small">Effective Days</label><input type="number" step="0.5" class="form-control form-control-sm glass-input" id="psEffDays"></div>
-          <div class="col-md-3"><label class="form-label small">Half / Absent</label>
+          <div class="col-md-2"><label class="form-label small">Days in Month</label><input type="number" class="form-control form-control-sm glass-input" id="psDaysInMonth" oninput="recalcVehicles()"></div>
+          <div class="col-md-2"><label class="form-label small">Half / Absent</label>
             <div class="input-group input-group-sm"><input type="number" class="form-control glass-input" id="psHalfDays" title="Half days"><input type="number" class="form-control glass-input" id="psAbsentDays" title="Absent days"></div></div>
-          <div class="col-md-6"><label class="form-label small">Monthly Salary</label><input type="number" step="0.01" class="form-control form-control-sm glass-input" id="psMonthlySalary"></div>
-          <div class="col-md-6"><label class="form-label small">Per Day Rate</label><input type="number" step="0.01" class="form-control form-control-sm glass-input" id="psPerDay"></div>
+        </div>
+        <div class="mb-3">
+          <b class="text-success" style="font-size:.95rem"><i class="bi bi-truck"></i> Salary by Vehicle</b> <small class="text-muted">— edit a Monthly Salary and it saves to that vehicle</small>
+          <div class="table-responsive mt-1"><table class="table table-sm glass-table mb-1" style="font-size:.85rem">
+            <thead><tr><th>Vehicle</th><th>Days<br><small>eff/total</small></th><th style="width:130px">Monthly Salary</th><th>Per Day</th><th>Salary</th></tr></thead>
+            <tbody id="psVehicles"></tbody>
+            <tfoot><tr class="fw-bold"><td colspan="4" class="text-end">Total Salary</td><td id="psTotalSalary" class="text-success">₹0</td></tr></tfoot>
+          </table></div>
         </div>
         <div class="row g-3">
           <div class="col-md-6">
-            <div class="d-flex justify-content-between align-items-center mb-1"><b class="text-success">Earnings</b><button type="button" class="btn btn-sm btn-outline-success py-0 px-2" onclick="addSlipRow('psEarnings')">+ Add</button></div>
+            <div class="d-flex justify-content-between align-items-center mb-1"><b class="text-success">Other Earnings</b><button type="button" class="btn btn-sm btn-outline-success py-0 px-2" onclick="addSlipRow('psEarnings')">+ Add</button></div>
             <div id="psEarnings"></div>
           </div>
           <div class="col-md-6">
@@ -122,8 +126,34 @@ function _slipRowHtml(box, label, amount){
 function addSlipRow(box){ document.getElementById(box).insertAdjacentHTML('beforeend', _slipRowHtml(box,'',null)); }
 function _fillRows(box, items){ document.getElementById(box).innerHTML = (items||[]).map(function(i){return _slipRowHtml(box, i.label, i.amount);}).join(''); }
 function _sumRows(box){ var t=0; document.getElementById(box).querySelectorAll('.slip-amt').forEach(function(a){ t += parseFloat(a.value)||0; }); return t; }
-function recalcPayslip(){ var net=_sumRows('psEarnings')-_sumRows('psDeductions'); document.getElementById('psNet').textContent='₹'+Number(net).toLocaleString('en-IN'); return net; }
+function recalcPayslip(){ var net=(window._psVehTotal||0)+_sumRows('psEarnings')-_sumRows('psDeductions'); document.getElementById('psNet').textContent='₹'+Number(Math.round(net*100)/100).toLocaleString('en-IN'); return net; }
 function _rowsPayload(box){ var out=[]; document.getElementById(box).querySelectorAll('.slip-row').forEach(function(r){ var l=r.querySelector('.slip-label').value.trim(); var a=parseFloat(r.querySelector('.slip-amt').value)||0; if(l) out.push({label:l,amount:a}); }); return out; }
+
+/* ---- Payslip: salary by vehicle (edit Monthly Salary -> saves to that vehicle) ---- */
+window._psVehTotal = 0;
+function _vehRowHtml(v){ v=v||{};
+  return '<tr class="veh-row" data-id="'+(v.vehicle_id||'')+'" data-num="'+String(v.vehicle_number||'').replace(/"/g,'&quot;')+'" data-days="'+(v.days||0)+'" data-eff="'+(v.effective_days||0)+'" data-pd="'+(v.per_day||0)+'" data-gross="'+(v.gross||0)+'">' +
+    '<td class="fw-bold">'+(v.vehicle_number||'')+'</td>' +
+    '<td>'+(v.effective_days||0)+' / '+(v.days||0)+'</td>' +
+    '<td><input type="number" step="0.01" class="form-control form-control-sm glass-input veh-ms" value="'+(v.monthly_salary!=null?v.monthly_salary:0)+'" oninput="recalcVehicles()"></td>' +
+    '<td class="veh-pd">₹'+Number(v.per_day||0).toLocaleString("en-IN")+'</td>' +
+    '<td class="veh-gross fw-bold">₹'+Number(v.gross||0).toLocaleString("en-IN")+'</td>' +
+    '</tr>';
+}
+function _fillVehicles(list){ document.getElementById('psVehicles').innerHTML=(list||[]).map(_vehRowHtml).join('') || '<tr><td colspan="5" class="text-muted small">No vehicle salary for this month</td></tr>'; }
+function recalcVehicles(){
+  var dim=parseFloat(document.getElementById('psDaysInMonth').value)||30, total=0;
+  document.getElementById('psVehicles').querySelectorAll('.veh-row').forEach(function(r){
+    var ms=parseFloat(r.querySelector('.veh-ms').value)||0, eff=parseFloat(r.dataset.eff)||0;
+    var pd=dim?ms/dim:0, gross=pd*eff;
+    r.querySelector('.veh-pd').textContent='₹'+Number(Math.round(pd*100)/100).toLocaleString('en-IN');
+    r.querySelector('.veh-gross').textContent='₹'+Number(Math.round(gross*100)/100).toLocaleString('en-IN');
+    r.dataset.pd=pd; r.dataset.gross=gross; total+=gross;
+  });
+  document.getElementById('psTotalSalary').textContent='₹'+Number(Math.round(total*100)/100).toLocaleString('en-IN');
+  window._psVehTotal=total; recalcPayslip();
+}
+function _vehiclesPayload(){ var out=[]; document.getElementById('psVehicles').querySelectorAll('.veh-row').forEach(function(r){ out.push({vehicle_id:r.dataset.id, vehicle_number:r.dataset.num, monthly_salary:parseFloat(r.querySelector('.veh-ms').value)||0, days:parseFloat(r.dataset.days)||0, effective_days:parseFloat(r.dataset.eff)||0, per_day:parseFloat(r.dataset.pd)||0, gross:parseFloat(r.dataset.gross)||0}); }); return out; }
 
 /* ---- Payslip payment/deduction history ---- */
 function _histRowHtml(h){ h=h||{};
@@ -152,26 +182,26 @@ async function openPayslip(driverId, month, name){
     document.getElementById('psTitleMonth').textContent = d.month_label||'';
     var c=d.company;
     setv('psCoName',c.name); setv('psCoAddr',c.address); setv('psCoPhone',c.phone); setv('psCoPhone2',c.phone2); setv('psCoGST',c.gst); setv('psCoEmail',c.email);
-    setv('psEmpName',d.driver.name); setv('psVehicle',d.driver.vehicle); setv('psDesignation',d.driver.designation);
+    setv('psEmpName',d.driver.name); setv('psDesignation',d.driver.designation);
     var mt=d.meta;
-    setv('psDaysInMonth',mt.days_in_month); setv('psEffDays',mt.effective_days); setv('psHalfDays',mt.half_days); setv('psAbsentDays',mt.absent_days);
-    setv('psMonthlySalary',mt.monthly_salary); setv('psPerDay',mt.per_day);
-    _fillRows('psEarnings', d.earnings); _fillRows('psDeductions', d.deductions);
+    setv('psDaysInMonth',mt.days_in_month); setv('psHalfDays',mt.half_days); setv('psAbsentDays',mt.absent_days);
+    _fillVehicles(d.vehicles);
+    _fillRows('psEarnings', d.other_earnings); _fillRows('psDeductions', d.deductions);
     _fillHistory(d.history);
-    setv('psRemarks',''); recalcPayslip();
+    setv('psRemarks',''); recalcVehicles();
   }catch(e){ showToast('Failed to load payslip','danger'); }
 }
 async function generatePayslip(){
   var btn=document.getElementById('psGenBtn'); btn.disabled=true;
   var payload = {
     company:{name:val('psCoName'),address:val('psCoAddr'),phone:val('psCoPhone'),phone2:val('psCoPhone2'),gst:val('psCoGST'),email:val('psCoEmail')},
-    driver:{id:_psMeta.driverId, name:val('psEmpName'), vehicle:val('psVehicle'), designation:val('psDesignation'),
+    driver:{id:_psMeta.driverId, name:val('psEmpName'), vehicle:_psMeta.driver.vehicle, designation:val('psDesignation'),
             mobile:_psMeta.driver.mobile, bank:_psMeta.driver.bank, account:_psMeta.driver.account, ifsc:_psMeta.driver.ifsc},
-    meta:{days_in_month:numv('psDaysInMonth'), effective_days:numv('psEffDays'), half_days:numv('psHalfDays'),
-          absent_days:numv('psAbsentDays'), monthly_salary:numv('psMonthlySalary'), per_day:numv('psPerDay')},
-    month:_psMeta.month, month_label:_psMeta.month_label, vehicle_id:_psMeta.vehicle_id,
-    earnings:_rowsPayload('psEarnings'), deductions:_rowsPayload('psDeductions'), history:_historyPayload(),
-    net:recalcPayslip(), remarks:val('psRemarks')
+    meta:{days_in_month:numv('psDaysInMonth'), half_days:numv('psHalfDays'), absent_days:numv('psAbsentDays')},
+    month:_psMeta.month, month_label:_psMeta.month_label,
+    vehicles:_vehiclesPayload(),
+    other_earnings:_rowsPayload('psEarnings'), deductions:_rowsPayload('psDeductions'), history:_historyPayload(),
+    remarks:val('psRemarks')
   };
   try{ await _downloadPdf('/payslip/api/payslip-pdf', payload, 'payslip'); } finally{ btn.disabled=false; }
 }

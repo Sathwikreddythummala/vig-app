@@ -271,17 +271,37 @@ async def payslip_data(request: Request, driver_id: str = "", month: str = ""):
         per_day = round(monthly_salary / days_in_month, 2) if days_in_month else 0.0
 
     dm = _diesel_mileage(primary, month) if primary else {"amount": 0.0}
-    gross = round(agg["Gross"], 2)
-    incentive = round(agg["Incentive"], 2)
     meals = round(agg["Meals"], 2)
     dm_amt = round(dm.get("amount", 0.0), 2)
     salary_paid = round(agg["SalaryPaid"], 2)
     advance = round(agg["Advance"], 2)
     deductions = round(agg["Deductions"], 2)
     other = round(agg["Other"], 2)
-    net = (gross + dm_amt + meals) - (salary_paid + advance + deductions + other)
-    _pv = _vehicle(primary)
-    vehicle_id = _pv.get("VehicleID", "") if _pv else ""
+
+    # Per-vehicle salary breakdown: a driver on 2 vehicles earns from EACH vehicle,
+    # pro-rated by the days driven on it (vehicle salary / days-in-month x days).
+    veh_rows = []
+    for r in rows:
+        veh_rows.append({
+            "vehicle_id": r.get("VehicleID", ""),
+            "vehicle_number": r.get("VehicleNumber", ""),
+            "monthly_salary": _num(r.get("VehicleSalary")),
+            "per_day": _num(r.get("PerDay")),
+            "days": _num(r.get("Days")),
+            "effective_days": _num(r.get("EffectiveDays")),
+            "gross": round(_num(r.get("Gross")), 2),
+        })
+    if not veh_rows and primary:
+        pv = _vehicle(primary)
+        if pv:
+            ms0 = _num(pv.get("MonthlySalary"))
+            veh_rows.append({
+                "vehicle_id": pv.get("VehicleID", ""), "vehicle_number": primary,
+                "monthly_salary": ms0, "per_day": round(ms0 / days_in_month, 2) if days_in_month else 0.0,
+                "days": 0, "effective_days": 0, "gross": 0.0,
+            })
+    total_gross = round(sum(v["gross"] for v in veh_rows), 2)
+    net = (total_gross + dm_amt + meals) - (salary_paid + advance + deductions + other)
 
     # itemized payment/deduction history from the DB (this driver's Driver Expense entries this month)
     dname = str(driver.get("DriverName", "")).strip()
@@ -314,11 +334,9 @@ async def payslip_data(request: Request, driver_id: str = "", month: str = ""):
             "days_in_month": days_in_month,
             "effective_days": round(agg["EffectiveDays"], 1),
             "half_days": round(agg["HalfDays"]), "absent_days": round(agg["AbsentDays"]),
-            "monthly_salary": monthly_salary, "per_day": per_day,
         },
-        "vehicle_id": vehicle_id,
-        "earnings": [
-            {"label": "Salary (Gross)", "amount": gross},
+        "vehicles": veh_rows,
+        "other_earnings": [
             {"label": "Diesel Mileage", "amount": dm_amt},
             {"label": "Meals Allowance", "amount": meals},
         ],
@@ -407,21 +425,27 @@ async def payslip_pdf(request: Request):
     _save_company_info(company)
     driver = data.get("driver", {})
     meta = data.get("meta", {})
-    earnings = [(str(e.get("label", "")), _num(e.get("amount"))) for e in data.get("earnings", []) if str(e.get("label", "")).strip()]
+    days_in_month = _num(meta.get("days_in_month")) or 30
+    # Per-vehicle salary. Recompute each gross server-side from the (possibly edited)
+    # monthly salary, and WRITE BACK the monthly salary to that vehicle.
+    veh = []
+    for v in data.get("vehicles", []):
+        ms = _num(v.get("monthly_salary"))
+        eff = _num(v.get("effective_days"))
+        pd = round(ms / days_in_month, 2) if days_in_month else 0.0
+        veh.append({"num": str(v.get("vehicle_number", "")), "ms": ms, "per_day": pd,
+                    "days": _num(v.get("days")), "eff": eff, "gross": round(pd * eff, 2)})
+        if str(v.get("vehicle_id", "")).strip() and str(v.get("monthly_salary")).strip() not in ("", "None"):
+            _set_vehicle_monthly_salary(str(v.get("vehicle_id")).strip(), ms)
+    total_salary = round(sum(x["gross"] for x in veh), 2)
+    other_earnings = [(str(e.get("label", "")), _num(e.get("amount"))) for e in data.get("other_earnings", []) if str(e.get("label", "")).strip()]
+    earnings = [("Salary (Total)", total_salary)] + other_earnings
     deductions = [(str(d.get("label", "")), _num(d.get("amount"))) for d in data.get("deductions", []) if str(d.get("label", "")).strip()]
     total_earn = sum(a for _l, a in earnings)
     total_ded = sum(a for _l, a in deductions)
     net = total_earn - total_ded
     month_label = str(data.get("month_label", ""))
     remarks = str(data.get("remarks", "")).strip()
-
-    # Write-back to the salaries data: overwrite the vehicle's Monthly Salary and this
-    # month's Incentive (only these two sync back; other amounts affect the PDF only).
-    month = str(data.get("month", "")).strip()
-    vehicle_id = str(data.get("vehicle_id", "")).strip()
-    ms = meta.get("monthly_salary")
-    if vehicle_id and str(ms).strip() not in ("", "None"):
-        _set_vehicle_monthly_salary(vehicle_id, _num(ms))
 
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -451,11 +475,10 @@ async def payslip_pdf(request: Request):
     el.append(Spacer(1, 8))
 
     grid = [
-        ["Driver Name", safe(driver.get("name", "")), "Vehicle Number", safe(driver.get("vehicle", ""))],
-        ["Designation", safe(driver.get("designation", "Driver")), "Pay Period", safe(month_label)],
-        ["Days in Month", str(meta.get("days_in_month", "")), "Effective Days", str(meta.get("effective_days", ""))],
-        ["Half Days", str(meta.get("half_days", "")), "Absent Days", str(meta.get("absent_days", ""))],
-        ["Monthly Salary", rs(meta.get("monthly_salary")), "Per Day Rate", rs(meta.get("per_day"))],
+        ["Driver Name", safe(driver.get("name", "")), "Designation", safe(driver.get("designation", "Driver"))],
+        ["Pay Period", safe(month_label), "Days in Month", str(int(days_in_month))],
+        ["Days Worked", f"{sum(x['eff'] for x in veh):g}", "Half / Absent",
+         f"{meta.get('half_days', 0)} / {meta.get('absent_days', 0)}"],
     ]
     gt = Table(grid, colWidths=[W * 0.18, W * 0.32, W * 0.18, W * 0.32])
     gt.setStyle(TableStyle([
@@ -467,6 +490,26 @@ async def payslip_pdf(request: Request):
         ("LEFTPADDING", (0, 0), (-1, -1), 7),
     ]))
     el.append(gt)
+    el.append(Spacer(1, 10))
+
+    # Salary by vehicle (a driver on 2 vehicles earns from each, by days on it)
+    el.append(Paragraph("<b>Salary by Vehicle</b>", small))
+    el.append(Spacer(1, 3))
+    vt = [["VEHICLE", "DAYS (eff/total)", "MONTHLY SALARY", "PER DAY", "SALARY"]]
+    for x in veh:
+        vt.append([safe(x["num"]), f"{x['eff']:g} / {x['days']:g}", rs(x["ms"]), rs(x["per_day"]), rs(x["gross"])])
+    vt.append(["", "", "", "Total Salary", rs(total_salary)])
+    vtab = Table(vt, colWidths=[W * 0.22, W * 0.18, W * 0.24, W * 0.16, W * 0.20])
+    vtab.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("BACKGROUND", (0, 0), (-1, 0), GOLD), ("TEXTCOLOR", (0, 0), (-1, 0), INK),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (2, 0), (4, -1), "RIGHT"), ("ALIGN", (1, 0), (1, -1), "CENTER"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"), ("BACKGROUND", (0, -1), (-1, -1), GOLD_LT),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E0C060")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    el.append(vtab)
     el.append(Spacer(1, 12))
 
     n = max(len(earnings), len(deductions))
