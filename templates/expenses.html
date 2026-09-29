@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [catRes, vehRes, drvRes] = await Promise.all([
         fetch('/expenses/api/categories').then(r=>r.json()),
         fetch('/vehicles/api/list').then(r=>r.json()),
-        fetch('/drivers/api/list').then(r=>r.json())
+        fetch('/drivers/api/list?active_only=1').then(r=>r.json())
     ]);
     categories = catRes.categories || {};
     vehicles = vehRes.vehicles || [];

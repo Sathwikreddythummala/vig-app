@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('attDate').value = todayLocal();
     document.getElementById('summaryMonth').value = thisMonthLocal();
     try {
-        const dres = await fetch('/drivers/api/list');
+        const dres = await fetch('/drivers/api/list?active_only=1');
         allDrivers = ((await dres.json()).drivers || []).filter(d => (d.EmployeeType||'Driver') === 'Driver');
     } catch(e) {}
     loadAttendance();

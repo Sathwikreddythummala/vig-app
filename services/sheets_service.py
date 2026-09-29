@@ -11,7 +11,7 @@ from services.db import execute, initialize_db
 SHEET_HEADERS = {
     "Vehicles": [
         "VehicleID", "VehicleNumber", "VehicleType", "DefaultDriver", "DefaultVendor", "VehicleStatus",
-        "MonthlySalary",
+        "MonthlySalary", "AllowedMileage", "DieselRate",
         "RCNumber", "RCExpiry",
         "InsurancePolicyNumber", "InsuranceCompany", "InsuranceStartDate", "InsuranceExpiryDate",
         "PermitNumber", "PermitExpiryDate",

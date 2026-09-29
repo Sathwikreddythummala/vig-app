@@ -60,6 +60,17 @@ def _norm_mobile(s: str) -> str:
     return digits[-10:] if len(digits) >= 10 else digits
 
 
+def _pin_for(driver: dict) -> str:
+    """The driver's app PIN = last 4 digits of their assigned vehicle number.
+    Falls back to any manually-set PortalPIN when the driver has no vehicle."""
+    digits = "".join(c for c in str(driver.get("AssignedVehicle", "") or "") if c.isdigit())
+    if len(digits) >= 4:
+        return digits[-4:]
+    if digits:
+        return digits
+    return str(driver.get("PortalPIN", "")).strip()
+
+
 # ---------------------------------------------------------------------------
 # Per-driver PIN login flow
 # ---------------------------------------------------------------------------
@@ -86,10 +97,10 @@ async def portal_login(request: Request):
             break
     if not driver:
         return JSONResponse({"error": "Mobile number not found. Ask the office."}, 404)
-    saved_pin = str(driver.get("PortalPIN", "")).strip()
-    if not saved_pin:
-        return JSONResponse({"error": "Your PIN is not set yet. Ask the office to set it."}, 400)
-    if pin != saved_pin:
+    expected = _pin_for(driver)  # last 4 digits of the driver's vehicle
+    if not expected:
+        return JSONResponse({"error": "No vehicle assigned yet. Ask the office to assign your vehicle."}, 400)
+    if pin != expected:
         return JSONResponse({"error": "Wrong PIN"}, 401)
     request.session["portal_driver"] = {
         "id": driver.get("DriverID", ""),
@@ -179,10 +190,10 @@ async def portal_pins(request: Request):
     drivers = [
         {"id": d.get("DriverID", ""), "name": d.get("DriverName", ""),
          "vehicle": d.get("AssignedVehicle", ""), "mobile": str(d.get("MobileNumber", "")).strip(),
-         "pin": str(d.get("PortalPIN", "")).strip()}
+         "pin": _pin_for(d)}  # PIN is the last 4 digits of the driver's vehicle
         for d in _active_drivers() if d.get("DriverID", "")
     ]
-    return {"drivers": drivers}
+    return {"drivers": drivers, "pin_source": "vehicle"}
 
 
 @router.post("/api/set-pin")

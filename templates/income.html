@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('incDate').value = todayLocal();
     var results = await Promise.all([
         fetch('/vehicles/api/list').then(function(r){return r.json()}),
-        fetch('/drivers/api/list').then(function(r){return r.json()}),
+        fetch('/drivers/api/list?active_only=1').then(function(r){return r.json()}),
         fetch('/vendors/api/list').then(function(r){return r.json()})
     ]);
     vehicles = results[0].vehicles||[];

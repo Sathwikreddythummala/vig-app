@@ -120,7 +120,7 @@ if (typeof USER_ROLE !== 'undefined' && USER_ROLE !== 'admin') {
 document.addEventListener('DOMContentLoaded', async function() {
     var results = await Promise.all([
         fetch('/vehicles/api/list').then(function(r){return r.json()}),
-        fetch('/drivers/api/list').then(function(r){return r.json()})
+        fetch('/drivers/api/list?active_only=1').then(function(r){return r.json()})
     ]);
     allVehicles = results[0].vehicles || [];
     allDrivers = results[1].drivers || [];

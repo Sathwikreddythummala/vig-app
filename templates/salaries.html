@@ -88,7 +88,7 @@ async function loadSalaries() {
             // Vehicle cell — per row, with assignment-edit shortcut
             const vehInactive = r.VehicleStatus && r.VehicleStatus !== 'Active';
             const vehBadge = vehInactive ? ` <span class="badge bg-secondary" style="font-size:0.62rem">${r.VehicleStatus}</span>` : '';
-            const asgBtn = ` <a href="/vehicles/details/${r.VehicleID}" class="btn btn-sm btn-outline-warning viewer-hide py-0 px-1" title="Edit driver assignment periods (split salary)"><i class="bi bi-calendar-range"></i></a>`;
+            const asgBtn = ` <a href="/vehicles/details/${r.VehicleID}" class="btn btn-sm btn-outline-warning viewer-hide py-0 px-1" title="Assign / change the driver for this vehicle"><i class="bi bi-person-gear"></i> Driver</a>`;
             const incCell = (canEdit && r.IncentiveEditable)
                 ? `<td><input type="number" class="form-control form-control-sm glass-input" style="width:95px" value="${r.Incentive}" data-driver="${r.DriverID}" onchange="saveIncentive(this)" title="Edit incentive"></td>`
                 : `<td>${fmt(r.Incentive)}</td>`;

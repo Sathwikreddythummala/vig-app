@@ -189,7 +189,8 @@
       "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/b790c56a-429d-4c2c-9c78-b70d885d1fba/scratchpad/dp.js\")",
       "Bash(git commit -q -m 'Driver app: label credit fuel as '\\\\''Katha'\\\\'' *)",
       "Bash(python -c \"import secrets; print\\(secrets.token_hex\\(32\\)\\)\")",
-      "PowerShell(cd \"C:\\\\TSR Fleet App\\\\routes\"; foreach \\($f in @\\(\"expenses.py\",\"purse.py\",\"emi.py\",\"gst.py\",\"mithi.py\"\\)\\) { $t = Get-Content $f -Raw; $t = $t -replace 'require_admin_or_viewer', 'require_view'; $t = $t -replace 'require_admin\\\\b', 'require_editor'; Set-Content $f $t -Encoding utf8 -NoNewline; \"updated $f\" })"
+      "PowerShell(cd \"C:\\\\TSR Fleet App\\\\routes\"; foreach \\($f in @\\(\"expenses.py\",\"purse.py\",\"emi.py\",\"gst.py\",\"mithi.py\"\\)\\) { $t = Get-Content $f -Raw; $t = $t -replace 'require_admin_or_viewer', 'require_view'; $t = $t -replace 'require_admin\\\\b', 'require_editor'; Set-Content $f $t -Encoding utf8 -NoNewline; \"updated $f\" })",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/1d390f8a-6409-4c52-ada2-aacc459f161b/scratchpad/vd.js\")"
     ]
   }
 }

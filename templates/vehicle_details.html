@@ -76,7 +76,7 @@ async function loadVehicleDetails() {
     var catWise = {};
     expenses.forEach(function(e) { catWise[e.Category] = (catWise[e.Category]||0) + parseFloat(e.Amount||0); });
 
-    var drvRes = await fetch('/drivers/api/list');
+    var drvRes = await fetch('/drivers/api/list?active_only=1');
     var drvData = await drvRes.json();
     allDrivers = drvData.drivers || [];
     var driverOptions = '<option value="">-- No Driver --</option>';
@@ -194,20 +194,51 @@ async function loadAssignments() {
             dl.innerHTML = allDrivers.map(function(d){return '<option value="'+(d.DriverName||'')+'">';}).join('');
             dl.dataset.filled = '1';
         }
-        var tb = document.getElementById('assignmentsTable');
-        if (!list.length) {
-            tb.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-2">No periods recorded — the current driver is treated as driving the whole month. Add periods to split.</td></tr>';
-            return;
-        }
-        tb.innerHTML = list.map(function(a){
-            return '<tr>'+
-                '<td class="fw-bold">'+(a.DriverName||'')+'</td>'+
-                '<td>'+(a.StartDate||'-')+'</td>'+
-                '<td>'+(a.EndDate||'<span class="badge bg-info text-dark">current</span>')+'</td>'+
-                '<td class="viewer-hide"><button class="btn btn-sm btn-outline-danger" onclick="deleteAssignment(\''+a.AssignmentID+'\')"><i class="bi bi-trash"></i></button></td>'+
-                '</tr>';
-        }).join('');
+        _assignments = list;
+        renderAssignments();
     } catch(e) {}
+}
+
+var _assignments = [];
+function _esc(s){ return String(s||'').replace(/"/g,'&quot;'); }
+function renderAssignments(editId) {
+    var tb = document.getElementById('assignmentsTable');
+    if (!_assignments.length) {
+        tb.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-2">No periods recorded — the current driver is treated as driving the whole month. Add periods to split.</td></tr>';
+        return;
+    }
+    tb.innerHTML = _assignments.map(function(a){
+        if (a.AssignmentID === editId) {
+            return '<tr>'+
+                '<td><input class="form-control form-control-sm glass-input" id="ed_drv_'+a.AssignmentID+'" list="asgDriverList" value="'+_esc(a.DriverName)+'"></td>'+
+                '<td><input type="date" class="form-control form-control-sm glass-input" id="ed_start_'+a.AssignmentID+'" value="'+(a.StartDate||'')+'"></td>'+
+                '<td><input type="date" class="form-control form-control-sm glass-input" id="ed_end_'+a.AssignmentID+'" value="'+(a.EndDate||'')+'"></td>'+
+                '<td class="viewer-hide text-nowrap"><button class="btn btn-sm btn-success" onclick="saveAssignment(\''+a.AssignmentID+'\')" title="Save"><i class="bi bi-check-lg"></i></button> <button class="btn btn-sm btn-outline-secondary" onclick="renderAssignments()" title="Cancel"><i class="bi bi-x-lg"></i></button></td>'+
+                '</tr>';
+        }
+        return '<tr>'+
+            '<td class="fw-bold">'+(a.DriverName||'')+'</td>'+
+            '<td>'+(a.StartDate||'-')+'</td>'+
+            '<td>'+(a.EndDate||'<span class="badge bg-info text-dark">current</span>')+'</td>'+
+            '<td class="viewer-hide text-nowrap"><button class="btn btn-sm btn-outline-warning" onclick="renderAssignments(\''+a.AssignmentID+'\')" title="Edit period"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteAssignment(\''+a.AssignmentID+'\')" title="Delete"><i class="bi bi-trash"></i></button></td>'+
+            '</tr>';
+    }).join('');
+}
+
+async function saveAssignment(id) {
+    var drv = document.getElementById('ed_drv_'+id).value.trim();
+    var start = document.getElementById('ed_start_'+id).value;
+    var end = document.getElementById('ed_end_'+id).value;
+    if (!drv || !start) { showToast('Driver and start date required', 'danger'); return; }
+    try {
+        var res = await fetch('/vehicles/api/assignments/' + id, {
+            method: 'PUT', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({DriverName: drv, StartDate: start, EndDate: end})
+        });
+        var data = await res.json();
+        if (data.success) { showToast('Assignment updated', 'success'); loadAssignments(); }
+        else { showToast(data.error || 'Failed', 'danger'); }
+    } catch(e) { showToast('Network error', 'danger'); }
 }
 
 async function addAssignment() {

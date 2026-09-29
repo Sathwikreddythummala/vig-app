@@ -2,8 +2,9 @@ from fastapi import APIRouter, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from services.sheets_service import (
     get_all_records, find_row_by_id, append_row, update_row, delete_row,
-    gen_id, now_str, add_audit_log,
+    gen_id, now_str, add_audit_log, invalidate_cache,
 )
+from services.db import execute as _db_execute
 from services.drive_service import upload_file
 from utils.templates import templates
 
@@ -56,11 +57,13 @@ async def drivers_page(request: Request):
 
 
 @router.get("/api/list")
-async def list_drivers(request: Request):
+async def list_drivers(request: Request, active_only: str = ""):
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     drivers = get_all_records("Drivers")
+    if active_only in ("1", "true", "yes"):
+        drivers = [d for d in drivers if str(d.get("Status", "Active")).strip().lower() != "inactive"]
     drivers.sort(key=lambda d: str(d.get("AssignedVehicle", "") or "ZZZ"))
     return {"drivers": drivers}
 
@@ -524,9 +527,25 @@ async def update_driver(request: Request, driver_id: str):
     }
     row = [vals.get(h, "") for h in headers]
     update_row("Drivers", row_num, row)
+
+    # Rename cascade: if the driver's name changed, update it everywhere it's stored as text
+    old_name = str(existing.get("DriverName", "")).strip()
+    new_name = str(data.get("DriverName", "")).strip()
+    if old_name and new_name and old_name != new_name:
+        for tbl in ("Expenses", "FuelEntries", "Attendance", "Incentives", "Income", "VehicleAssignments"):
+            try:
+                _db_execute(f'UPDATE "{tbl}" SET "DriverName"=%s WHERE "DriverName"=%s', [new_name, old_name])
+            except Exception:
+                pass
+        try:
+            _db_execute('UPDATE "Vehicles" SET "DefaultDriver"=%s WHERE "DefaultDriver"=%s', [new_name, old_name])
+        except Exception:
+            pass
+        invalidate_cache()
+
     old_vehicle = str(existing.get("AssignedVehicle", "")).strip()
     new_vehicle = str(data.get("AssignedVehicle", "")).strip()
-    driver_name = str(data.get("DriverName", "")).strip()
+    driver_name = new_name
     if old_vehicle != new_vehicle:
         from services.sheets_service import SHEET_HEADERS
         vehicles = get_all_records("Vehicles")
