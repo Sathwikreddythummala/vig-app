@@ -148,7 +148,7 @@ async function openPayslip(driverId, month, name){
     var res = await fetch('/payslip/api/payslip-data?driver_id='+encodeURIComponent(driverId)+'&month='+encodeURIComponent(month));
     var d = await res.json();
     if(d.error){ showToast(d.error,'danger'); return; }
-    _psMeta = {driverId:driverId, month:month, month_label:d.month_label, driver:d.driver};
+    _psMeta = {driverId:driverId, month:month, month_label:d.month_label, driver:d.driver, vehicle_id:d.vehicle_id};
     document.getElementById('psTitleMonth').textContent = d.month_label||'';
     var c=d.company;
     setv('psCoName',c.name); setv('psCoAddr',c.address); setv('psCoPhone',c.phone); setv('psCoPhone2',c.phone2); setv('psCoGST',c.gst); setv('psCoEmail',c.email);
@@ -169,7 +169,7 @@ async function generatePayslip(){
             mobile:_psMeta.driver.mobile, bank:_psMeta.driver.bank, account:_psMeta.driver.account, ifsc:_psMeta.driver.ifsc},
     meta:{days_in_month:numv('psDaysInMonth'), effective_days:numv('psEffDays'), half_days:numv('psHalfDays'),
           absent_days:numv('psAbsentDays'), monthly_salary:numv('psMonthlySalary'), per_day:numv('psPerDay')},
-    month:_psMeta.month, month_label:_psMeta.month_label,
+    month:_psMeta.month, month_label:_psMeta.month_label, vehicle_id:_psMeta.vehicle_id,
     earnings:_rowsPayload('psEarnings'), deductions:_rowsPayload('psDeductions'), history:_historyPayload(),
     net:recalcPayslip(), remarks:val('psRemarks')
   };

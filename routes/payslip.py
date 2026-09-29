@@ -7,7 +7,7 @@ incentive computed from Approved KM vs allowed mileage, and amount in words w/ p
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 import io
-from services.sheets_service import get_all_records, append_row, update_row, build_row, now_str, add_audit_log
+from services.sheets_service import get_all_records, append_row, update_row, build_row, now_str, add_audit_log, find_row_by_id, gen_id
 from services.db import execute
 from routes.drivers import vehicle_salaries_api
 
@@ -185,6 +185,38 @@ def _diesel_mileage(vnum: str, month: str) -> dict:
     }
 
 
+def _set_vehicle_monthly_salary(vehicle_id: str, amount: float):
+    from services.sheets_service import SHEET_HEADERS
+    res = find_row_by_id("Vehicles", vehicle_id)
+    if not res:
+        return
+    rn, v = res
+    headers = SHEET_HEADERS["Vehicles"]
+    row = [v.get(h, "") for h in headers]
+    row[headers.index("MonthlySalary")] = str(amount)
+    row[headers.index("UpdatedDate")] = now_str()
+    update_row("Vehicles", rn, row)
+
+
+def _set_incentive(driver_id: str, driver_name: str, month: str, amount: float):
+    from services.sheets_service import SHEET_HEADERS
+    headers = SHEET_HEADERS["Incentives"]
+    for inc in get_all_records("Incentives"):
+        if str(inc.get("DriverID", "")) == str(driver_id) and str(inc.get("ForMonth", "")) == month:
+            res = find_row_by_id("Incentives", inc.get("IncentiveID", ""))
+            if res:
+                rn, ex = res
+                row = [ex.get(h, "") for h in headers]
+                row[headers.index("Amount")] = str(amount)
+                row[headers.index("UpdatedDate")] = now_str()
+                update_row("Incentives", rn, row)
+            return
+    vals = {"IncentiveID": gen_id("INC"), "DriverID": driver_id, "DriverName": driver_name,
+            "ForMonth": month, "Amount": str(amount), "Description": "Payslip",
+            "EnteredBy": "payslip", "CreatedDate": now_str(), "UpdatedDate": now_str()}
+    append_row("Incentives", build_row("Incentives", vals))
+
+
 def _driver_and_primary_vehicle(driver_id: str, rows: list):
     driver = None
     for d in get_all_records("Drivers"):
@@ -222,7 +254,7 @@ async def payslip_data(request: Request, driver_id: str = "", month: str = ""):
     if not driver:
         return JSONResponse({"error": "Driver not found"}, 404)
 
-    agg = {k: 0.0 for k in ("Gross", "SalaryPaid", "Advance", "Meals", "Deductions", "Other",
+    agg = {k: 0.0 for k in ("Gross", "Incentive", "SalaryPaid", "Advance", "Meals", "Deductions", "Other",
                             "EffectiveDays", "HalfDays", "AbsentDays")}
     for r in rows:
         for k in agg:
@@ -240,6 +272,7 @@ async def payslip_data(request: Request, driver_id: str = "", month: str = ""):
 
     dm = _diesel_mileage(primary, month) if primary else {"amount": 0.0}
     gross = round(agg["Gross"], 2)
+    incentive = round(agg["Incentive"], 2)
     meals = round(agg["Meals"], 2)
     dm_amt = round(dm.get("amount", 0.0), 2)
     salary_paid = round(agg["SalaryPaid"], 2)
@@ -247,6 +280,8 @@ async def payslip_data(request: Request, driver_id: str = "", month: str = ""):
     deductions = round(agg["Deductions"], 2)
     other = round(agg["Other"], 2)
     net = (gross + dm_amt + meals) - (salary_paid + advance + deductions + other)
+    _pv = _vehicle(primary)
+    vehicle_id = _pv.get("VehicleID", "") if _pv else ""
 
     # itemized payment/deduction history from the DB (this driver's Driver Expense entries this month)
     dname = str(driver.get("DriverName", "")).strip()
@@ -281,6 +316,7 @@ async def payslip_data(request: Request, driver_id: str = "", month: str = ""):
             "half_days": round(agg["HalfDays"]), "absent_days": round(agg["AbsentDays"]),
             "monthly_salary": monthly_salary, "per_day": per_day,
         },
+        "vehicle_id": vehicle_id,
         "earnings": [
             {"label": "Salary (Gross)", "amount": gross},
             {"label": "Diesel Mileage", "amount": dm_amt},
@@ -378,6 +414,14 @@ async def payslip_pdf(request: Request):
     net = total_earn - total_ded
     month_label = str(data.get("month_label", ""))
     remarks = str(data.get("remarks", "")).strip()
+
+    # Write-back to the salaries data: overwrite the vehicle's Monthly Salary and this
+    # month's Incentive (only these two sync back; other amounts affect the PDF only).
+    month = str(data.get("month", "")).strip()
+    vehicle_id = str(data.get("vehicle_id", "")).strip()
+    ms = meta.get("monthly_salary")
+    if vehicle_id and str(ms).strip() not in ("", "None"):
+        _set_vehicle_monthly_salary(vehicle_id, _num(ms))
 
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
