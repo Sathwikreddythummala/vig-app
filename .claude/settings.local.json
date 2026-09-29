@@ -196,7 +196,8 @@
       "Bash(python -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\)\\) for f in ['routes/dashboard.py','routes/expenses.py','routes/vehicles.py']]; print\\('python OK'\\)\")",
       "Bash(node --check static/js/app.js)",
       "Bash(echo \"commit rc=$?\")",
-      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/c60a22bb-120a-4dd1-b80d-9229c36863f4/scratchpad/veh.js\")"
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/c60a22bb-120a-4dd1-b80d-9229c36863f4/scratchpad/veh.js\")",
+      "Bash(git commit -q -m 'Vehicles: show current driver from the open assignment period, not stale DefaultDriver *)"
     ]
   }
 }

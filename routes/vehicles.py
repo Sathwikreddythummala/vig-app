@@ -65,7 +65,21 @@ async def list_vehicles(request: Request):
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    vehicles = get_all_records("Vehicles")
+    vehicles = [{**v} for v in get_all_records("Vehicles")]
+    # The current driver is the OPEN assignment period (source of truth), not the
+    # possibly-stale DefaultDriver field. Show that on the cards/lists.
+    open_by_vehicle = {}
+    for a in get_all_records("VehicleAssignments"):
+        if str(a.get("EndDate", "")).strip():
+            continue
+        vn = str(a.get("VehicleNumber", "")).strip()
+        prev = open_by_vehicle.get(vn)
+        if not prev or str(a.get("StartDate", "")) >= str(prev.get("StartDate", "")):
+            open_by_vehicle[vn] = a
+    for v in vehicles:
+        cur = open_by_vehicle.get(str(v.get("VehicleNumber", "")).strip())
+        if cur and str(cur.get("DriverName", "")).strip():
+            v["DefaultDriver"] = cur.get("DriverName", "")
     vehicles.sort(key=lambda v: str(v.get("VehicleNumber", "")))
     return {"vehicles": vehicles}
 
