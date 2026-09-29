@@ -99,6 +99,35 @@ def reconcile_driver_vehicle():
                 closed += 1
     invalidate_cache("VehicleAssignments")
 
+    # 1b. A driver can drive only ONE vehicle at a time. If a driver has >1 OPEN
+    #     assignment, keep the latest-start one and close the earlier ones (a vehicle
+    #     may still have many drivers over the month — that's separate periods).
+    from collections import defaultdict
+    from datetime import timedelta
+    open_by_driver = defaultdict(list)
+    for a in get_all_records("VehicleAssignments"):
+        if not str(a.get("EndDate", "")).strip() and str(a.get("DriverName", "")).strip():
+            open_by_driver[str(a.get("DriverName", "")).strip()].append(a)
+    for _drv, lst in open_by_driver.items():
+        if len(lst) <= 1:
+            continue
+        lst.sort(key=lambda a: str(a.get("StartDate", "")))
+        keep = lst[-1]
+        try:
+            end = (datetime.strptime(str(keep.get("StartDate", ""))[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            end = now_str()[:10]
+        for a in lst[:-1]:
+            res = find_row_by_id("VehicleAssignments", a.get("AssignmentID", ""))
+            if res:
+                rn, ex = res
+                row = [ex.get(h, "") for h in a_headers]
+                row[a_headers.index("EndDate")] = end
+                row[a_headers.index("UpdatedDate")] = now_str()
+                update_row("VehicleAssignments", rn, row)
+                closed += 1
+    invalidate_cache("VehicleAssignments")
+
     # 2. Effective current driver per active vehicle (open assignment else DefaultDriver, active only)
     omap = _open_driver_map(inactive)
     veh_current = {}   # vehicle_number -> driver
