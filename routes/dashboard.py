@@ -179,13 +179,18 @@ async def dashboard_alerts(request: Request):
                     })
             except ValueError:
                 pass
-    # Strictly no vehicle should be without a driver — flag every active vehicle with none
+    # Strictly no vehicle should be without a driver — flag every active vehicle with none.
+    # A vehicle "has a driver" if DefaultDriver is set OR it has an open assignment period.
+    has_open_assignment = set()
+    for a in get_all_records("VehicleAssignments"):
+        if not str(a.get("EndDate", "")).strip() and str(a.get("DriverName", "")).strip():
+            has_open_assignment.add(str(a.get("VehicleNumber", "")).strip())
     no_driver = []
     for v in vehicles:
         if str(v.get("VehicleStatus", "Active")).strip().lower() in ("inactive", "sold", "scrapped"):
             continue
-        if not str(v.get("DefaultDriver", "")).strip():
-            vn = v.get("VehicleNumber", "")
+        vn = str(v.get("VehicleNumber", "")).strip()
+        if not str(v.get("DefaultDriver", "")).strip() and vn not in has_open_assignment:
             no_driver.append({"vehicle": vn, "id": v.get("VehicleID", "")})
             alerts.append({"type": "danger", "message": f"{vn} - NO DRIVER assigned",
                            "entity": "Vehicle", "entity_id": vn})

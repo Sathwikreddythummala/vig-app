@@ -44,6 +44,42 @@ def _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver
         append_row("VehicleAssignments", build_row("VehicleAssignments", vals))
 
 
+def _open_driver_map():
+    """{vehicle_number: current driver} from the open assignment period (EndDate blank,
+    latest start). This is the source of truth for who is driving a vehicle now."""
+    out = {}
+    for a in get_all_records("VehicleAssignments"):
+        if str(a.get("EndDate", "")).strip():
+            continue
+        vn = str(a.get("VehicleNumber", "")).strip()
+        name = str(a.get("DriverName", "")).strip()
+        if not vn or not name:
+            continue
+        prev = out.get(vn)
+        if not prev or str(a.get("StartDate", "")) >= str(prev[1]):
+            out[vn] = (name, str(a.get("StartDate", "")))
+    return {vn: v[0] for vn, v in out.items()}
+
+
+def _sync_default_driver(vehicle_id):
+    """Set a vehicle's DefaultDriver to its current open-assignment driver (if any)."""
+    from services.sheets_service import SHEET_HEADERS
+    res = find_row_by_id("Vehicles", vehicle_id)
+    if not res:
+        return
+    row_num, v = res
+    vnum = str(v.get("VehicleNumber", "")).strip()
+    name = _open_driver_map().get(vnum)
+    if name is None:
+        return  # no open assignment -> leave DefaultDriver untouched
+    headers = SHEET_HEADERS["Vehicles"]
+    if str(v.get("DefaultDriver", "")).strip() != name:
+        row = [v.get(h, "") for h in headers]
+        row[headers.index("DefaultDriver")] = name
+        row[headers.index("UpdatedDate")] = now_str()
+        update_row("Vehicles", row_num, row)
+
+
 def get_user(request: Request):
     user = request.session.get("user")
     if not user:
@@ -126,6 +162,10 @@ async def get_vehicle(request: Request, vehicle_id: str):
     if not result:
         return JSONResponse({"error": "Vehicle not found"}, 404)
     _, record = result
+    # show the current driver from the open assignment (not the possibly-stale field)
+    cur = _open_driver_map().get(str(record.get("VehicleNumber", "")).strip())
+    if cur:
+        record = {**record, "DefaultDriver": cur}
     from services.db import execute as db_exec
     db_exec("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, entity_type TEXT, entity_id TEXT, doc_type TEXT, file_name TEXT, mime_type TEXT, file_data BYTEA, uploaded_by TEXT, uploaded_date TEXT)")
     vehicle_docs = db_exec("SELECT doc_id, entity_type, entity_id, doc_type, file_name, mime_type, uploaded_date FROM document_files WHERE entity_type='Vehicle' AND entity_id=%s ORDER BY uploaded_date DESC", [vehicle_id], fetch=True) or []
@@ -316,6 +356,7 @@ async def add_assignment(request: Request, vehicle_id: str):
         "CreatedDate": now_str(), "UpdatedDate": now_str(),
     }
     append_row("VehicleAssignments", build_row("VehicleAssignments", vals))
+    _sync_default_driver(vehicle_id)
     add_audit_log("CREATE", "VehicleAssignments", aid, f"{driver_name} on {vnum}: {start} to {end or 'open'}", user["email"])
     return {"success": True, "assignment_id": aid}
 
@@ -334,6 +375,7 @@ async def update_assignment(request: Request, assignment_id: str):
     vals = {**existing, **{k: v for k, v in data.items() if k in ("StartDate", "EndDate", "DriverName")},
             "AssignmentID": assignment_id, "UpdatedDate": now_str()}
     update_row("VehicleAssignments", row_num, build_row("VehicleAssignments", vals))
+    _sync_default_driver(existing.get("VehicleID", ""))
     add_audit_log("UPDATE", "VehicleAssignments", assignment_id, "Assignment period updated", user["email"])
     return {"success": True}
 
@@ -348,6 +390,7 @@ async def delete_assignment(request: Request, assignment_id: str):
         return JSONResponse({"error": "Not found"}, 404)
     row_num, record = result
     delete_row("VehicleAssignments", row_num)
+    _sync_default_driver(record.get("VehicleID", ""))
     add_audit_log("DELETE", "VehicleAssignments", assignment_id, f"Assignment removed ({record.get('DriverName','')})", user["email"])
     return {"success": True}
 
