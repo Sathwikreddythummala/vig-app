@@ -194,10 +194,20 @@ async def dashboard_alerts(request: Request):
             no_driver.append({"vehicle": vn, "id": v.get("VehicleID", "")})
             alerts.append({"type": "danger", "message": f"{vn} - NO DRIVER assigned",
                            "entity": "Vehicle", "entity_id": vn})
-    # Strictly every driver needs an ENTRY (joining) date; every INACTIVE (left) driver
-    # also needs an EXIT date. Flag whoever is missing one.
+    # Driver rules:
+    #  - every driver needs an ENTRY (joining) date,
+    #  - an INACTIVE (left) driver needs an EXIT date,
+    #  - an ACTIVE driver with NO vehicle must be made inactive (or given a vehicle).
     from services.auth_service import is_driver_record
-    drivers_missing_dates = []
+    driven = set()
+    for a in get_all_records("VehicleAssignments"):
+        if not str(a.get("EndDate", "")).strip() and str(a.get("DriverName", "")).strip():
+            driven.add(str(a.get("DriverName", "")).strip())
+    for v in vehicles:
+        dd = str(v.get("DefaultDriver", "")).strip()
+        if dd:
+            driven.add(dd)
+    driver_issues = []
     for d in drivers:
         if not is_driver_record(d):
             continue
@@ -205,17 +215,18 @@ async def dashboard_alerts(request: Request):
         if not name:
             continue
         inactive = str(d.get("Status", "Active")).strip().lower() == "inactive"
-        miss = []
+        has_vehicle = bool(str(d.get("AssignedVehicle", "")).strip()) or name in driven
+        issues = []
         if not str(d.get("JoiningDate", "")).strip():
-            miss.append("entry")
+            issues.append("no entry date")
         if inactive and not str(d.get("ExitDate", "")).strip():
-            miss.append("exit")
-        if miss:
-            drivers_missing_dates.append({"name": name, "id": d.get("DriverID", ""),
-                                          "missing": " & ".join(miss), "inactive": inactive})
-            alerts.append({"type": "danger",
-                           "message": f"{name} - missing {' & '.join(miss)} date",
+            issues.append("no exit date")
+        if not inactive and not has_vehicle:
+            issues.append("active but no vehicle - assign one or mark inactive")
+        if issues:
+            driver_issues.append({"name": name, "id": d.get("DriverID", ""), "issue": ", ".join(issues)})
+            alerts.append({"type": "danger", "message": f"{name} - {', '.join(issues)}",
                            "entity": "Driver", "entity_id": name})
     alerts.sort(key=lambda x: 0 if x["type"] == "danger" else 1 if x["type"] == "warning" else 2)
     return {"alerts": alerts, "vehicles_without_driver": no_driver,
-            "drivers_missing_dates": drivers_missing_dates}
+            "driver_issues": driver_issues}

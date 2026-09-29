@@ -273,9 +273,9 @@ async function loadAlerts() {
             listEl.innerHTML = '<div class="p-3 text-center text-muted">No alerts</div>';
         }
         var noDrv = data.vehicles_without_driver || [];
-        var missDates = data.drivers_missing_dates || [];
+        var drvIssues = data.driver_issues || [];
         if (noDrv.length) { setTimeout(function(){ showNoDriverPopup(noDrv); }, 600); }
-        else if (missDates.length) { setTimeout(function(){ showDriverDatesPopup(missDates); }, 700); }
+        else if (drvIssues.length) { setTimeout(function(){ showDriverDatesPopup(drvIssues); }, 700); }
     } catch (err) {
         console.error('Failed to load alerts:', err);
     }
@@ -314,15 +314,15 @@ function showDriverDatesPopup(list) {
         el.className = 'modal fade'; el.id = id; el.tabIndex = -1;
         el.innerHTML =
             '<div class="modal-dialog"><div class="modal-content">' +
-            '<div class="modal-header" style="background:#dc3545;color:#fff"><h5 class="modal-title"><i class="bi bi-calendar-x-fill"></i> Driver dates missing</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>' +
-            '<div class="modal-body"><p class="mb-2 fw-bold text-danger">Every driver needs an entry (joining) date; a driver who has left also needs an exit date. Please add:</p><div id="driverDatesList" style="max-height:50vh;overflow:auto"></div></div>' +
+            '<div class="modal-header" style="background:#dc3545;color:#fff"><h5 class="modal-title"><i class="bi bi-person-exclamation"></i> Driver issues to fix</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>' +
+            '<div class="modal-body"><p class="mb-2 fw-bold text-danger">Every driver needs an entry (joining) date. A driver who left needs an exit date, and an active driver with no vehicle should be given one or marked inactive:</p><div id="driverDatesList" style="max-height:50vh;overflow:auto"></div></div>' +
             '<div class="modal-footer"><a href="/drivers" class="btn btn-warning viewer-hide"><i class="bi bi-people"></i> Open Employees</a><button class="btn btn-secondary" data-bs-dismiss="modal">Later</button></div>' +
             '</div></div>';
         document.body.appendChild(el);
     }
     document.getElementById('driverDatesList').innerHTML = list.map(function (d) {
-        return '<div class="d-flex justify-content-between align-items-center border-bottom py-2"><b>' + d.name + '</b>' +
-            '<span class="badge bg-danger">missing ' + d.missing + ' date</span></div>';
+        return '<div class="d-flex justify-content-between align-items-center border-bottom py-2 gap-2"><b>' + d.name + '</b>' +
+            '<span class="badge bg-danger text-wrap" style="text-align:right">' + d.issue + '</span></div>';
     }).join('');
     try { bootstrap.Modal.getOrCreateInstance(el).show(); } catch (e) {}
 }
