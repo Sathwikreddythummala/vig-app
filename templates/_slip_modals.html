@@ -56,6 +56,7 @@
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-warning" id="psSaveBtn" onclick="saveSalaryOnly()" title="Save the Monthly Salary changes to the vehicle(s) — no PDF"><i class="bi bi-save"></i> Save Salary</button>
         <button type="button" class="btn btn-warning" id="psGenBtn" onclick="generatePayslip()"><i class="bi bi-file-earmark-pdf"></i> Confirm &amp; Generate PDF</button>
       </div>
     </div>
@@ -204,6 +205,20 @@ async function generatePayslip(){
     remarks:val('psRemarks')
   };
   try{ await _downloadPdf('/payslip/api/payslip-pdf', payload, 'payslip'); } finally{ btn.disabled=false; }
+}
+
+async function saveSalaryOnly(){
+  var btn=document.getElementById('psSaveBtn'); btn.disabled=true;
+  try{
+    var res=await fetch('/payslip/api/save-salary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vehicles:_vehiclesPayload()})});
+    var data=await res.json();
+    if(data.success){
+      showToast('Monthly salary saved to '+(data.saved||0)+' vehicle'+((data.saved===1)?'':'s'),'success');
+      if(typeof loadSalaries==='function') loadSalaries();
+      else if(typeof loadDriverDetails==='function') loadDriverDetails();
+    } else { showToast(data.error||'Failed','danger'); }
+  }catch(e){ showToast('Network error','danger'); }
+  btn.disabled=false;
 }
 
 /* ---- Diesel mileage ---- */

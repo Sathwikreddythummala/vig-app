@@ -415,6 +415,25 @@ def _title_bar(text, W):
     return t
 
 
+@router.post("/api/save-salary")
+async def save_salary(request: Request):
+    """Save just the (edited) Monthly Salary back to each vehicle — no PDF."""
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    data = await request.json()
+    saved = 0
+    for v in data.get("vehicles", []):
+        vid = str(v.get("vehicle_id", "")).strip()
+        ms = v.get("monthly_salary")
+        if vid and str(ms).strip() not in ("", "None"):
+            _set_vehicle_monthly_salary(vid, _num(ms))
+            saved += 1
+    if saved:
+        add_audit_log("UPDATE", "Vehicles", "", f"Monthly salary updated for {saved} vehicle(s) via payslip", user.get("email", ""))
+    return {"success": True, "saved": saved}
+
+
 @router.post("/api/payslip-pdf")
 async def payslip_pdf(request: Request):
     user = get_user(request)
