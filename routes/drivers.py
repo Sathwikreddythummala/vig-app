@@ -479,6 +479,11 @@ async def add_driver(request: Request):
                 update_row("Vehicles", idx + 2, veh_row)
                 break
     _sync_user_access(data.get("Email", ""), data.get("DriverName", ""), data.get("EmployeeType", "Driver"), data.get("AccessType", "viewer"))
+    try:
+        from routes.vehicles import reconcile_driver_vehicle
+        reconcile_driver_vehicle()
+    except Exception:
+        pass
     add_audit_log("CREATE", "Drivers", did, f"{data.get('EmployeeType','Driver')} {data.get('DriverName','')} added", user["email"])
     return {"success": True, "driver_id": did}
 
@@ -569,6 +574,12 @@ async def update_driver(request: Request, driver_id: str):
                     update_row("Vehicles", idx + 2, veh_row)
                     break
     _sync_user_access(data.get("Email", existing.get("Email", "")), data.get("DriverName", ""), data.get("EmployeeType", existing.get("EmployeeType", "Driver")), data.get("AccessType", "viewer"))
+    # keep driver<->vehicle consistent (an inactive driver holds no vehicle; no one drives two)
+    try:
+        from routes.vehicles import reconcile_driver_vehicle
+        reconcile_driver_vehicle()
+    except Exception:
+        pass
     add_audit_log("UPDATE", "Drivers", driver_id, f"{data.get('EmployeeType','Driver')} {data.get('DriverName','')} updated", user["email"])
     return {"success": True}
 

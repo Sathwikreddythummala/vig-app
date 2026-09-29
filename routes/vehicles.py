@@ -44,21 +44,120 @@ def _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver
         append_row("VehicleAssignments", build_row("VehicleAssignments", vals))
 
 
-def _open_driver_map():
+def _inactive_driver_names():
+    return {str(d.get("DriverName", "")).strip() for d in get_all_records("Drivers")
+            if str(d.get("Status", "Active")).strip().lower() == "inactive"}
+
+
+def _open_driver_map(inactive=None):
     """{vehicle_number: current driver} from the open assignment period (EndDate blank,
-    latest start). This is the source of truth for who is driving a vehicle now."""
+    latest start). Inactive drivers are skipped — they can't be a current driver."""
+    if inactive is None:
+        inactive = _inactive_driver_names()
     out = {}
     for a in get_all_records("VehicleAssignments"):
         if str(a.get("EndDate", "")).strip():
             continue
         vn = str(a.get("VehicleNumber", "")).strip()
         name = str(a.get("DriverName", "")).strip()
-        if not vn or not name:
+        if not vn or not name or name in inactive:
             continue
         prev = out.get(vn)
         if not prev or str(a.get("StartDate", "")) >= str(prev[1]):
             out[vn] = (name, str(a.get("StartDate", "")))
     return {vn: v[0] for vn, v in out.items()}
+
+
+def reconcile_driver_vehicle():
+    """Make Drivers.AssignedVehicle and Vehicles.DefaultDriver consistent with reality:
+      - a driver is the current driver of AT MOST ONE vehicle,
+      - inactive drivers hold no vehicle and no open assignment,
+      - each vehicle's DefaultDriver = its current open-assignment driver (active only).
+    Returns a summary dict. Safe to run repeatedly."""
+    from services.sheets_service import SHEET_HEADERS, invalidate_cache
+    from datetime import datetime
+    invalidate_cache()
+    inactive = _inactive_driver_names()
+
+    # 1. Close open assignments held by inactive drivers (end at their exit date / today)
+    drv_exit = {}
+    for d in get_all_records("Drivers"):
+        drv_exit[str(d.get("DriverName", "")).strip()] = str(d.get("ExitDate", "")).strip()[:10]
+    a_headers = SHEET_HEADERS["VehicleAssignments"]
+    closed = 0
+    for a in get_all_records("VehicleAssignments"):
+        nm = str(a.get("DriverName", "")).strip()
+        if nm in inactive and not str(a.get("EndDate", "")).strip():
+            end = drv_exit.get(nm) or now_str()[:10]
+            res = find_row_by_id("VehicleAssignments", a.get("AssignmentID", ""))
+            if res:
+                rn, ex = res
+                row = [ex.get(h, "") for h in a_headers]
+                row[a_headers.index("EndDate")] = end
+                row[a_headers.index("UpdatedDate")] = now_str()
+                update_row("VehicleAssignments", rn, row)
+                closed += 1
+    invalidate_cache("VehicleAssignments")
+
+    # 2. Effective current driver per active vehicle (open assignment else DefaultDriver, active only)
+    omap = _open_driver_map(inactive)
+    veh_current = {}   # vehicle_number -> driver
+    v_headers = SHEET_HEADERS["Vehicles"]
+    vehicles = get_all_records("Vehicles")
+    for v in vehicles:
+        if str(v.get("VehicleStatus", "Active")).strip().lower() in ("inactive", "sold", "scrapped"):
+            continue
+        vn = str(v.get("VehicleNumber", "")).strip()
+        drv = omap.get(vn)
+        if not drv:
+            dd = str(v.get("DefaultDriver", "")).strip()
+            drv = dd if dd and dd not in inactive else ""
+        if drv:
+            veh_current[vn] = drv
+
+    # a driver current on >1 vehicle: keep the open-assignment one, else the first
+    seen = {}
+    for vn, drv in list(veh_current.items()):
+        if drv in seen:
+            keep_open = vn in omap
+            prev_vn = seen[drv]
+            if keep_open and prev_vn not in omap:
+                veh_current.pop(prev_vn, None); seen[drv] = vn
+            else:
+                veh_current.pop(vn, None)
+        else:
+            seen[drv] = vn
+
+    # 3. Sync Vehicles.DefaultDriver to the effective driver
+    veh_fixed = 0
+    for idx, v in enumerate(get_all_records("Vehicles")):
+        vn = str(v.get("VehicleNumber", "")).strip()
+        want = veh_current.get(vn, str(v.get("DefaultDriver", "")).strip())
+        if str(v.get("DefaultDriver", "")).strip() in inactive:
+            want = veh_current.get(vn, "")
+        if str(v.get("DefaultDriver", "")).strip() != want:
+            row = [v.get(h, "") for h in v_headers]
+            row[v_headers.index("DefaultDriver")] = want
+            row[v_headers.index("UpdatedDate")] = now_str()
+            update_row("Vehicles", idx + 2, row)
+            veh_fixed += 1
+    invalidate_cache("Vehicles")
+
+    # 4. Set each driver's AssignedVehicle to the one vehicle they currently drive (else clear)
+    driver_vehicle = {drv: vn for vn, drv in veh_current.items()}
+    d_headers = SHEET_HEADERS["Drivers"]
+    drv_fixed = 0
+    for idx, d in enumerate(get_all_records("Drivers")):
+        nm = str(d.get("DriverName", "")).strip()
+        want = "" if nm in inactive else driver_vehicle.get(nm, "")
+        if str(d.get("AssignedVehicle", "")).strip() != want:
+            row = [d.get(h, "") for h in d_headers]
+            row[d_headers.index("AssignedVehicle")] = want
+            row[d_headers.index("UpdatedDate")] = now_str()
+            update_row("Drivers", idx + 2, row)
+            drv_fixed += 1
+    invalidate_cache()
+    return {"closed_inactive_assignments": closed, "vehicles_fixed": veh_fixed, "drivers_fixed": drv_fixed}
 
 
 def _sync_default_driver(vehicle_id):
@@ -125,32 +224,9 @@ async def sync_drivers_to_vehicles(request: Request):
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    from services.sheets_service import SHEET_HEADERS, invalidate_cache
-    drivers = get_all_records("Drivers")
-    vehicles = get_all_records("Vehicles")
-    veh_headers = SHEET_HEADERS["Vehicles"]
-    drv_idx = veh_headers.index("DefaultDriver")
-    veh_updated_idx = veh_headers.index("UpdatedDate")
-    vehicle_driver_map = {}
-    for d in drivers:
-        veh = str(d.get("AssignedVehicle", "")).strip()
-        name = str(d.get("DriverName", "")).strip()
-        if veh and name and str(d.get("Status", "")) == "Active":
-            vehicle_driver_map[veh] = name
-    updated = 0
-    for idx, v in enumerate(vehicles):
-        vnum = str(v.get("VehicleNumber", "")).strip()
-        current_driver = str(v.get("DefaultDriver", "")).strip()
-        expected_driver = vehicle_driver_map.get(vnum, "")
-        if current_driver != expected_driver:
-            veh_row = [v.get(h, "") for h in veh_headers]
-            veh_row[drv_idx] = expected_driver
-            veh_row[veh_updated_idx] = now_str()
-            update_row("Vehicles", idx + 2, veh_row)
-            updated += 1
-    invalidate_cache("Vehicles")
-    add_audit_log("SYNC", "Vehicles", "", f"Synced drivers to {updated} vehicles", user["email"])
-    return {"success": True, "updated": updated}
+    summary = reconcile_driver_vehicle()
+    add_audit_log("SYNC", "Vehicles", "", f"Reconciled drivers/vehicles {summary}", user["email"])
+    return {"success": True, "updated": summary.get("drivers_fixed", 0) + summary.get("vehicles_fixed", 0), **summary}
 
 
 @router.get("/api/{vehicle_id}")
@@ -311,6 +387,7 @@ async def assign_driver(request: Request, vehicle_id: str):
                 new_driver_id = d.get("DriverID", "")
                 break
         _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, new_driver_id, exit_date=exit_date)
+    reconcile_driver_vehicle()  # a driver can only be current on one vehicle; keep everything consistent
     add_audit_log("ASSIGN", "Vehicles", vehicle_id, f"Driver changed from '{old_driver}' to '{new_driver}' on {vehicle_number} (exit {exit_date or '-'}, entry {changeover_date})", user["email"])
     return {"success": True}
 
@@ -356,7 +433,7 @@ async def add_assignment(request: Request, vehicle_id: str):
         "CreatedDate": now_str(), "UpdatedDate": now_str(),
     }
     append_row("VehicleAssignments", build_row("VehicleAssignments", vals))
-    _sync_default_driver(vehicle_id)
+    reconcile_driver_vehicle()
     add_audit_log("CREATE", "VehicleAssignments", aid, f"{driver_name} on {vnum}: {start} to {end or 'open'}", user["email"])
     return {"success": True, "assignment_id": aid}
 
@@ -375,7 +452,7 @@ async def update_assignment(request: Request, assignment_id: str):
     vals = {**existing, **{k: v for k, v in data.items() if k in ("StartDate", "EndDate", "DriverName")},
             "AssignmentID": assignment_id, "UpdatedDate": now_str()}
     update_row("VehicleAssignments", row_num, build_row("VehicleAssignments", vals))
-    _sync_default_driver(existing.get("VehicleID", ""))
+    reconcile_driver_vehicle()
     add_audit_log("UPDATE", "VehicleAssignments", assignment_id, "Assignment period updated", user["email"])
     return {"success": True}
 
@@ -390,7 +467,7 @@ async def delete_assignment(request: Request, assignment_id: str):
         return JSONResponse({"error": "Not found"}, 404)
     row_num, record = result
     delete_row("VehicleAssignments", row_num)
-    _sync_default_driver(record.get("VehicleID", ""))
+    reconcile_driver_vehicle()
     add_audit_log("DELETE", "VehicleAssignments", assignment_id, f"Assignment removed ({record.get('DriverName','')})", user["email"])
     return {"success": True}
 
