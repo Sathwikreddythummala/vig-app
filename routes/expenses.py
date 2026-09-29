@@ -102,6 +102,32 @@ async def list_expenses(
     }
 
 
+def _last_working_month(driver: dict) -> str:
+    """The month an (inactive) driver last worked — used to attribute advances/expenses
+    paid to them after they left, into their correct salary month."""
+    exit_date = str(driver.get("ExitDate", "")).strip()
+    if len(exit_date) >= 7:
+        return exit_date[:7]
+    dname = str(driver.get("DriverName", "")).strip()
+    months = []
+    for a in get_all_records("VehicleAssignments"):
+        if str(a.get("DriverName", "")).strip() == dname:
+            for k in ("EndDate", "StartDate"):
+                v = str(a.get(k, "")).strip()
+                if len(v) >= 7:
+                    months.append(v[:7])
+                    break
+    for at in get_all_records("Attendance"):
+        if str(at.get("DriverName", "")).strip() == dname:
+            v = str(at.get("Date", ""))[:7]
+            if len(v) >= 7:
+                months.append(v)
+    if months:
+        return max(months)
+    upd = str(driver.get("UpdatedDate", ""))[:7]
+    return upd if len(upd) >= 7 else ""
+
+
 @router.post("/api/add")
 async def add_expense(request: Request):
     user = get_user(request)
@@ -142,6 +168,14 @@ async def add_expense(request: Request):
     for_month = data.get("ForMonth", "")
     if not for_month:
         for_month = str(data.get("ExpenseDate", ""))[:7]
+    # An advance/expense paid to an INACTIVE driver is attributed to their last working month
+    dname = str(data.get("DriverName", "")).strip()
+    if dname:
+        drv = next((d for d in get_all_records("Drivers") if str(d.get("DriverName", "")).strip() == dname), None)
+        if drv and str(drv.get("Status", "Active")).strip().lower() == "inactive":
+            lwm = _last_working_month(drv)
+            if lwm:
+                for_month = lwm
     from services.sheets_service import build_row
     vals = {**data, "ExpenseID": eid, "ForMonth": for_month, "ExpenseFor": data.get("ExpenseFor", "Vehicle Expense"), "PaymentMode": data.get("PaymentMode", "Cash"), "CreatedDate": now_str()}
     row = build_row("Expenses", vals)

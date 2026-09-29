@@ -6,27 +6,24 @@
     <div class="text-center py-5"><div class="spinner-border text-warning"></div><p class="mt-2">Loading vehicle details...</p></div>
 </div>
 
-<div class="glass-card animate-in mt-3" id="assignmentsCard" style="display:none">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h6 class="mb-0"><i class="bi bi-calendar-range"></i> Driver Assignment Periods <small class="text-muted">(used to split salary between drivers)</small></h6>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-sm glass-table mb-2">
-            <thead><tr><th>Driver</th><th>Start Date</th><th>End Date <small class="text-muted">(blank = current)</small></th><th class="viewer-hide">Actions</th></tr></thead>
-            <tbody id="assignmentsTable"></tbody>
-        </table>
-    </div>
-    <div class="row g-2 align-items-end viewer-hide" style="max-width:760px">
-        <div class="col-md-4">
-            <label class="form-label small mb-1">Driver</label>
-            <input type="text" class="form-control form-control-sm glass-input" id="asgDriver" list="asgDriverList" placeholder="Type or pick driver">
-            <datalist id="asgDriverList"></datalist>
+<div class="modal fade" id="changeDriverModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-0"><h5 class="modal-title"><i class="bi bi-person-gear text-warning"></i> Change Driver</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">Current driver: <b id="cdCurrent">-</b>. Enter the day the current driver <b>leaves</b> this vehicle and the day the new driver <b>joins</b> — the month's salary is split between them by these dates.</p>
+                <div class="mb-3"><label class="form-label small">New Driver *</label><select class="form-select glass-input" id="cdNewDriver"><option value="">-- Select --</option></select></div>
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small">Previous driver's exit date *</label><input type="date" class="form-control glass-input" id="cdExitDate"></div>
+                    <div class="col-6"><label class="form-label small">New driver's entry date *</label><input type="date" class="form-control glass-input" id="cdEntryDate"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="cdSaveBtn" onclick="changeDriver()"><i class="bi bi-check-lg"></i> Save Change</button>
+            </div>
         </div>
-        <div class="col-md-3"><label class="form-label small mb-1">Start</label><input type="date" class="form-control form-control-sm glass-input" id="asgStart"></div>
-        <div class="col-md-3"><label class="form-label small mb-1">End <small class="text-muted">(optional)</small></label><input type="date" class="form-control form-control-sm glass-input" id="asgEnd"></div>
-        <div class="col-md-2"><button class="btn btn-warning btn-sm w-100" onclick="addAssignment()"><i class="bi bi-plus-lg"></i> Add</button></div>
     </div>
-    <div class="text-muted small mt-2"><i class="bi bi-info-circle"></i> Example: Chandhan 1st→15th, Rohith 16th→end. Overlapping dates should be avoided.</div>
 </div>
 <div class="modal fade" id="uploadDocModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
@@ -99,10 +96,6 @@ async function loadVehicleDetails() {
         '<div class="d-flex flex-wrap align-items-center gap-3">' +
             '<div><h4 class="mb-0">' + v.VehicleNumber + '</h4><small class="text-muted">' + (v.VehicleType||'') + ' | ' + (v.VehicleStatus||'Active') + '</small></div>' +
             '<div class="d-flex align-items-center gap-2" style="min-width:250px">' +
-                '<label class="form-label mb-0 fw-bold text-nowrap"><i class="bi bi-person"></i> Driver:</label>' +
-                '<select class="form-select glass-input form-select-sm" id="assignDriverSelect" onchange="assignDriver()" style="width:180px">' + driverOptions + '</select>' +
-            '</div>' +
-            '<div class="d-flex align-items-center gap-2" style="min-width:250px">' +
                 '<label class="form-label mb-0 fw-bold text-nowrap"><i class="bi bi-building"></i> Vendor:</label>' +
                 '<select class="form-select glass-input form-select-sm" id="assignVendorSelect" onchange="assignVendor()" style="width:180px">' + vendorOptions + '</select>' +
             '</div>' +
@@ -117,6 +110,17 @@ async function loadVehicleDetails() {
         '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.1s"><div class="stat-icon bg-vehicle"><i class="bi bi-person"></i></div><div class="stat-info"><small>Current Driver</small><h4 id="currentDriverName">' + (v.DefaultDriver||'None') + '</h4></div></div></div>' +
         '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.2s"><div class="stat-icon bg-month"><i class="bi bi-file-earmark"></i></div><div class="stat-info"><small>Documents</small><h4>' + docs.length + '</h4></div></div></div>' +
         '<div class="col-xl-3 col-md-6"><div class="glass-card stat-card animate-in" style="animation-delay:0.3s"><div class="stat-icon bg-driver"><i class="bi bi-receipt"></i></div><div class="stat-info"><small>Transactions</small><h4>' + expenses.length + '</h4></div></div></div>' +
+    '</div>' +
+    '<div class="glass-card animate-in mb-3" id="assignmentsCard">' +
+        '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">' +
+            '<h6 class="mb-0"><i class="bi bi-person-badge"></i> Driver &amp; Assignment Periods <small class="text-muted">(salary is split by these dates)</small></h6>' +
+            '<button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#changeDriverModal" onclick="openChangeDriver()"><i class="bi bi-person-gear"></i> Change Driver</button>' +
+        '</div>' +
+        '<div class="table-responsive"><table class="table table-sm glass-table mb-0">' +
+            '<thead><tr><th>Driver</th><th>Start Date</th><th>End Date <small class="text-muted">(blank = current)</small></th><th class="viewer-hide">Actions</th></tr></thead>' +
+            '<tbody id="assignmentsTable"></tbody>' +
+        '</table></div>' +
+        '<datalist id="asgDriverList"></datalist>' +
     '</div>' +
     '<div class="row g-3 mb-3">' +
         '<div class="col-lg-6"><div class="glass-card animate-in" style="animation-delay:0.3s">' +
@@ -187,7 +191,6 @@ async function loadAssignments() {
         var res = await fetch('/vehicles/api/' + vehicleId + '/assignments');
         var data = await res.json();
         var list = data.assignments || [];
-        document.getElementById('assignmentsCard').style.display = '';
         // driver datalist
         var dl = document.getElementById('asgDriverList');
         if (dl && !dl.dataset.filled && allDrivers.length) {
@@ -241,25 +244,40 @@ async function saveAssignment(id) {
     } catch(e) { showToast('Network error', 'danger'); }
 }
 
-async function addAssignment() {
-    var driver = document.getElementById('asgDriver').value.trim();
-    var start = document.getElementById('asgStart').value;
-    var end = document.getElementById('asgEnd').value;
-    if (!driver || !start) { showToast('Driver and start date required', 'danger'); return; }
+function openChangeDriver() {
+    var curEl = document.getElementById('currentDriverName');
+    var cur = curEl ? curEl.textContent.trim() : '';
+    document.getElementById('cdCurrent').textContent = cur || 'None';
+    var sel = document.getElementById('cdNewDriver');
+    sel.innerHTML = '<option value="">-- Select --</option>' + allDrivers.map(function(d){
+        return '<option value="'+(d.DriverName||'')+'">'+(d.DriverName||'')+(d.AssignedVehicle ? ' ('+d.AssignedVehicle+')' : '')+'</option>';
+    }).join('');
+    var t = todayLocal();
+    document.getElementById('cdExitDate').value = t;
+    document.getElementById('cdEntryDate').value = t;
+}
+
+async function changeDriver() {
+    var nd = document.getElementById('cdNewDriver').value;
+    var ex = document.getElementById('cdExitDate').value;
+    var en = document.getElementById('cdEntryDate').value;
+    if (!nd) { showToast('Select the new driver', 'danger'); return; }
+    if (!en) { showToast("Enter the new driver's entry date", 'danger'); return; }
+    if (!ex) { showToast("Enter the previous driver's exit date", 'danger'); return; }
+    var btn = document.getElementById('cdSaveBtn'); btn.disabled = true;
     try {
-        var res = await fetch('/vehicles/api/' + vehicleId + '/assignments', {
+        var res = await fetch('/vehicles/api/' + vehicleId + '/assign-driver', {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({driver_name: driver, start_date: start, end_date: end})
+            body: JSON.stringify({driver_name: nd, exit_date: ex, entry_date: en})
         });
         var data = await res.json();
         if (data.success) {
-            showToast('Assignment period added', 'success');
-            document.getElementById('asgDriver').value = '';
-            document.getElementById('asgStart').value = '';
-            document.getElementById('asgEnd').value = '';
-            loadAssignments();
+            var m = bootstrap.Modal.getInstance(document.getElementById('changeDriverModal')); if (m) m.hide();
+            showToast('Driver changed to ' + nd, 'success');
+            loadVehicleDetails();
         } else { showToast(data.error || 'Failed', 'danger'); }
     } catch(e) { showToast('Network error', 'danger'); }
+    btn.disabled = false;
 }
 
 async function deleteAssignment(id) {
@@ -270,31 +288,6 @@ async function deleteAssignment(id) {
         if (data.success) { showToast('Deleted', 'success'); loadAssignments(); }
         else { showToast(data.error || 'Failed', 'danger'); }
     } catch(e) { showToast('Network error', 'danger'); }
-}
-
-async function assignDriver() {
-    var newDriver = document.getElementById('assignDriverSelect').value;
-    var today = todayLocal();
-    // Ask the changeover date so salary splits correctly between the outgoing and incoming driver
-    var changeover = prompt('From which date does ' + (newDriver || 'the new driver') + ' take over this vehicle?\n(The previous driver is paid up to the day before.)\n\nFormat: YYYY-MM-DD', today);
-    if (changeover === null) { loadVehicleDetails(); return; }  // cancelled — reset the dropdown
-    changeover = (changeover || '').trim() || today;
-    try {
-        var res = await fetch('/vehicles/api/' + vehicleId + '/assign-driver', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({driver_name: newDriver, changeover_date: changeover})
-        });
-        var data = await res.json();
-        if (data.success) {
-            document.getElementById('currentDriverName').textContent = newDriver || 'None';
-            showToast('Driver ' + (newDriver ? 'assigned: ' + newDriver + ' (from ' + changeover + ')' : 'unassigned'), 'success');
-        } else {
-            showToast(data.error || 'Failed to assign driver', 'danger');
-        }
-    } catch(err) {
-        showToast('Network error', 'danger');
-    }
 }
 
 async function assignVendor() {

@@ -179,5 +179,15 @@ async def dashboard_alerts(request: Request):
                     })
             except ValueError:
                 pass
+    # Strictly no vehicle should be without a driver — flag every active vehicle with none
+    no_driver = []
+    for v in vehicles:
+        if str(v.get("VehicleStatus", "Active")).strip().lower() in ("inactive", "sold", "scrapped"):
+            continue
+        if not str(v.get("DefaultDriver", "")).strip():
+            vn = v.get("VehicleNumber", "")
+            no_driver.append({"vehicle": vn, "id": v.get("VehicleID", "")})
+            alerts.append({"type": "danger", "message": f"{vn} - NO DRIVER assigned",
+                           "entity": "Vehicle", "entity_id": vn})
     alerts.sort(key=lambda x: 0 if x["type"] == "danger" else 1 if x["type"] == "warning" else 2)
-    return {"alerts": alerts}
+    return {"alerts": alerts, "vehicles_without_driver": no_driver}

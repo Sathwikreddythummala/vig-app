@@ -272,9 +272,34 @@ async function loadAlerts() {
             countEl.style.display = 'none';
             listEl.innerHTML = '<div class="p-3 text-center text-muted">No alerts</div>';
         }
+        var noDrv = data.vehicles_without_driver || [];
+        if (noDrv.length) { setTimeout(function(){ showNoDriverPopup(noDrv); }, 600); }
     } catch (err) {
         console.error('Failed to load alerts:', err);
     }
+}
+
+// Strictly no vehicle without a driver — pop up until every one is assigned.
+function showNoDriverPopup(list) {
+    if (document.querySelector('.modal.show')) return;  // don't stack over another dialog
+    var id = 'noDriverModal';
+    var el = document.getElementById(id);
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'modal fade'; el.id = id; el.tabIndex = -1;
+        el.innerHTML =
+            '<div class="modal-dialog"><div class="modal-content">' +
+            '<div class="modal-header" style="background:#dc3545;color:#fff"><h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Vehicle without a driver</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>' +
+            '<div class="modal-body"><p class="mb-2 fw-bold text-danger">Every vehicle must have a driver. These have none — assign one:</p><div id="noDriverList"></div></div>' +
+            '<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Later</button></div>' +
+            '</div></div>';
+        document.body.appendChild(el);
+    }
+    document.getElementById('noDriverList').innerHTML = list.map(function (v) {
+        return '<div class="d-flex justify-content-between align-items-center border-bottom py-2"><b>' + v.vehicle + '</b>' +
+            '<a href="/vehicles/details/' + v.id + '" class="btn btn-sm btn-warning viewer-hide"><i class="bi bi-person-gear"></i> Assign driver</a></div>';
+    }).join('');
+    try { bootstrap.Modal.getOrCreateInstance(el).show(); } catch (e) {}
 }
 
 // ---- Optional click-to-sort on tables ----

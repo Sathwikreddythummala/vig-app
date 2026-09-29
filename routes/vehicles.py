@@ -10,25 +10,29 @@ from utils.templates import templates
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
-def _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, driver_id=""):
-    """Close the vehicle's current open assignment and open a new one for the incoming
-    driver, so each driver's period on the vehicle is preserved (used for pro-rata salary)."""
+def _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, driver_id="", exit_date=""):
+    """Close the vehicle's current open assignment (at the outgoing driver's exit date)
+    and open a new one for the incoming driver from the entry date, so each driver's
+    period on the vehicle is preserved (used for pro-rata salary)."""
     from datetime import datetime, timedelta
     from services.sheets_service import build_row, SHEET_HEADERS
     assignments = get_all_records("VehicleAssignments")
-    # close any open assignment for this vehicle (EndDate blank)
+    # close any open assignment for this vehicle (EndDate blank) at the exit date
     for idx, a in enumerate(assignments):
         if str(a.get("VehicleID", "")) == str(vehicle_id) and not str(a.get("EndDate", "")).strip():
-            try:
-                end = (datetime.strptime(changeover_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-            except (ValueError, TypeError):
-                end = changeover_date
+            if exit_date:
+                end = exit_date
+            else:
+                try:
+                    end = (datetime.strptime(changeover_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    end = changeover_date
             headers = SHEET_HEADERS["VehicleAssignments"]
             row = [a.get(h, "") for h in headers]
             row[headers.index("EndDate")] = end
             row[headers.index("UpdatedDate")] = now_str()
             update_row("VehicleAssignments", idx + 2, row)
-    # open a new assignment for the incoming driver
+    # open a new assignment for the incoming driver from the entry date
     if new_driver:
         aid = gen_id("ASGN")
         vals = {
@@ -208,7 +212,9 @@ async def assign_driver(request: Request, vehicle_id: str):
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
     new_driver = data.get("driver_name", "").strip()
-    changeover_date = str(data.get("changeover_date", "")).strip() or now_str()[:10]
+    entry_date = str(data.get("entry_date", "")).strip()
+    exit_date = str(data.get("exit_date", "")).strip()
+    changeover_date = entry_date or str(data.get("changeover_date", "")).strip() or now_str()[:10]
     result = find_row_by_id("Vehicles", vehicle_id)
     if not result:
         return JSONResponse({"error": "Vehicle not found"}, 404)
@@ -250,8 +256,8 @@ async def assign_driver(request: Request, vehicle_id: str):
             if str(d.get("DriverName", "")).strip() == new_driver:
                 new_driver_id = d.get("DriverID", "")
                 break
-        _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, new_driver_id)
-    add_audit_log("ASSIGN", "Vehicles", vehicle_id, f"Driver changed from '{old_driver}' to '{new_driver}' on {vehicle_number} (from {changeover_date})", user["email"])
+        _record_assignment_change(vehicle_id, vehicle_number, old_driver, new_driver, changeover_date, new_driver_id, exit_date=exit_date)
+    add_audit_log("ASSIGN", "Vehicles", vehicle_id, f"Driver changed from '{old_driver}' to '{new_driver}' on {vehicle_number} (exit {exit_date or '-'}, entry {changeover_date})", user["email"])
     return {"success": True}
 
 

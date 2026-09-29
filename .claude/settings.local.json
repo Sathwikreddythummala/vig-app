@@ -190,7 +190,12 @@
       "Bash(git commit -q -m 'Driver app: label credit fuel as '\\\\''Katha'\\\\'' *)",
       "Bash(python -c \"import secrets; print\\(secrets.token_hex\\(32\\)\\)\")",
       "PowerShell(cd \"C:\\\\TSR Fleet App\\\\routes\"; foreach \\($f in @\\(\"expenses.py\",\"purse.py\",\"emi.py\",\"gst.py\",\"mithi.py\"\\)\\) { $t = Get-Content $f -Raw; $t = $t -replace 'require_admin_or_viewer', 'require_view'; $t = $t -replace 'require_admin\\\\b', 'require_editor'; Set-Content $f $t -Encoding utf8 -NoNewline; \"updated $f\" })",
-      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/1d390f8a-6409-4c52-ada2-aacc459f161b/scratchpad/vd.js\")"
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/1d390f8a-6409-4c52-ada2-aacc459f161b/scratchpad/vd.js\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/vehicles.py',encoding='utf-8'\\).read\\(\\)\\); print\\('vehicles.py OK'\\)\")",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/1d390f8a-6409-4c52-ada2-aacc459f161b/scratchpad/vd2.js\")",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\)\\) for f in ['routes/dashboard.py','routes/expenses.py','routes/vehicles.py']]; print\\('python OK'\\)\")",
+      "Bash(node --check static/js/app.js)",
+      "Bash(echo \"commit rc=$?\")"
     ]
   }
 }
