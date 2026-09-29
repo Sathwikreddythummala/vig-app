@@ -194,5 +194,28 @@ async def dashboard_alerts(request: Request):
             no_driver.append({"vehicle": vn, "id": v.get("VehicleID", "")})
             alerts.append({"type": "danger", "message": f"{vn} - NO DRIVER assigned",
                            "entity": "Vehicle", "entity_id": vn})
+    # Strictly every driver needs an ENTRY (joining) date; every INACTIVE (left) driver
+    # also needs an EXIT date. Flag whoever is missing one.
+    from services.auth_service import is_driver_record
+    drivers_missing_dates = []
+    for d in drivers:
+        if not is_driver_record(d):
+            continue
+        name = str(d.get("DriverName", "")).strip()
+        if not name:
+            continue
+        inactive = str(d.get("Status", "Active")).strip().lower() == "inactive"
+        miss = []
+        if not str(d.get("JoiningDate", "")).strip():
+            miss.append("entry")
+        if inactive and not str(d.get("ExitDate", "")).strip():
+            miss.append("exit")
+        if miss:
+            drivers_missing_dates.append({"name": name, "id": d.get("DriverID", ""),
+                                          "missing": " & ".join(miss), "inactive": inactive})
+            alerts.append({"type": "danger",
+                           "message": f"{name} - missing {' & '.join(miss)} date",
+                           "entity": "Driver", "entity_id": name})
     alerts.sort(key=lambda x: 0 if x["type"] == "danger" else 1 if x["type"] == "warning" else 2)
-    return {"alerts": alerts, "vehicles_without_driver": no_driver}
+    return {"alerts": alerts, "vehicles_without_driver": no_driver,
+            "drivers_missing_dates": drivers_missing_dates}
