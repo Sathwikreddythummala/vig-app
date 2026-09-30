@@ -374,28 +374,25 @@ async function deleteExpense(id) {
     }
 }
 
-function exportExcel() {
-    const params = new URLSearchParams({
+function exportParams() {
+    return new URLSearchParams({
         month: document.getElementById('filterMonth').value,
         date_from: document.getElementById('filterDateFrom').value,
         date_to: document.getElementById('filterDateTo').value,
         vehicle: document.getElementById('filterVehicle').value,
         category: document.getElementById('filterCategory').value,
+        subcategory: document.getElementById('filterSubCategory').value,
         paid_by: document.getElementById('filterPaidBy').value,
+        search: document.getElementById('filterSearch').value,
     });
-    window.open('/expenses/api/export/excel?' + params);
+}
+
+function exportExcel() {
+    window.open('/expenses/api/export/excel?' + exportParams());
 }
 
 function exportPDF() {
-    const params = new URLSearchParams({
-        month: document.getElementById('filterMonth').value,
-        date_from: document.getElementById('filterDateFrom').value,
-        date_to: document.getElementById('filterDateTo').value,
-        vehicle: document.getElementById('filterVehicle').value,
-        category: document.getElementById('filterCategory').value,
-        paid_by: document.getElementById('filterPaidBy').value,
-    });
-    window.open('/expenses/api/export/pdf?' + params);
+    window.open('/expenses/api/export/pdf?' + exportParams());
 }
 </script>
 {% endblock %}

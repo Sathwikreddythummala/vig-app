@@ -32,6 +32,29 @@ def get_user(request: Request):
     return request.session.get("user")
 
 
+def _filter_expenses(expenses, month="", date_from="", date_to="", vehicle="",
+                     category="", subcategory="", paid_by="", search=""):
+    """Apply the Expenses page filters (shared by list + exports).
+    Month follows the payment date (ExpenseDate), not the salary for-month."""
+    from utils.filters import filter_multi
+    if month:
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
+    if date_from:
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
+    if date_to:
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) <= date_to]
+    expenses = filter_multi(expenses, "VehicleNumber", vehicle)
+    expenses = filter_multi(expenses, "Category", category)
+    expenses = filter_multi(expenses, "SubCategory", subcategory)
+    expenses = filter_multi(expenses, "PaidBy", paid_by)
+    if search:
+        s = search.lower().strip()
+        _fields = ("ExpenseID", "Description", "VehicleNumber", "DriverName", "Category",
+                   "SubCategory", "PaidBy", "PaymentMode", "Amount", "ExpenseFor", "ForMonth", "ExpenseDate")
+        expenses = [e for e in expenses if any(s in str(e.get(f, "")).lower() for f in _fields)]
+    return expenses
+
+
 @router.get("")
 async def expenses_page(request: Request):
     user = get_user(request)
@@ -228,32 +251,27 @@ async def export_excel(
     date_to: str = "",
     vehicle: str = "",
     category: str = "",
+    subcategory: str = "",
     paid_by: str = "",
+    search: str = "",
 ):
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    expenses = get_all_records("Expenses")
-    if month:
-        # Month filter follows the payment date (ExpenseDate), not the salary "for-month"
-        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
-    if date_from:
-        expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
-    if date_to:
-        expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) <= date_to]
-    from utils.filters import filter_multi
-    expenses = filter_multi(expenses, "VehicleNumber", vehicle)
-    expenses = filter_multi(expenses, "Category", category)
-    expenses = filter_multi(expenses, "PaidBy", paid_by)
-    from utils.exports import to_numeric_df
+    expenses = _filter_expenses(get_all_records("Expenses"), month, date_from, date_to,
+                                vehicle, category, subcategory, paid_by, search)
+    from utils.exports import to_numeric_df, filtered_filename
     df = to_numeric_df(expenses, ["Amount"])
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
     buf.seek(0)
+    fname = filtered_filename("expenses", month=month, date_from=date_from, date_to=date_to,
+                              vehicle=vehicle, category=category, subcategory=subcategory,
+                              paid_by=paid_by, search=search) + ".xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=expenses.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
 
 
@@ -265,7 +283,9 @@ async def export_pdf(
     date_to: str = "",
     vehicle: str = "",
     category: str = "",
+    subcategory: str = "",
     paid_by: str = "",
+    search: str = "",
 ):
     user = get_user(request)
     if not user:
@@ -274,18 +294,8 @@ async def export_pdf(
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
-    expenses = get_all_records("Expenses")
-    if month:
-        # Month filter follows the payment date (ExpenseDate), not the salary "for-month"
-        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
-    if date_from:
-        expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
-    if date_to:
-        expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) <= date_to]
-    from utils.filters import filter_multi
-    expenses = filter_multi(expenses, "VehicleNumber", vehicle)
-    expenses = filter_multi(expenses, "Category", category)
-    expenses = filter_multi(expenses, "PaidBy", paid_by)
+    expenses = _filter_expenses(get_all_records("Expenses"), month, date_from, date_to,
+                                vehicle, category, subcategory, paid_by, search)
     def safe(v, limit=30):
         return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
 
@@ -324,8 +334,12 @@ async def export_pdf(
     elements.append(table)
     doc.build(elements)
     buf.seek(0)
+    from utils.exports import filtered_filename
+    fname = filtered_filename("expenses", month=month, date_from=date_from, date_to=date_to,
+                              vehicle=vehicle, category=category, subcategory=subcategory,
+                              paid_by=paid_by, search=search) + ".pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=expenses.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
