@@ -169,6 +169,23 @@ async def vehicle_salaries_api(request: Request, month: str = ""):
     expenses = get_all_records("Expenses")
     incentives = get_all_records("Incentives")
     driver_by_name = {str(d.get("DriverName", "")).strip(): d for d in drivers}
+
+    # Month-effective vehicle salary: a salary set for month M applies to M and every
+    # month AFTER it (until a later change). Earlier months keep their own value, so
+    # editing a salary never changes previous months.
+    _sal_over = defaultdict(list)  # VehicleID -> [(EffectiveMonth, MonthlySalary)]
+    for _s in get_all_records("VehicleSalaries"):
+        _vid = str(_s.get("VehicleID", "")).strip()
+        _em = str(_s.get("EffectiveMonth", "")).strip()
+        if _vid and _em:
+            _sal_over[_vid].append((_em, float(_s.get("MonthlySalary", 0) or 0)))
+
+    def _eff_salary(v):
+        applicable = [(em, amt) for em, amt in _sal_over.get(str(v.get("VehicleID", "")).strip(), []) if em <= month]
+        if applicable:
+            applicable.sort(key=lambda x: x[0])
+            return applicable[-1][1]
+        return float(v.get("MonthlySalary", 0) or 0)
     seen_driver = set()  # so a driver's deductions/incentive are counted once even across vehicles
 
     # Classify assignments: single-day (Start==End) are per-day overrides that take
@@ -195,7 +212,7 @@ async def vehicle_salaries_api(request: Request, month: str = ""):
 
     rows = []
     for v in vehicles:
-        vsal = float(v.get("MonthlySalary", 0) or 0)
+        vsal = _eff_salary(v)
         if vsal <= 0:
             continue
         vid, vnum = v.get("VehicleID", ""), str(v.get("VehicleNumber", "")).strip()

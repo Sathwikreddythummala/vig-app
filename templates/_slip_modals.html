@@ -210,7 +210,7 @@ async function generatePayslip(){
 async function saveSalaryOnly(){
   var btn=document.getElementById('psSaveBtn'); btn.disabled=true;
   try{
-    var res=await fetch('/payslip/api/save-salary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vehicles:_vehiclesPayload()})});
+    var res=await fetch('/payslip/api/save-salary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({month:_psMeta.month, vehicles:_vehiclesPayload()})});
     var data=await res.json();
     if(data.success){
       showToast('Monthly salary saved to '+(data.saved||0)+' vehicle'+((data.saved===1)?'':'s'),'success');

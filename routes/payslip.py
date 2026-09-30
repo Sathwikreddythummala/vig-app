@@ -198,6 +198,29 @@ def _set_vehicle_monthly_salary(vehicle_id: str, amount: float):
     update_row("Vehicles", rn, row)
 
 
+def _set_month_salary(vehicle_id: str, vehicle_number: str, month: str, amount: float, user_email: str = ""):
+    """Set a vehicle's salary EFFECTIVE FROM `month` (applies to that month and forward,
+    until a later change) — never touches earlier months. Upserts a VehicleSalaries row."""
+    from services.sheets_service import SHEET_HEADERS
+    if not vehicle_id or not month:
+        return
+    headers = SHEET_HEADERS["VehicleSalaries"]
+    for s in get_all_records("VehicleSalaries"):
+        if str(s.get("VehicleID", "")) == str(vehicle_id) and str(s.get("EffectiveMonth", "")) == month:
+            res = find_row_by_id("VehicleSalaries", s.get("SalaryID", ""))
+            if res:
+                rn, ex = res
+                row = [ex.get(h, "") for h in headers]
+                row[headers.index("MonthlySalary")] = str(amount)
+                row[headers.index("UpdatedBy")] = user_email
+                row[headers.index("UpdatedDate")] = now_str()
+                update_row("VehicleSalaries", rn, row)
+            return
+    vals = {"SalaryID": gen_id("VSAL"), "VehicleID": vehicle_id, "VehicleNumber": vehicle_number,
+            "EffectiveMonth": month, "MonthlySalary": str(amount), "UpdatedBy": user_email, "UpdatedDate": now_str()}
+    append_row("VehicleSalaries", build_row("VehicleSalaries", vals))
+
+
 def _set_incentive(driver_id: str, driver_name: str, month: str, amount: float):
     from services.sheets_service import SHEET_HEADERS
     headers = SHEET_HEADERS["Incentives"]
@@ -422,15 +445,18 @@ async def save_salary(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
+    month = str(data.get("month", "")).strip()
+    if not month:
+        return JSONResponse({"error": "Month is required"}, 400)
     saved = 0
     for v in data.get("vehicles", []):
         vid = str(v.get("vehicle_id", "")).strip()
         ms = v.get("monthly_salary")
         if vid and str(ms).strip() not in ("", "None"):
-            _set_vehicle_monthly_salary(vid, _num(ms))
+            _set_month_salary(vid, str(v.get("vehicle_number", "")), month, _num(ms), user.get("email", ""))
             saved += 1
     if saved:
-        add_audit_log("UPDATE", "Vehicles", "", f"Monthly salary updated for {saved} vehicle(s) via payslip", user.get("email", ""))
+        add_audit_log("UPDATE", "VehicleSalaries", "", f"Salary set for {month} on {saved} vehicle(s) via payslip", user.get("email", ""))
     return {"success": True, "saved": saved}
 
 
@@ -444,9 +470,10 @@ async def payslip_pdf(request: Request):
     _save_company_info(company)
     driver = data.get("driver", {})
     meta = data.get("meta", {})
+    month = str(data.get("month", "")).strip()
     days_in_month = _num(meta.get("days_in_month")) or 30
     # Per-vehicle salary. Recompute each gross server-side from the (possibly edited)
-    # monthly salary, and WRITE BACK the monthly salary to that vehicle.
+    # monthly salary, and WRITE BACK the salary effective FROM this month (forward only).
     veh = []
     for v in data.get("vehicles", []):
         ms = _num(v.get("monthly_salary"))
@@ -454,8 +481,8 @@ async def payslip_pdf(request: Request):
         pd = round(ms / days_in_month, 2) if days_in_month else 0.0
         veh.append({"num": str(v.get("vehicle_number", "")), "ms": ms, "per_day": pd,
                     "days": _num(v.get("days")), "eff": eff, "gross": round(pd * eff, 2)})
-        if str(v.get("vehicle_id", "")).strip() and str(v.get("monthly_salary")).strip() not in ("", "None"):
-            _set_vehicle_monthly_salary(str(v.get("vehicle_id")).strip(), ms)
+        if str(v.get("vehicle_id", "")).strip() and month and str(v.get("monthly_salary")).strip() not in ("", "None"):
+            _set_month_salary(str(v.get("vehicle_id")).strip(), str(v.get("vehicle_number", "")), month, ms, user.get("email", ""))
     total_salary = round(sum(x["gross"] for x in veh), 2)
     other_earnings = [(str(e.get("label", "")), _num(e.get("amount"))) for e in data.get("other_earnings", []) if str(e.get("label", "")).strip()]
     earnings = [("Salary (Total)", total_salary)] + other_earnings
