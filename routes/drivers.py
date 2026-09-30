@@ -348,10 +348,12 @@ async def export_vehicle_salaries_excel(request: Request, month: str = ""):
     df.to_excel(buf, index=False, engine="openpyxl", sheet_name=f"Salaries {month or 'All'}")
     buf.seek(0)
     from fastapi.responses import StreamingResponse
+    from utils.exports import filtered_filename
+    fname = filtered_filename("vehicle_salaries", month=month) + ".xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename=vehicle_salaries_{month or "all"}.xlsx'},
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
 
 
@@ -419,9 +421,10 @@ async def export_salaries_excel(request: Request, month: str = ""):
     wb.save(buf)
     buf.seek(0)
     from fastapi.responses import StreamingResponse
-    filename = f"Salaries_{month or 'All'}.xlsx"
+    from utils.exports import filtered_filename
+    filename = filtered_filename("salaries", month=month) + ".xlsx"
     return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+                             headers={"Content-Disposition": f'attachment; filename={filename}'})
 
 
 @router.get("/api/{driver_id}")

@@ -148,7 +148,7 @@ async def fuel_stats(request: Request):
     }
 
 
-def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel_type: str, month: str = "") -> list[dict]:
+def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel_type: str, month: str = "", payment_status: str = "") -> list[dict]:
     records = get_all_records("FuelEntries")
     if month:
         records = [r for r in records if str(r.get("EntryDate", ""))[:7] == month]
@@ -160,6 +160,8 @@ def _filtered_fuel(date_from: str, date_to: str, vehicle: str, driver: str, fuel
     records = filter_multi(records, "VehicleNumber", vehicle)
     records = filter_multi(records, "DriverName", driver)
     records = filter_multi(records, "FuelType", fuel_type)
+    if payment_status:
+        records = [r for r in records if (str(r.get("PaymentStatus", "")).strip() or "Paid") == payment_status]
     records.sort(key=lambda x: str(x.get("EntryDate", "")), reverse=True)
     return records
 
@@ -173,25 +175,28 @@ async def export_excel(
     vehicle: str = "",
     driver: str = "",
     fuel_type: str = "",
+    payment_status: str = "",
 ):
     user = get_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
-    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month)
+    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month, payment_status)
     num_cols = ["Litres", "Amount", "Kilometre"]
     if _is_admin(user):
         km_map = _km_run_map(get_all_records("FuelEntries"))
         records = [{**r, "Km Run": km_map.get(r.get("FuelID", ""), "")} for r in records]
         num_cols.append("Km Run")
-    from utils.exports import to_numeric_df
+    from utils.exports import to_numeric_df, filtered_filename
     df = to_numeric_df(records, num_cols)
     buf = io.BytesIO()
     df.to_excel(buf, index=False, engine="openpyxl")
     buf.seek(0)
+    fname = filtered_filename("fuel", month=month, date_from=date_from, date_to=date_to,
+                              vehicle=vehicle, subcategory=fuel_type, extra=[driver, payment_status]) + ".xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=fuel_entries.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
 
 
@@ -204,6 +209,7 @@ async def export_pdf(
     vehicle: str = "",
     driver: str = "",
     fuel_type: str = "",
+    payment_status: str = "",
 ):
     user = get_user(request)
     if not user:
@@ -212,7 +218,7 @@ async def export_pdf(
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
-    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month)
+    records = _filtered_fuel(date_from, date_to, vehicle, driver, fuel_type, month, payment_status)
 
     def safe(v, limit=30):
         return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
@@ -270,10 +276,13 @@ async def export_pdf(
     elements.append(table)
     doc.build(elements)
     buf.seek(0)
+    from utils.exports import filtered_filename
+    fname = filtered_filename("fuel", month=month, date_from=date_from, date_to=date_to,
+                              vehicle=vehicle, subcategory=fuel_type, extra=[driver, payment_status]) + ".pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=fuel_entries.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
 
 

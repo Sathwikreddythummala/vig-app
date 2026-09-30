@@ -52,7 +52,10 @@ def filtered_filename(base, *, month="", date_from="", date_to="", vehicle="",
         if s:
             parts.append(s)
     parts = [p for p in parts if p] or ["all"]
-    parts.append(_slug(base))
+    # Preserve word breaks in the base noun (e.g. "vehicle_salaries") since
+    # underscore is our separator.
+    base_slug = "_".join(p for p in (_slug(b) for b in str(base).split("_")) if p) or "export"
+    parts.append(base_slug)
     return "_".join(parts)
 
 
