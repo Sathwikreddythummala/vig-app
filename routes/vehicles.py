@@ -401,10 +401,15 @@ async def assign_driver(request: Request, vehicle_id: str):
                 ur("Drivers", idx + 2, drv_row)
                 break
     if new_driver:
+        status_idx = drv_headers.index("Status")
+        exit_idx = drv_headers.index("ExitDate")
         for idx, d in enumerate(all_drivers):
             if str(d.get("DriverName", "")).strip() == new_driver:
                 drv_row = [d.get(h, "") for h in drv_headers]
                 drv_row[assigned_idx] = vehicle_number
+                # A driver taking over a vehicle is working again — reactivate if inactive.
+                drv_row[status_idx] = "Active"
+                drv_row[exit_idx] = ""
                 drv_row[drv_updated_idx] = ns()
                 ur("Drivers", idx + 2, drv_row)
                 break

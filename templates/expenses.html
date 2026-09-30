@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [catRes, vehRes, drvRes] = await Promise.all([
         fetch('/expenses/api/categories').then(r=>r.json()),
         fetch('/vehicles/api/list').then(r=>r.json()),
-        fetch('/drivers/api/list?active_only=1').then(r=>r.json())
+        fetch('/drivers/api/list').then(r=>r.json())
     ]);
     categories = catRes.categories || {};
     vehicles = vehRes.vehicles || [];
@@ -143,9 +143,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     let drvSel = document.getElementById('expDriver');
     drvSel.innerHTML = '<option value="">-- Select --</option>';
-    drivers.forEach(d => {
-        drvSel.innerHTML += `<option value="${d.DriverName}">${d.DriverName}</option>`;
-    });
+    // Active first, then inactive (marked) — inactive drivers still get advances/salary
+    // for their last working month.
+    const _act = drivers.filter(d => String(d.Status||'Active').toLowerCase() !== 'inactive');
+    const _inact = drivers.filter(d => String(d.Status||'Active').toLowerCase() === 'inactive');
+    _act.forEach(d => { drvSel.innerHTML += `<option value="${d.DriverName}">${d.DriverName}</option>`; });
+    _inact.forEach(d => { drvSel.innerHTML += `<option value="${d.DriverName}">${d.DriverName} (inactive)</option>`; });
     // Live search — updates as you type (debounced), no Filter click needed
     var searchEl = document.getElementById('filterSearch');
     searchEl.addEventListener('input', debouncedExpenseSearch);

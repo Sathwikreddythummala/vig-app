@@ -73,7 +73,7 @@ async function loadVehicleDetails() {
     var catWise = {};
     expenses.forEach(function(e) { catWise[e.Category] = (catWise[e.Category]||0) + parseFloat(e.Amount||0); });
 
-    var drvRes = await fetch('/drivers/api/list?active_only=1');
+    var drvRes = await fetch('/drivers/api/list');
     var drvData = await drvRes.json();
     allDrivers = drvData.drivers || [];
     var driverOptions = '<option value="">-- No Driver --</option>';
@@ -248,10 +248,24 @@ function openChangeDriver() {
     var curEl = document.getElementById('currentDriverName');
     var cur = curEl ? curEl.textContent.trim() : '';
     document.getElementById('cdCurrent').textContent = cur || 'None';
-    var sel = document.getElementById('cdNewDriver');
-    sel.innerHTML = '<option value="">-- Select --</option>' + allDrivers.map(function(d){
-        return '<option value="'+(d.DriverName||'')+'">'+(d.DriverName||'')+(d.AssignedVehicle ? ' ('+d.AssignedVehicle+')' : '')+'</option>';
-    }).join('');
+    // Drivers who have driven THIS vehicle (from its assignment periods) + the current
+    // driver — active OR inactive — shown first. Other active drivers follow as a fallback.
+    var vehNames = {};
+    (_assignments || []).forEach(function(a){ if (a.DriverName) vehNames[a.DriverName.trim()] = true; });
+    if (cur && cur !== 'None') vehNames[cur] = true;
+    var byName = {}; (allDrivers || []).forEach(function(d){ byName[(d.DriverName||'').trim()] = d; });
+    function opt(name){
+        var d = byName[name], inactive = d && String(d.Status||'Active').toLowerCase() === 'inactive';
+        return '<option value="'+name+'">'+name+(inactive ? ' (inactive)' : '')+'</option>';
+    }
+    var vehList = Object.keys(vehNames).filter(Boolean).sort();
+    var others = (allDrivers || []).filter(function(d){
+        return String(d.Status||'Active').toLowerCase() !== 'inactive' && !vehNames[(d.DriverName||'').trim()];
+    }).map(function(d){ return (d.DriverName||'').trim(); });
+    var html = '<option value="">-- Select --</option>';
+    if (vehList.length) html += '<optgroup label="Drivers of this vehicle">' + vehList.map(opt).join('') + '</optgroup>';
+    if (others.length) html += '<optgroup label="Other active drivers">' + others.map(opt).join('') + '</optgroup>';
+    document.getElementById('cdNewDriver').innerHTML = html;
     var t = todayLocal();
     document.getElementById('cdExitDate').value = t;
     document.getElementById('cdEntryDate').value = t;
