@@ -29,7 +29,7 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover glass-table">
-            <thead><tr><th>Date</th><th>For</th><th>Vehicle</th><th>Driver</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Mode</th><th>Paid By</th><th>Month</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>For</th><th>Vehicle</th><th>Driver</th><th>Category</th><th>SubCategory</th><th>Description</th><th>Amount</th><th>Mode</th><th>Paid By</th><th>For Month</th><th>Actions</th></tr></thead>
             <tbody id="expenseTable"><tr><td colspan="12" class="text-center"><div class="spinner-border spinner-border-sm text-warning"></div></td></tr></tbody>
         </table>
     </div>
@@ -231,7 +231,7 @@ async function loadExpenses(page) {
             <td>${e.ExpenseDate}</td><td>${e.ExpenseFor||'-'}</td><td>${e.VehicleNumber||'-'}</td><td>${e.DriverName||'-'}</td>
             <td><span class="badge bg-warning text-dark">${e.Category}</span></td><td>${e.SubCategory||'-'}</td>
             <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
-            <td>${e.PaymentMode||'-'}</td><td>${e.PaidBy||'-'}</td><td>${(e.ExpenseDate||'').slice(0,7)||'-'}</td>
+            <td>${e.PaymentMode||'-'}</td><td>${e.PaidBy||'-'}</td><td>${e.ForMonth||'-'}</td>
             <td>
                 <button class="btn btn-sm btn-outline-warning" onclick="editExpense('${e.ExpenseID}')"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteExpense('${e.ExpenseID}')"><i class="bi bi-trash"></i></button>
