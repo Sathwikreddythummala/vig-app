@@ -204,7 +204,8 @@
       "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/c60a22bb-120a-4dd1-b80d-9229c36863f4/scratchpad/sm.js\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('routes/payslip.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('routes/dashboard.py',encoding='utf-8'\\).read\\(\\)\\); print\\('dashboard.py OK'\\)\")",
-      "Bash(curl -s -o /dev/null -w \"save-salary\\(unauth\\):%{http_code}\\\\n\" -X POST http://localhost:8000/payslip/api/save-salary)"
+      "Bash(curl -s -o /dev/null -w \"save-salary\\(unauth\\):%{http_code}\\\\n\" -X POST http://localhost:8000/payslip/api/save-salary)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/expenses.py'\\).read\\(\\)\\); print\\('expenses.py OK'\\)\")"
     ]
   }
 }

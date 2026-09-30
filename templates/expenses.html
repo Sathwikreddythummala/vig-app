@@ -231,7 +231,7 @@ async function loadExpenses(page) {
             <td>${e.ExpenseDate}</td><td>${e.ExpenseFor||'-'}</td><td>${e.VehicleNumber||'-'}</td><td>${e.DriverName||'-'}</td>
             <td><span class="badge bg-warning text-dark">${e.Category}</span></td><td>${e.SubCategory||'-'}</td>
             <td>${e.Description||'-'}</td><td class="fw-bold">₹${Number(e.Amount).toLocaleString('en-IN')}</td>
-            <td>${e.PaymentMode||'-'}</td><td>${e.PaidBy||'-'}</td><td>${e.ForMonth||'-'}</td>
+            <td>${e.PaymentMode||'-'}</td><td>${e.PaidBy||'-'}</td><td>${(e.ExpenseDate||'').slice(0,7)||'-'}</td>
             <td>
                 <button class="btn btn-sm btn-outline-warning" onclick="editExpense('${e.ExpenseID}')"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteExpense('${e.ExpenseID}')"><i class="bi bi-trash"></i></button>

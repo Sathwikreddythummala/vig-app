@@ -68,7 +68,8 @@ async def list_expenses(
         return JSONResponse({"error": "Unauthorized"}, 401)
     expenses = get_all_records("Expenses")
     if month:
-        expenses = [e for e in expenses if (str(e.get("ForMonth", "")) or str(e.get("ExpenseDate", ""))[:7]) == month]
+        # Month filter follows the payment date (ExpenseDate), not the salary "for-month"
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     # Drivers only see their own Driver Expense and Deductions entries
     if user.get("role") == "driver":
         driver_name = user.get("driver_name", "")
@@ -234,7 +235,8 @@ async def export_excel(
         return JSONResponse({"error": "Unauthorized"}, 401)
     expenses = get_all_records("Expenses")
     if month:
-        expenses = [e for e in expenses if (str(e.get("ForMonth", "")) or str(e.get("ExpenseDate", ""))[:7]) == month]
+        # Month filter follows the payment date (ExpenseDate), not the salary "for-month"
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     if date_from:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:
@@ -274,7 +276,8 @@ async def export_pdf(
     from reportlab.lib.styles import getSampleStyleSheet
     expenses = get_all_records("Expenses")
     if month:
-        expenses = [e for e in expenses if (str(e.get("ForMonth", "")) or str(e.get("ExpenseDate", ""))[:7]) == month]
+        # Month filter follows the payment date (ExpenseDate), not the salary "for-month"
+        expenses = [e for e in expenses if str(e.get("ExpenseDate", ""))[:7] == month]
     if date_from:
         expenses = [e for e in expenses if str(e.get("ExpenseDate", "")) >= date_from]
     if date_to:
