@@ -227,6 +227,10 @@
             document.getElementById('assignedVehicleText').textContent = 'Vehicle: ' + (d.AssignedVehicle||'Not assigned') + ' | Salary: ₹' + Number(d.Salary||0).toLocaleString('en-IN');
             var veh = d.AssignedVehicle || '--';
             document.getElementById('vehicleBadge').textContent = veh.slice(-4) || '--';
+            // Keep the diesel form's vehicle in sync with the live assignment
+            // (not the session value captured at login).
+            assignedVehicle = d.AssignedVehicle || assignedVehicle;
+            document.getElementById('dslVehicle').value = d.AssignedVehicle || 'Not assigned';
             document.getElementById('statSalary').textContent = '₹' + Number(d.Salary||0).toLocaleString('en-IN');
             document.getElementById('statAdvance').textContent = '₹' + Number(data.total_advance||0).toLocaleString('en-IN');
             document.getElementById('statMeals').textContent = '₹' + Number(data.total_meals||0).toLocaleString('en-IN');

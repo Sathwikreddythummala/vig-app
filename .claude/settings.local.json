@@ -205,7 +205,10 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\('routes/payslip.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('routes/dashboard.py',encoding='utf-8'\\).read\\(\\)\\); print\\('dashboard.py OK'\\)\")",
       "Bash(curl -s -o /dev/null -w \"save-salary\\(unauth\\):%{http_code}\\\\n\" -X POST http://localhost:8000/payslip/api/save-salary)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/expenses.py'\\).read\\(\\)\\); print\\('expenses.py OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/expenses.py'\\).read\\(\\)\\); print\\('expenses.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/driver_portal.py'\\).read\\(\\)\\); print\\('driver_portal.py OK'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"driver-login:%{http_code}\\\\n\" http://localhost:8000/driver-portal/login)",
+      "Bash(curl -s -o /dev/null -w \"diesel-noauth:%{http_code}\\\\n\" -X POST http://localhost:8000/driver-portal/api/diesel -H \"Content-Type: application/json\" -d '{}')"
     ]
   }
 }

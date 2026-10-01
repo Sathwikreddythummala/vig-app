@@ -41,6 +41,31 @@ def get_driver_user(request: Request):
     return None
 
 
+def _live_driver(request: Request) -> dict | None:
+    """Re-read the signed-in driver's CURRENT record from the DB.
+
+    The session captures the driver's vehicle/name at login time; if the
+    office re-assigns the driver afterwards, that session goes stale. Every
+    write (fuel/expense) must resolve the driver fresh so the stored
+    VehicleNumber/DriverName always match the master assignment.
+    """
+    pd = request.session.get("portal_driver")
+    if pd and pd.get("id"):
+        res = find_row_by_id("Drivers", pd.get("id"))
+        if res:
+            return res[1]
+    user = request.session.get("user")
+    if user and user.get("role") == "driver":
+        email = str(user.get("email", "")).strip().lower()
+        name = str(user.get("driver_name", "")).strip()
+        for d in get_all_records("Drivers"):
+            if email and str(d.get("Email", "")).strip().lower() == email:
+                return d
+            if name and str(d.get("DriverName", "")).strip() == name:
+                return d
+    return None
+
+
 def _active_drivers() -> list[dict]:
     out = []
     for d in get_all_records("Drivers"):
@@ -292,9 +317,13 @@ async def add_diesel(request: Request):
     if not user:
         return JSONResponse({"error": "Unauthorized"}, 401)
     data = await request.json()
-    vehicle = user.get("assigned_vehicle", "")
-    if data.get("VehicleNumber"):
-        vehicle = data["VehicleNumber"]
+    # Strict sync: always use the driver's CURRENT record, never the (possibly
+    # stale) session vehicle or a client-supplied VehicleNumber.
+    live = _live_driver(request)
+    driver_name = str(live.get("DriverName", "")).strip() if live else user.get("driver_name", "")
+    vehicle = str(live.get("AssignedVehicle", "")).strip() if live else user.get("assigned_vehicle", "")
+    if not vehicle:
+        return JSONResponse({"error": "No vehicle assigned to you. Ask the office."}, 400)
     status = (data.get("PaymentStatus") or "Paid").strip() or "Paid"
     station = str(data.get("FuelStation", "")).strip()
     if status == "Unpaid" and not station:
@@ -303,7 +332,7 @@ async def add_diesel(request: Request):
     if is_duplicate("FuelEntries", {
         "EntryDate": data.get("Date", datetime.now(_IST).strftime("%Y-%m-%d")),
         "VehicleNumber": vehicle,
-        "DriverName": user.get("driver_name", ""),
+        "DriverName": driver_name,
         "FuelType": data.get("FuelType", "Diesel"),
         "Litres": data.get("Litres", ""),
         "Amount": data.get("Amount", 0),
@@ -315,7 +344,7 @@ async def add_diesel(request: Request):
         "FuelID": fid,
         "EntryDate": data.get("Date", datetime.now(_IST).strftime("%Y-%m-%d")),
         "VehicleNumber": vehicle,
-        "DriverName": user.get("driver_name", ""),
+        "DriverName": driver_name,
         "FuelType": data.get("FuelType", "Diesel"),
         "Litres": data.get("Litres", ""),
         "Amount": data.get("Amount", 0),
@@ -329,6 +358,6 @@ async def add_diesel(request: Request):
     row = build_row("FuelEntries", vals)
     append_row("FuelEntries", row)
     add_audit_log("CREATE", "FuelEntries", fid,
-                  f"Fuel Rs.{data.get('Amount',0)} ({status}) by driver {user.get('driver_name','')}",
+                  f"Fuel Rs.{data.get('Amount',0)} ({status}) by driver {driver_name}",
                   user["email"])
     return {"success": True, "fuel_id": fid}
