@@ -157,14 +157,23 @@ def reconcile_driver_vehicle():
         else:
             seen[drv] = vn
 
-    # 3. Sync Vehicles.DefaultDriver to the effective driver
+    # 3. Sync Vehicles.DefaultDriver to the effective driver.
+    #    A vehicle not in veh_current has no current driver: clear a stale
+    #    DefaultDriver if that person is inactive or now drives ANOTHER vehicle
+    #    (otherwise leave it as-is, e.g. a standalone or inactive/sold vehicle's
+    #    historical driver that conflicts with nothing).
+    claimed = {drv: vn for vn, drv in veh_current.items()}  # driver -> their one current vehicle
     veh_fixed = 0
     for idx, v in enumerate(get_all_records("Vehicles")):
         vn = str(v.get("VehicleNumber", "")).strip()
-        want = veh_current.get(vn, str(v.get("DefaultDriver", "")).strip())
-        if str(v.get("DefaultDriver", "")).strip() in inactive:
-            want = veh_current.get(vn, "")
-        if str(v.get("DefaultDriver", "")).strip() != want:
+        dd = str(v.get("DefaultDriver", "")).strip()
+        if vn in veh_current:
+            want = veh_current[vn]
+        elif dd and (dd in inactive or (dd in claimed and claimed[dd] != vn)):
+            want = ""
+        else:
+            want = dd
+        if dd != want:
             row = [v.get(h, "") for h in v_headers]
             row[v_headers.index("DefaultDriver")] = want
             row[v_headers.index("UpdatedDate")] = now_str()
