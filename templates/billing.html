@@ -31,7 +31,11 @@
             <select class="form-select glass-input" id="filterStatus" style="width:125px"><option value="">All Status</option><option>Pending</option><option>Partial</option><option>Paid</option></select>
             <button class="btn btn-warning btn-sm" onclick="loadBills()"><i class="bi bi-funnel"></i></button>
         </div>
-        <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#billModal" onclick="resetBillForm()"><i class="bi bi-plus-lg"></i> Add Bill</button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="exportBillsExcel()"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+            <button class="btn btn-outline-warning btn-sm" onclick="exportBillsPDF()"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+            <button class="btn btn-warning btn-sm viewer-hide" data-bs-toggle="modal" data-bs-target="#billModal" onclick="resetBillForm()"><i class="bi bi-plus-lg"></i> Add Bill</button>
+        </div>
     </div>
 </div>
 <div class="glass-card animate-in" style="animation-delay:0.4s">
@@ -321,6 +325,20 @@ function resetBillForm(){
     document.getElementById('invNumHint').style.display='none';
     calcBill();
 }
+
+function billExportParams(){
+    return new URLSearchParams({
+        month:document.getElementById('filterMonth').value,
+        working_month:document.getElementById('filterWorkMonth').value,
+        date_from:document.getElementById('filterDateFrom').value,
+        date_to:document.getElementById('filterDateTo').value,
+        vehicle:document.getElementById('filterVehicle').value,
+        vendor:document.getElementById('filterVendor').value,
+        status:document.getElementById('filterStatus').value
+    });
+}
+function exportBillsExcel(){ window.open('/billing/api/export/excel?'+billExportParams()); }
+function exportBillsPDF(){ window.open('/billing/api/export/pdf?'+billExportParams()); }
 
 async function loadBills(page){
     currentPage=page||1;

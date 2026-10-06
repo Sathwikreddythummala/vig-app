@@ -151,6 +151,138 @@ async def list_bills(
     }
 
 
+def _filter_bills(all_records, month="", working_month="", date_from="", date_to="",
+                  vehicle="", vendor="", status=""):
+    """Apply the Billing list filters (shared by list + exports). Period filters
+    use PaymentMonth (falling back to InvoiceDate's month), matching the list."""
+    from utils.filters import filter_multi
+    records = list(all_records)
+    if month:
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) == month]
+    if working_month:
+        records = [r for r in records if str(r.get("WorkingMonth", "")) == working_month]
+    if date_from:
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) >= date_from[:7]]
+    if date_to:
+        records = [r for r in records if (str(r.get("PaymentMonth", "")) or str(r.get("InvoiceDate", ""))[:7]) <= date_to[:7]]
+    records = filter_multi(records, "VehicleNumber", vehicle)
+    records = filter_multi(records, "VendorName", vendor)
+    records = filter_multi(records, "PaymentStatus", status)
+    # For a pure period filter, pull in the rest of each matched invoice (same as list)
+    if not (vehicle or vendor or status):
+        matched = {str(r.get("InvoiceNumber", "")).strip().upper() for r in records if str(r.get("InvoiceNumber", "")).strip()}
+        if matched:
+            seen = {r.get("BillID") for r in records}
+            for r in all_records:
+                if str(r.get("InvoiceNumber", "")).strip().upper() in matched and r.get("BillID") not in seen:
+                    records.append(r); seen.add(r.get("BillID"))
+    records.sort(key=lambda x: (str(x.get("PaymentMonth", "")) or str(x.get("InvoiceDate", ""))[:7]), reverse=True)
+    return records
+
+
+_EXPORT_COLS = [
+    "InvoiceNumber", "InvoiceDate", "PaymentMonth", "WorkingMonth", "VehicleNumber",
+    "VendorName", "FixedAmount", "VariableAmount", "Tollgates", "TrafficChallan",
+    "SubTotal", "SGST", "CGST", "TDS", "TotalAmount", "PaidAmount", "BalanceAmount",
+    "PaymentStatus",
+]
+_EXPORT_NUM = ["FixedAmount", "VariableAmount", "Tollgates", "TrafficChallan", "SubTotal",
+               "SGST", "CGST", "TDS", "TotalAmount", "PaidAmount", "BalanceAmount"]
+
+
+@router.get("/api/export/excel")
+async def export_bills_excel(
+    request: Request, month: str = "", working_month: str = "", date_from: str = "",
+    date_to: str = "", vehicle: str = "", vendor: str = "", status: str = "",
+):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    import io
+    from fastapi.responses import StreamingResponse
+    from utils.exports import to_numeric_df, filtered_filename
+    bills = _filter_bills(get_all_records("Billing"), month, working_month, date_from, date_to, vehicle, vendor, status)
+    data = [{c: b.get(c, "") for c in _EXPORT_COLS} for b in bills]
+    df = to_numeric_df(data or [{c: "" for c in _EXPORT_COLS}], _EXPORT_NUM)[_EXPORT_COLS]
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False, engine="openpyxl")
+    buf.seek(0)
+    fname = filtered_filename("billing", month=month, date_from=date_from, date_to=date_to,
+                              vehicle=vehicle, extra=[vendor, status,
+                              ("work" + working_month if working_month else "")]) + ".xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+@router.get("/api/export/pdf")
+async def export_bills_pdf(
+    request: Request, month: str = "", working_month: str = "", date_from: str = "",
+    date_to: str = "", vehicle: str = "", vendor: str = "", status: str = "",
+):
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    import io
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    from utils.exports import filtered_filename
+    bills = _filter_bills(get_all_records("Billing"), month, working_month, date_from, date_to, vehicle, vendor, status)
+
+    def safe(v, limit=22):
+        return str(v or "").encode("ascii", "ignore").decode("ascii")[:limit]
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4))
+    styles = getSampleStyleSheet()
+    elements = [Paragraph("Vigneshwara Enterprises - Billing Report", styles["Title"]), Spacer(1, 16)]
+    header = ["Invoice", "Date", "Pay Mon", "Vehicle", "Vendor", "SubTotal", "GST", "TDS", "Total", "Paid", "Balance", "Status"]
+    data = [header]
+    t_total = t_paid = t_bal = 0.0
+    for b in bills:
+        total = float(b.get("TotalAmount", 0) or 0)
+        paid = float(b.get("PaidAmount", 0) or 0)
+        bal = float(b.get("BalanceAmount", 0) or 0)
+        gst = float(b.get("SGST", 0) or 0) + float(b.get("CGST", 0) or 0)
+        t_total += total; t_paid += paid; t_bal += bal
+        data.append([
+            safe(b.get("InvoiceNumber"), 16), safe(b.get("InvoiceDate"), 11),
+            safe(b.get("PaymentMonth"), 8), safe(b.get("VehicleNumber"), 12),
+            safe(b.get("VendorName"), 18),
+            f"{float(b.get('SubTotal',0) or 0):,.0f}", f"{gst:,.0f}",
+            f"{float(b.get('TDS',0) or 0):,.0f}", f"{total:,.0f}",
+            f"{paid:,.0f}", f"{bal:,.0f}", safe(b.get("PaymentStatus"), 10),
+        ])
+    data.append(["", "", "", "", "Total", "", "", "", f"{t_total:,.0f}", f"{t_paid:,.0f}", f"{t_bal:,.0f}", ""])
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FFD54F")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#FFF9C4")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#FFFDE7")]),
+    ]))
+    elements.append(table)
+    doc.build(elements)
+    buf.seek(0)
+    fname = filtered_filename("billing", month=month, date_from=date_from, date_to=date_to,
+                              vehicle=vehicle, extra=[vendor, status,
+                              ("work" + working_month if working_month else "")]) + ".pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
 @router.post("/api/add")
 async def add_bill(request: Request):
     user = get_user(request)
