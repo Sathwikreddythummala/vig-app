@@ -664,10 +664,11 @@ async function loadVendorBills(){
     });
     var html='<div class="d-flex gap-2 py-1 fw-bold small text-muted" style="border-bottom:1px solid rgba(255,193,7,0.3)">'+
         '<span style="width:22px"></span>'+
-        '<span style="flex:1.2">Vendor</span>'+
-        '<span style="flex:1.2">Invoice</span>'+
+        '<span style="flex:1.1">Vendor</span>'+
+        '<span style="flex:1">Invoice</span>'+
+        '<span style="flex:1;text-align:center">Pay / Work Month</span>'+
         '<span style="flex:1.1;text-align:right">Balance</span>'+
-        '<span style="flex:0.9;text-align:center">Share %</span>'+
+        '<span style="flex:0.7;text-align:center">Share %</span>'+
         '<span style="flex:1.1;text-align:right">Split ₹</span></div>';
     var shown=0;
     invOrder.forEach(function(inv){
@@ -680,12 +681,15 @@ async function loadVendorBills(){
         invVendorMap[inv]=grp[0].VendorName||'';
         var cls=status==='Partial'?'bg-warning text-dark':'bg-danger';
         var invEsc=inv.replace(/"/g,'&quot;');
+        var pay=grp[0].PaymentMonth?monthName(grp[0].PaymentMonth):(grp[0].InvoiceDate||'—');
+        var work=grp[0].WorkingMonth?monthName(grp[0].WorkingMonth):'—';
         html+='<div class="d-flex align-items-center gap-2 py-1 small" data-inv="'+invEsc+'">'+
             '<input type="checkbox" class="rInvChk" value="'+invEsc+'" style="width:22px" onchange="onInvCheck()">'+
-            '<span style="flex:1.2">'+(grp[0].VendorName||'—')+'</span>'+
-            '<span style="flex:1.2"><strong>'+inv+'</strong> <span class="badge '+cls+'" style="font-size:0.6rem">'+status+'</span></span>'+
+            '<span style="flex:1.1">'+(grp[0].VendorName||'—')+'</span>'+
+            '<span style="flex:1"><strong>'+inv+'</strong> <span class="badge '+cls+'" style="font-size:0.6rem">'+status+'</span></span>'+
+            '<span style="flex:1;text-align:center">'+pay+'<br><span class="text-muted" style="font-size:0.7rem">work: '+work+'</span></span>'+
             '<span style="flex:1.1;text-align:right">₹'+totalBal.toLocaleString('en-IN')+'</span>'+
-            '<span style="flex:0.9;text-align:center" class="rInvPct text-muted">—</span>'+
+            '<span style="flex:0.7;text-align:center" class="rInvPct text-muted">—</span>'+
             '<span style="flex:1.1;text-align:right" class="rInvSplit">—</span>'+
             '</div>';
     });
