@@ -135,12 +135,15 @@
             <div class="modal-body">
                 <form id="recvForm">
                     <div class="row g-3">
-                        <div class="col-md-6"><label class="form-label">Receive Date *</label><input type="date" class="form-control glass-input" id="rDate" required></div>
-                        <div class="col-md-6"><label class="form-label">Vendor *</label><select class="form-select glass-input" id="rVendor" required onchange="loadVendorBills()"><option value="">-- Select --</option></select></div>
-                        <div class="col-md-12"><label class="form-label">Against Invoice(s) <small class="text-muted">(tick one or more — the payment splits across them by balance; leave all unticked for a general payment)</small></label>
-                            <div id="rBillList" class="glass-input" style="max-height:190px;overflow:auto;padding:10px;border-radius:10px"><div class="text-muted small">Select a vendor to load invoices</div></div>
+                        <div class="col-md-4"><label class="form-label">Receive Date *</label><input type="date" class="form-control glass-input" id="rDate" required></div>
+                        <div class="col-md-8"><label class="form-label">Vendor(s) * <small class="text-muted">(tick one or more to load their invoices)</small></label>
+                            <div id="rVendorList" class="glass-input" style="max-height:110px;overflow:auto;padding:8px;border-radius:10px"><div class="text-muted small">Loading vendors…</div></div>
                         </div>
-                        <div class="col-md-3"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="rAmount" required min="0" step="0.01"></div>
+                        <div class="col-md-12"><label class="form-label">Against Invoice(s) <small class="text-muted">(tick invoices — the amount is split automatically across them and their vehicles in proportion to their values. Leave all unticked for a general payment to a single vendor.)</small></label>
+                            <div id="rBillList" class="glass-input" style="max-height:210px;overflow:auto;padding:10px;border-radius:10px"><div class="text-muted small">Select vendor(s) to load invoices</div></div>
+                            <div id="rSplitSummary" class="small mt-1"></div>
+                        </div>
+                        <div class="col-md-3"><label class="form-label">Amount (₹) *</label><input type="number" class="form-control glass-input" id="rAmount" required min="0" step="0.01" oninput="recomputeSplits()"></div>
                         <div class="col-md-3"><label class="form-label">Payment Mode</label><select class="form-select glass-input" id="rPayMode"><option>Bank Transfer</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></div>
                         <div class="col-md-3"><label class="form-label">Reference No</label><input type="text" class="form-control glass-input" id="rRefNum" placeholder="UTR/Cheque No"></div>
                         <div class="col-md-3"><label class="form-label">Description</label><input type="text" class="form-control glass-input" id="rDesc"></div>
@@ -184,10 +187,11 @@ document.addEventListener('DOMContentLoaded', async function(){
         if(allVehicles.length){s.innerHTML+='<optgroup label="Own Vehicles">';allVehicles.forEach(v=>{s.innerHTML+='<option value="'+v.VehicleNumber+'" data-vendor="'+(v.DefaultVendor||'')+'">'+v.VehicleNumber+'</option>';});s.innerHTML+='</optgroup>';}
         if(outsideVehicles.length){s.innerHTML+='<optgroup label="Outside Vehicles">';outsideVehicles.filter(v=>v.Status==='Active').forEach(v=>{s.innerHTML+='<option value="'+v.VehicleNumber+'" data-vendor="">'+v.VehicleNumber+' ('+v.OwnerName+')</option>';});s.innerHTML+='</optgroup>';}
     });
-    ['bVendor','filterVendor','rVendor','filterRecvVendor'].forEach(function(id){
+    ['bVendor','filterVendor','filterRecvVendor'].forEach(function(id){
         var s=document.getElementById(id);
         allVendors.filter(v=>v.Status==='Active').forEach(v=>{s.innerHTML+='<option value="'+v.VendorName+'">'+v.VendorName+'</option>';});
     });
+    renderVendorChecklist();
     loadBills();
     loadAlerts();
     refreshInvoiceList();
@@ -596,8 +600,12 @@ function resetRecvForm(){
     document.getElementById('recvModalTitle').textContent='Add Received Payment';
     document.getElementById('recvForm').reset();
     document.getElementById('rDate').value=todayStr();
-    invBalanceMap={};
-    document.getElementById('rBillList').innerHTML='<div class="text-muted small">Select a vendor to load invoices</div>';
+    invBalanceMap={}; invVendorMap={};
+    renderVendorChecklist();
+    document.querySelectorAll('.rVendorChk').forEach(function(c){c.checked=false;});
+    document.getElementById('rBillList').innerHTML='<div class="text-muted small">Select vendor(s) to load invoices</div>';
+    document.getElementById('rSplitSummary').innerHTML='';
+    document.getElementById('rVendorList').style.display='';
 }
 
 function editRecv(id){
@@ -607,12 +615,8 @@ function editRecv(id){
     editingRecvId=id;
     document.getElementById('recvModalTitle').textContent='Edit Received Payment';
     document.getElementById('rDate').value=r.ReceiveDate||'';
-    var vSel=document.getElementById('rVendor');
-    vSel.value=r.VendorName||'';
-    if(r.VendorName && vSel.value!==r.VendorName){
-        var opt=document.createElement('option');opt.value=r.VendorName;opt.textContent=r.VendorName;
-        vSel.appendChild(opt);vSel.value=r.VendorName;
-    }
+    // On edit we keep the existing vendor/invoice link; show it read-only.
+    document.getElementById('rVendorList').innerHTML='<div class="small">Vendor: <strong>'+(r.VendorName||'—')+'</strong> <span class="text-muted">(kept on edit)</span></div>';
     document.getElementById('rAmount').value=r.Amount||'';
     document.getElementById('rPayMode').value=r.PaymentMode||'Bank Transfer';
     document.getElementById('rRefNum').value=r.ReferenceNumber||'';
@@ -621,55 +625,112 @@ function editRecv(id){
     bootstrap.Modal.getOrCreateInstance(recvModalEl).show();
 }
 
-var invBalanceMap={};
+var invBalanceMap={}, invVendorMap={};
+
+function renderVendorChecklist(){
+    var box=document.getElementById('rVendorList');
+    if(!box) return;
+    var vs=allVendors.filter(function(v){return v.Status==='Active';});
+    if(!vs.length){box.innerHTML='<div class="text-muted small">No active vendors</div>';return;}
+    box.innerHTML=vs.map(function(v){
+        var nm=(v.VendorName||'').replace(/"/g,'&quot;');
+        return '<label class="d-flex align-items-center gap-2 small" style="cursor:pointer;padding:2px 0">'+
+            '<input type="checkbox" class="rVendorChk" value="'+nm+'" onchange="loadVendorBills()"><span>'+(v.VendorName||'')+'</span></label>';
+    }).join('');
+}
+function selectedVendors(){
+    return Array.from(document.querySelectorAll('.rVendorChk:checked')).map(function(c){return c.value;});
+}
+function invRows(){ return Array.from(document.querySelectorAll('#rBillList [data-inv]')); }
+
 async function loadVendorBills(){
-    var vendor=document.getElementById('rVendor').value;
+    var vendors=selectedVendors();
     var box=document.getElementById('rBillList');
-    invBalanceMap={};
-    if(!vendor){box.innerHTML='<div class="text-muted small">Select a vendor to load invoices</div>';return;}
+    invBalanceMap={}; invVendorMap={};
+    document.getElementById('rSplitSummary').innerHTML='';
+    if(!vendors.length){box.innerHTML='<div class="text-muted small">Select vendor(s) to load invoices</div>';return;}
     box.innerHTML='<div class="text-muted small">Loading…</div>';
-    var res=await fetch('/billing/api/list?per_page=1000&vendor='+encodeURIComponent(vendor));
-    var data=await res.json();
-    var bills=data.bills||[];
+    var all=[];
+    for(var i=0;i<vendors.length;i++){
+        var res=await fetch('/billing/api/list?per_page=1000&vendor='+encodeURIComponent(vendors[i]));
+        var data=await res.json();
+        (data.bills||[]).forEach(function(b){all.push(b);});
+    }
     var invGroups={}, invOrder=[];
-    bills.forEach(b=>{
+    all.forEach(function(b){
         var inv=b.InvoiceNumber||'Unknown';
         if(!invGroups[inv]){invGroups[inv]=[];invOrder.push(inv);}
         invGroups[inv].push(b);
     });
-    // header row for the dropdown format
     var html='<div class="d-flex gap-2 py-1 fw-bold small text-muted" style="border-bottom:1px solid rgba(255,193,7,0.3)">'+
         '<span style="width:22px"></span>'+
-        '<span style="flex:1.4">Invoice</span><span style="flex:1.2;text-align:right">Amount (balance)</span>'+
-        '<span style="flex:1;text-align:center">Working Month</span><span style="flex:1;text-align:center">Payment Month</span></div>';
+        '<span style="flex:1.2">Vendor</span>'+
+        '<span style="flex:1.2">Invoice</span>'+
+        '<span style="flex:1.1;text-align:right">Balance</span>'+
+        '<span style="flex:0.9;text-align:center">Share %</span>'+
+        '<span style="flex:1.1;text-align:right">Split ₹</span></div>';
     var shown=0;
     invOrder.forEach(function(inv){
         var grp=invGroups[inv];
-        var totalBal=grp.reduce((s,b)=>s+parseFloat(b.BalanceAmount||0),0);
+        var totalBal=grp.reduce(function(s,b){return s+parseFloat(b.BalanceAmount||0);},0);
         var status=grp[0].PaymentStatus||'Pending';
-        // only pending / partial invoices (something still owed)
         if(status==='Paid' || totalBal<=0) return;
         shown++;
         invBalanceMap[inv]=totalBal;
-        var work=grp[0].WorkingMonth?monthName(grp[0].WorkingMonth):'—';
-        var pay=grp[0].PaymentMonth?monthName(grp[0].PaymentMonth):'—';
+        invVendorMap[inv]=grp[0].VendorName||'';
         var cls=status==='Partial'?'bg-warning text-dark':'bg-danger';
-        html+='<label class="d-flex align-items-center gap-2 py-1 small" style="cursor:pointer">'+
-            '<input type="checkbox" class="rInvChk" value="'+inv+'" style="width:22px" onchange="onInvCheck()">'+
-            '<span style="flex:1.4"><strong>'+inv+'</strong> <span class="badge '+cls+'" style="font-size:0.6rem">'+status+'</span></span>'+
-            '<span style="flex:1.2;text-align:right">₹'+totalBal.toLocaleString('en-IN')+'</span>'+
-            '<span style="flex:1;text-align:center">'+work+'</span>'+
-            '<span style="flex:1;text-align:center">'+pay+'</span>'+
-            '</label>';
+        var invEsc=inv.replace(/"/g,'&quot;');
+        html+='<div class="d-flex align-items-center gap-2 py-1 small" data-inv="'+invEsc+'">'+
+            '<input type="checkbox" class="rInvChk" value="'+invEsc+'" style="width:22px" onchange="onInvCheck()">'+
+            '<span style="flex:1.2">'+(grp[0].VendorName||'—')+'</span>'+
+            '<span style="flex:1.2"><strong>'+inv+'</strong> <span class="badge '+cls+'" style="font-size:0.6rem">'+status+'</span></span>'+
+            '<span style="flex:1.1;text-align:right">₹'+totalBal.toLocaleString('en-IN')+'</span>'+
+            '<span style="flex:0.9;text-align:center" class="rInvPct text-muted">—</span>'+
+            '<span style="flex:1.1;text-align:right" class="rInvSplit">—</span>'+
+            '</div>';
     });
-    box.innerHTML = shown ? html : '<div class="text-muted small">No pending / partial invoices for this vendor</div>';
+    box.innerHTML = shown ? html : '<div class="text-muted small">No pending / partial invoices for the selected vendor(s)</div>';
 }
 
-// Tick invoices -> auto-fill the Amount with the total balance of those selected (editable)
+// When the ticked invoices change, auto-fill the Amount with their total balance
+// (editable), then split by value.
 function onInvCheck(){
-    var checked=Array.from(document.querySelectorAll('.rInvChk:checked'));
-    var sum=checked.reduce(function(s,c){return s+(invBalanceMap[c.value]||0);},0);
-    if(checked.length) document.getElementById('rAmount').value=Math.round(sum*100)/100;
+    var checkedRows=invRows().filter(function(r){return r.querySelector('.rInvChk').checked;});
+    var sumBal=checkedRows.reduce(function(s,r){return s+(invBalanceMap[r.getAttribute('data-inv')]||0);},0);
+    if(checkedRows.length) document.getElementById('rAmount').value=Math.round(sumBal*100)/100;
+    recomputeSplits();
+}
+
+// Split the entered Amount across the ticked invoices IN PROPORTION TO THEIR
+// VALUES (balances). The % column is just a read-out of how it divided; the last
+// invoice absorbs any rounding so the splits add up to the Amount exactly.
+function recomputeSplits(){
+    var amount=parseFloat(document.getElementById('rAmount').value)||0;
+    var rows=invRows();
+    var checkedRows=rows.filter(function(r){return r.querySelector('.rInvChk').checked;});
+    rows.forEach(function(row){
+        if(!row.querySelector('.rInvChk').checked){
+            row.querySelector('.rInvPct').textContent='—';
+            row.querySelector('.rInvSplit').textContent='—';
+            row.removeAttribute('data-split');
+        }
+    });
+    var el=document.getElementById('rSplitSummary');
+    if(!checkedRows.length){el.innerHTML='';return;}
+    var sumBal=checkedRows.reduce(function(s,r){return s+(invBalanceMap[r.getAttribute('data-inv')]||0);},0);
+    var acc=0, totalSplit=0;
+    checkedRows.forEach(function(row,i){
+        var bal=invBalanceMap[row.getAttribute('data-inv')]||0;
+        var prop=sumBal>0?(bal/sumBal):(1/checkedRows.length);
+        var split=(i===checkedRows.length-1)?Math.round((amount-acc)*100)/100:Math.round(amount*prop*100)/100;
+        if(i<checkedRows.length-1) acc+=split;
+        totalSplit+=split;
+        row.querySelector('.rInvPct').textContent=(Math.round(prop*1000)/10)+'%';
+        row.querySelector('.rInvSplit').textContent='₹'+split.toLocaleString('en-IN');
+        row.setAttribute('data-split', split);
+    });
+    el.innerHTML='Splitting <strong>₹'+amount.toLocaleString('en-IN')+'</strong> across '+checkedRows.length+
+        ' invoice(s) by value &nbsp;|&nbsp; Allocated: <strong>₹'+totalSplit.toLocaleString('en-IN')+'</strong>';
 }
 
 async function loadRecv(){
@@ -743,26 +804,39 @@ async function loadRecv(){
 }
 
 async function saveRecv(){
-    var checked=Array.from(document.querySelectorAll('.rInvChk:checked')).map(function(c){return c.value;});
-    var payload={ReceiveDate:document.getElementById('rDate').value,VendorName:document.getElementById('rVendor').value,Invoices:checked,Amount:document.getElementById('rAmount').value,PaymentMode:document.getElementById('rPayMode').value,ReferenceNumber:document.getElementById('rRefNum').value,Description:document.getElementById('rDesc').value};
-    if(!payload.ReceiveDate||!payload.VendorName||!payload.Amount){showToast('Fill required fields','danger');return;}
+    var amount=document.getElementById('rAmount').value;
+    var base={ReceiveDate:document.getElementById('rDate').value,Amount:amount,PaymentMode:document.getElementById('rPayMode').value,ReferenceNumber:document.getElementById('rRefNum').value,Description:document.getElementById('rDesc').value};
+    if(!base.ReceiveDate||!base.Amount){showToast('Fill date and amount','danger');return;}
+    if(editingRecvId){
+        try{
+            var res=await fetch('/billing/api/receivables/'+editingRecvId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)});
+            var data=await res.json();
+            if(data.success){bootstrap.Modal.getInstance(recvModalEl).hide();showToast('Payment updated','success');loadRecv();loadBills(currentPage);}
+            else showToast(data.error||'Failed','danger');
+        }catch(e){showToast('Network error','danger');}
+        return;
+    }
+    var vendors=selectedVendors();
+    if(!vendors.length){showToast('Select at least one vendor','danger');return;}
+    var checkedRows=invRows().filter(function(r){return r.querySelector('.rInvChk').checked;});
+    var payload;
+    if(checkedRows.length){
+        recomputeSplits();
+        var splits=checkedRows.map(function(row){return {invoice:row.getAttribute('data-inv'), amount:parseFloat(row.getAttribute('data-split'))||0};});
+        payload=Object.assign({},base,{Vendors:vendors, InvoiceSplits:splits});
+    }else{
+        if(vendors.length>1){showToast('Tick invoices to split across multiple vendors, or pick one vendor for a general payment','danger');return;}
+        payload=Object.assign({},base,{VendorName:vendors[0]});
+    }
     try{
-        var res, msg;
-        if(editingRecvId){
-            delete payload.Invoices; // keep existing bill link on edit
-            res=await fetch('/billing/api/receivables/'+editingRecvId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-            msg='Payment updated';
-        }else{
-            res=await fetch('/billing/api/receivables/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-            msg='Payment recorded';
-        }
+        var res=await fetch('/billing/api/receivables/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         var data=await res.json();
         if(data.success){
-            if(!editingRecvId && data.invoice_count>1) msg='Payment split across '+data.invoice_count+' invoices';
-            else if(!editingRecvId && data.split_count>1) msg='Payment split across '+data.split_count+' bills';
+            var msg='Payment recorded';
+            if(data.invoice_count>1) msg='Payment split across '+data.invoice_count+' invoice(s) / '+data.split_count+' bill(s)';
+            else if(data.split_count>1) msg='Payment split across '+data.split_count+' bill(s)';
             bootstrap.Modal.getInstance(recvModalEl).hide();showToast(msg,'success');loadRecv();loadBills(currentPage);
-        }
-        else showToast(data.error||'Failed','danger');
+        }else showToast(data.error||'Failed','danger');
     }catch(e){showToast('Network error','danger');}
 }
 

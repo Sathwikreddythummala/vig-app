@@ -527,6 +527,62 @@ async def add_receivable(request: Request):
     from services.sheets_service import build_row
     bill_id = data.get("BillID", "")
 
+    # Explicit per-invoice split (multi-vendor): client sends InvoiceSplits =
+    # [{invoice, amount}] (amounts already resolved from the percentages). Each
+    # invoice's amount is split across its own unpaid bills by balance, and the
+    # receivable's vendor is taken from each bill (so vendors can differ).
+    splits = data.get("InvoiceSplits") or []
+    if splits:
+        all_bills = get_all_records("Billing")
+        bills_by_inv = {}
+        for b in all_bills:
+            inv = str(b.get("InvoiceNumber", "")).strip().upper()
+            if inv:
+                bills_by_inv.setdefault(inv, []).append(b)
+        created = []
+        used_invoices = 0
+        skip_keys = ("InvoiceSplits", "Invoices", "Vendors", "BillID")
+        for sp in splits:
+            inv = str(sp.get("invoice", "")).strip().upper()
+            inv_amount = float(sp.get("amount", 0) or 0)
+            if not inv or inv_amount <= 0:
+                continue
+            inv_bills = [b for b in bills_by_inv.get(inv, []) if b.get("PaymentStatus") != "Paid"]
+            if not inv_bills:
+                continue
+            used_invoices += 1
+            total_balance = sum(float(b.get("BalanceAmount", 0) or 0) for b in inv_bills)
+            acc = 0.0
+            for i, b in enumerate(inv_bills):
+                bill_balance = float(b.get("BalanceAmount", 0) or 0)
+                proportion = (bill_balance / total_balance) if total_balance > 0 else (1 / len(inv_bills))
+                # last bill absorbs the rounding remainder so the invoice's split is exact
+                if i == len(inv_bills) - 1:
+                    split_amount = round(inv_amount - acc, 2)
+                else:
+                    split_amount = round(inv_amount * proportion, 2)
+                    acc += split_amount
+                rid = gen_id("RCV")
+                bill_pay_month = str(b.get("PaymentMonth", "")).strip() or str(b.get("InvoiceDate", ""))[:7] or payment_month
+                vals = {k: v for k, v in data.items() if k not in skip_keys}
+                vals.update({
+                    "ReceivableID": rid, "BillID": b["BillID"], "Amount": split_amount,
+                    "VendorName": b.get("VendorName", ""),
+                    "PaymentMonth": bill_pay_month,
+                    "PaymentMode": data.get("PaymentMode", "Bank Transfer"),
+                    "Description": (data.get("Description", "") + f" [{b.get('InvoiceNumber','')}]").strip(),
+                    "CreatedDate": now_str(),
+                })
+                append_row("Receivables", build_row("Receivables", vals))
+                recalc_bill(b["BillID"])
+                created.append(rid)
+        if not created:
+            return JSONResponse({"error": "No unpaid bills found for the selected invoice(s)"}, 400)
+        add_audit_log("CREATE", "Receivables",
+                      ",".join(sorted({str(s.get("invoice", "")).strip().upper() for s in splits if s.get("invoice")})),
+                      f"Payment split across {used_invoices} invoice(s) / {len(created)} bill(s)", user["email"])
+        return {"success": True, "receivable_ids": created, "split_count": len(created), "invoice_count": used_invoices}
+
     # Multi-invoice payment: one payment split across all unpaid bills of the selected invoices
     invoices = data.get("Invoices") or []
     invoices = [str(i).strip().upper() for i in invoices if str(i).strip()]
