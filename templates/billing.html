@@ -47,6 +47,7 @@
         </table>
     </div>
 </div>
+<input type="file" id="invUploadInput" accept="application/pdf,image/*" style="display:none" onchange="onInvoiceFileChosen(this)">
 </div>
 
 <!-- RECEIVED PAYMENTS TAB -->
@@ -160,7 +161,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
-var allVehicles=[], allVendors=[], allBills=[], currentPage=1;
+var allVehicles=[], allVendors=[], allBills=[], currentPage=1, invoiceDocs={};
 var editingRecvId=null, recvCache={};
 var billModalEl=document.getElementById('billModal'), recvModalEl=document.getElementById('recvModal');
 var canEdit = (typeof USER_ROLE !== 'undefined') && USER_ROLE !== 'viewer';
@@ -361,6 +362,11 @@ async function loadBills(page){
     var recvRes=await fetch('/billing/api/receivables?'+recvParams);
     var recvData=await recvRes.json();
     document.getElementById('statPaid').textContent=fmt(recvData.total_received||0);
+    try{
+        var dres=await fetch('/billing/api/invoice-docs');
+        var ddata=await dres.json();
+        invoiceDocs=ddata.docs||{};
+    }catch(e){ invoiceDocs={}; }
     renderBillTable(allBills);
     renderBillSummary(allBills);
 }
@@ -419,6 +425,41 @@ function saveInvoiceDesc(inv){
     });
 }
 
+// --- Invoice document flag + upload ---------------------------------------
+function invoiceDocCell(inv){
+    var docs=invoiceDocs[(inv||'').trim().toUpperCase()]||[];
+    if(docs.length){
+        var d=docs[0];
+        return '<span class="badge bg-success"><i class="bi bi-paperclip"></i> Invoice</span>'
+            +' <a href="/documents/api/view/'+d.doc_id+'" target="_blank" class="small ms-1">view</a>'
+            +(docs.length>1?' <span class="text-muted small">(+'+(docs.length-1)+')</span>':'')
+            +' <button class="btn btn-sm btn-outline-secondary viewer-hide ms-1 py-0" style="font-size:0.7em" onclick="triggerInvoiceUpload(\''+inv+'\')"><i class="bi bi-arrow-repeat"></i> Replace</button>';
+    }
+    return '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>No Invoice</span>'
+        +' <button class="btn btn-sm btn-warning viewer-hide ms-1 py-0" style="font-size:0.72em" onclick="triggerInvoiceUpload(\''+inv+'\')"><i class="bi bi-upload me-1"></i>Upload Invoice</button>';
+}
+function triggerInvoiceUpload(inv){
+    var f=document.getElementById('invUploadInput');
+    f.value=''; f.setAttribute('data-inv', inv); f.click();
+}
+async function onInvoiceFileChosen(fileInput){
+    var inv=fileInput.getAttribute('data-inv');
+    var file=fileInput.files&&fileInput.files[0];
+    if(!inv||!file){return;}
+    var fd=new FormData();
+    fd.append('file', file);
+    fd.append('entity_type','Invoice');
+    fd.append('entity_id', inv);
+    fd.append('doc_type','Invoice');
+    try{
+        var res=await fetch('/documents/api/upload',{method:'POST',body:fd});
+        var data=await res.json();
+        if(data.success){ showToast('Invoice uploaded for '+inv,'success'); loadBills(currentPage); }
+        else showToast(data.error||'Upload failed','danger');
+    }catch(e){ showToast('Network error','danger'); }
+    fileInput.value='';
+}
+
 function renderBillTable(bills){
     var tbody=document.getElementById('billTable');
     if(!bills.length){tbody.innerHTML='<tr><td colspan="15" class="text-center text-muted">No bills yet</td></tr>';return;}
@@ -468,6 +509,7 @@ function renderBillTable(bills){
                 +(worksTxt?'<span class="mx-2" style="color:'+curColor+'">|</span><span class="fw-semibold" style="color:'+curColor+'"><i class="bi bi-calendar-event me-1"></i>'+worksTxt+'</span>':'')
                 +(vendorsTxt?'<span class="mx-2" style="color:'+curColor+'">|</span><span class="fw-semibold text-muted">'+vendorsTxt+'</span>':'')
                 +(typesTxt?'<span class="mx-2" style="color:'+curColor+'">|</span><span class="fw-semibold text-muted">'+typesTxt+'</span>':'')
+                +(inv?'<span class="mx-2" style="color:'+curColor+'">|</span>'+invoiceDocCell(inv):'')
                 +'</td></tr>'
                 +'<tr style="background:rgba(255,213,79,0.15);font-size:0.75em;text-transform:uppercase;letter-spacing:0.04em;border-left:4px solid '+curColor+'44">'
                 +'<td class="ps-3 fw-bold">Date</td><td class="fw-bold">Vehicle</td>'

@@ -283,6 +283,34 @@ async def export_bills_pdf(
     )
 
 
+@router.get("/api/invoice-docs")
+async def invoice_docs(request: Request):
+    """Map of InvoiceNumber -> uploaded invoice documents, so the Billing page can
+    flag invoices that have no invoice document attached."""
+    user = get_user(request)
+    if not user:
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    from services.db import execute
+    out = {}
+    try:
+        rows = execute(
+            "SELECT doc_id, entity_id, file_name, uploaded_date FROM document_files "
+            "WHERE entity_type = %s ORDER BY uploaded_date DESC",
+            ["Invoice"], fetch=True,
+        )
+        for r in (rows or []):
+            inv = str(r["entity_id"]).strip().upper()
+            if inv:
+                out.setdefault(inv, []).append({
+                    "doc_id": r["doc_id"], "file_name": r["file_name"],
+                    "uploaded_date": r.get("uploaded_date", ""),
+                })
+    except Exception:
+        # document_files table may not exist yet (no upload has created it) -> no docs
+        out = {}
+    return {"docs": out}
+
+
 @router.post("/api/add")
 async def add_bill(request: Request):
     user = get_user(request)
