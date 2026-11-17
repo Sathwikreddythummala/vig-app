@@ -208,7 +208,13 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\('routes/expenses.py'\\).read\\(\\)\\); print\\('expenses.py OK'\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('routes/driver_portal.py'\\).read\\(\\)\\); print\\('driver_portal.py OK'\\)\")",
       "Bash(curl -s -o /dev/null -w \"driver-login:%{http_code}\\\\n\" http://localhost:8000/driver-portal/login)",
-      "Bash(curl -s -o /dev/null -w \"diesel-noauth:%{http_code}\\\\n\" -X POST http://localhost:8000/driver-portal/api/diesel -H \"Content-Type: application/json\" -d '{}')"
+      "Bash(curl -s -o /dev/null -w \"diesel-noauth:%{http_code}\\\\n\" -X POST http://localhost:8000/driver-portal/api/diesel -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(python \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/c60a22bb-120a-4dd1-b80d-9229c36863f4/scratchpad/sync_test.py\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/vehicles.py'\\).read\\(\\)\\); print\\('vehicles.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routes/billing.py'\\).read\\(\\)\\); print\\('billing.py OK'\\)\")",
+      "Bash(node --check \"C:/Users/SATHWI~1/AppData/Local/Temp/claude/E--vig-app/c60a22bb-120a-4dd1-b80d-9229c36863f4/scratchpad/billing_js.js\")",
+      "Bash(curl -s -o /dev/null -w \"billing:%{http_code}\\\\n\" http://localhost:8000/billing)",
+      "Bash(curl -s -o /dev/null -w \"billing\\(redirect\\):%{http_code}\\\\n\" http://localhost:8000/billing)"
     ]
   }
 }
