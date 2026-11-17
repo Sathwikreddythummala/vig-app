@@ -644,6 +644,31 @@ document.addEventListener('DOMContentLoaded', function () { makeTablesSortable()
         document.addEventListener('click', function (e) { if (!e.target.closest('.global-search')) hide(); });
     }
 
+    // ---------- Month stepper (◀ ▶ around #filterMonth) ----------
+    function stepMonth(input, delta) {
+        var v = input.value || (typeof thisMonthLocal === 'function' ? thisMonthLocal() : '');
+        if (!v) return;
+        var p = v.split('-'), y = parseInt(p[0], 10), m = parseInt(p[1], 10) + delta;
+        if (m > 12) { m = 1; y++; } else if (m < 1) { m = 12; y--; }
+        input.value = y + '-' + String(m).padStart(2, '0');
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    function initMonthStepper() {
+        var m = document.getElementById('filterMonth');
+        if (!m || m.type !== 'month' || m._stepper) return;
+        m._stepper = 1;
+        function mk(html, delta) {
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'btn btn-outline-warning btn-sm'; b.innerHTML = html;
+            b.title = delta < 0 ? 'Previous month' : 'Next month';
+            b.onclick = function () { stepMonth(m, delta); };
+            return b;
+        }
+        m.parentNode.insertBefore(mk('<i class="bi bi-chevron-left"></i>', -1), m);
+        if (m.nextSibling) m.parentNode.insertBefore(mk('<i class="bi bi-chevron-right"></i>', 1), m.nextSibling);
+        else m.parentNode.appendChild(mk('<i class="bi bi-chevron-right"></i>', 1));
+    }
+
     // ---------- Keyboard shortcuts ----------
     function onKey(e) {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -666,6 +691,7 @@ document.addEventListener('DOMContentLoaded', function () { makeTablesSortable()
         try { enhanceSelects(); } catch (e) {}
         try { initGlobalSearch(); } catch (e) {}
         try { wireRememberFields(); } catch (e) {}
+        try { initMonthStepper(); } catch (e) {}
         // save filters on any change; restore saved filters after the page's own init
         document.addEventListener('change', function (e) {
             if (e.target && e.target.id && e.target.id.indexOf('filter') === 0) saveFilters();
