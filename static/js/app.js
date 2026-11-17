@@ -120,27 +120,48 @@ function makeMultiSelect(sel) {
     });
     function buildMenu() {
         menu.innerHTML = '';
+        var realOpts = Array.from(sel.options).filter(function (o) { return o.value.trim(); });
+        // Type-to-filter box for long lists (vehicles, vendors, drivers…)
+        var search = null;
+        if (realOpts.length > 7) {
+            var sWrap = document.createElement('div');
+            sWrap.className = 'ms-filter-search';
+            search = document.createElement('input');
+            search.type = 'text';
+            search.placeholder = 'Search…';
+            search.className = 'form-control form-control-sm';
+            search.onclick = function (e) { e.stopPropagation(); };
+            search.oninput = function () { applySearch(); };
+            sWrap.appendChild(search);
+            menu.appendChild(sWrap);
+        }
         var clear = document.createElement('div');
         clear.className = 'ms-filter-item ms-filter-clear';
         clear.textContent = allLabel;
         clear.onclick = function (e) { e.stopPropagation(); selected.clear(); buildMenu(); fire(); };
         menu.appendChild(clear);
-        Array.from(sel.options).forEach(function (opt) {
-            var val = opt.value; // empty-value options are "All …" placeholders, handled by the clear row
-            if (!val.trim()) return;
+        realOpts.forEach(function (opt) {
             var item = document.createElement('label');
             item.className = 'ms-filter-item';
+            item.dataset.text = opt.text.toLowerCase();
             var cb = document.createElement('input');
             cb.type = 'checkbox';
-            cb.checked = selected.has(val);
+            cb.checked = selected.has(opt.value);
             cb.onchange = function () {
-                if (cb.checked) selected.add(val); else selected.delete(val);
+                if (cb.checked) selected.add(opt.value); else selected.delete(opt.value);
                 fire();
             };
             item.appendChild(cb);
             item.appendChild(document.createTextNode(' ' + opt.text));
             menu.appendChild(item);
         });
+        function applySearch() {
+            var q = (search.value || '').toLowerCase().trim();
+            menu.querySelectorAll('.ms-filter-item:not(.ms-filter-clear)').forEach(function (it) {
+                it.style.display = (!q || it.dataset.text.indexOf(q) >= 0) ? '' : 'none';
+            });
+        }
+        if (search) setTimeout(function () { search.focus(); }, 30);
     }
     btn.onclick = function (e) {
         e.stopPropagation();
@@ -176,7 +197,16 @@ document.addEventListener('DOMContentLoaded', function () {
         '.ms-filter-item{display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:7px;cursor:pointer;white-space:nowrap;margin:0;font-size:.85rem;color:var(--text-dark,#3E2723)}' +
         '.ms-filter-item:hover{background:rgba(255,213,79,.3)}' +
         '.ms-filter-clear{font-weight:600;border-bottom:1px solid rgba(255,213,79,.4);border-radius:7px 7px 0 0}' +
-        '.ms-elevated{position:relative;z-index:500}';
+        '.ms-filter-search{position:sticky;top:0;background:#FFFDE7;padding:2px 2px 6px;margin-bottom:4px;border-bottom:1px solid rgba(255,213,79,.4)}' +
+        '.ms-elevated{position:relative;z-index:500}' +
+        // searchable single-select combobox
+        '.ss-wrap{position:relative;display:inline-block;vertical-align:middle}' +
+        '.ss-input{cursor:text}' +
+        '.ss-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:1065;min-width:100%;max-height:260px;overflow:auto;background:#FFFDE7;border:1px solid rgba(255,213,79,.6);border-radius:10px;padding:5px;box-shadow:0 8px 22px rgba(0,0,0,.18)}' +
+        '.ss-menu.open{display:block}' +
+        '.ss-opt{padding:6px 9px;border-radius:7px;cursor:pointer;white-space:nowrap;font-size:.88rem;color:var(--text-dark,#3E2723)}' +
+        '.ss-opt:hover,.ss-opt.active{background:rgba(255,213,79,.35)}' +
+        '.ss-opt.ss-none{color:#999;cursor:default}';
     document.head.appendChild(css);
     document.querySelectorAll('select[id^="filter"]').forEach(makeMultiSelect);
 });
@@ -406,3 +436,255 @@ function makeTablesSortable(root) {
 }
 
 document.addEventListener('DOMContentLoaded', function () { makeTablesSortable(); });
+
+// ===================================================================
+// UX enhancements — fewer clicks / less searching / less typing.
+// All defensive (try/catch) so a failure here can never break a page.
+// ===================================================================
+(function () {
+    'use strict';
+
+    // ---------- Searchable single-select (form dropdowns) ----------
+    // Enhances a <select> into a type-to-pick combobox while keeping the
+    // native select in the DOM as the value source (graceful fallback).
+    function makeSearchableSelect(sel) {
+        if (!sel || sel.multiple || sel._ss || sel.dataset.noSearch === '1') return;
+        if (sel.options.length < 6) return;            // short lists don't need it
+        var wrap = document.createElement('div');
+        wrap.className = 'ss-wrap';
+        wrap.style.width = sel.style.width || '100%';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = (sel.className || 'form-control') + ' ss-input';
+        input.setAttribute('autocomplete', 'off');
+        input.placeholder = (sel.options[0] && !sel.options[0].value) ? sel.options[0].text : 'Search…';
+        var menu = document.createElement('div');
+        menu.className = 'ss-menu';
+        sel.parentNode.insertBefore(wrap, sel);
+        wrap.appendChild(input); wrap.appendChild(menu); wrap.appendChild(sel);
+        sel.style.display = 'none';
+        sel._ss = { input: input };
+
+        function curText() {
+            var o = sel.options[sel.selectedIndex];
+            return (o && o.value) ? o.text : '';
+        }
+        function syncInput() { input.value = curText(); }
+        sel._ss.refresh = syncInput;
+        var active = -1, items = [];
+        function render() {
+            var q = input.value.toLowerCase().trim();
+            menu.innerHTML = ''; items = []; active = -1;
+            Array.from(sel.options).forEach(function (o) {
+                if (!o.value) return;
+                if (q && o.text.toLowerCase().indexOf(q) < 0) return;
+                var d = document.createElement('div');
+                d.className = 'ss-opt'; d.textContent = o.text; d.dataset.val = o.value;
+                d.onmousedown = function (e) { e.preventDefault(); choose(o.value); };
+                menu.appendChild(d); items.push(d);
+            });
+            if (!items.length) {
+                var n = document.createElement('div'); n.className = 'ss-opt ss-none'; n.textContent = 'No match';
+                menu.appendChild(n);
+            }
+        }
+        function open() { render(); menu.classList.add('open'); var c = wrap.closest('.glass-card'); if (c) c.classList.add('ms-elevated'); }
+        function close() { menu.classList.remove('open'); syncInput(); }
+        function choose(val) {
+            sel.value = val;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            syncInput(); menu.classList.remove('open');
+        }
+        function setActive(i) {
+            if (!items.length) return;
+            active = (i + items.length) % items.length;
+            items.forEach(function (it, idx) { it.classList.toggle('active', idx === active); });
+            items[active].scrollIntoView({ block: 'nearest' });
+        }
+        input.addEventListener('focus', open);
+        input.addEventListener('click', open);
+        input.addEventListener('input', function () { menu.classList.add('open'); render(); });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (!menu.classList.contains('open')) open(); setActive(active + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+            else if (e.key === 'Enter') { if (menu.classList.contains('open') && active >= 0) { e.preventDefault(); choose(items[active].dataset.val); } }
+            else if (e.key === 'Escape') { close(); }
+        });
+        input.addEventListener('blur', function () { setTimeout(function () { if (!menu.contains(document.activeElement)) close(); }, 120); });
+        // reflect programmatic value changes (edit flows dispatch change)
+        sel.addEventListener('change', syncInput);
+        syncInput();
+    }
+    window.makeSearchableSelect = makeSearchableSelect;
+
+    function enhanceSelects(root) {
+        try {
+            (root || document).querySelectorAll('select.searchable, select[data-search="1"]').forEach(makeSearchableSelect);
+        } catch (e) {}
+    }
+    // Fields that should remember the last value you used (per browser).
+    var REMEMBER_FIELDS = ['expPaymentMode', 'expPaidBy', 'fPayMode', 'fFuelType', 'rPayMode'];
+    function wireRememberFields() {
+        REMEMBER_FIELDS.forEach(function (id) {
+            var el = document.getElementById(id); if (!el) return;
+            el.addEventListener('change', function () { UX.setLast('field:' + id, el.value); });
+        });
+    }
+    function applyRemembered(modal) {
+        REMEMBER_FIELDS.forEach(function (id) {
+            var el = modal.querySelector('#' + id); if (!el) return;
+            var v = UX.getLast('field:' + id, null);
+            if (v) { el.value = v; if (el._ss) el._ss.refresh(); }
+        });
+    }
+    // Re-sync comboboxes when a modal opens (edit flows set .value directly);
+    // on an ADD modal, also pre-fill the remembered Payment Mode / Paid-By etc.
+    document.addEventListener('shown.bs.modal', function (e) {
+        try {
+            enhanceSelects(e.target);
+            e.target.querySelectorAll('select').forEach(function (s) { if (s._ss) s._ss.refresh(); });
+            var title = e.target.querySelector('.modal-title');
+            if (title && /^\s*add/i.test(title.textContent)) applyRemembered(e.target);
+        } catch (err) {}
+    });
+
+    // ---------- Remember last-used form values (localStorage) ----------
+    window.UX = window.UX || {};
+    UX.getLast = function (key, dflt) { try { var v = localStorage.getItem('uxlast:' + key); return v === null ? (dflt || '') : v; } catch (e) { return dflt || ''; } };
+    UX.setLast = function (key, val) { try { localStorage.setItem('uxlast:' + key, val == null ? '' : String(val)); } catch (e) {} };
+    // Bind an input/select: restore its remembered value now, save on change.
+    UX.remember = function (id, key) {
+        try {
+            var el = document.getElementById(id); if (!el) return;
+            key = key || (location.pathname + ':' + id);
+            var saved = UX.getLast(key, null);
+            if (saved !== null && saved !== '' && !el.value) el.value = saved;
+            el.addEventListener('change', function () { UX.setLast(key, el.value); });
+        } catch (e) {}
+    };
+
+    // ---------- Remember page filters (localStorage) ----------
+    function filterKey() { return 'uxfilters:' + location.pathname; }
+    function filterEls() {
+        return Array.from(document.querySelectorAll('[id^="filter"]'))
+            .filter(function (el) { return el.id !== 'filterSearch'; });  // don't persist live text search
+    }
+    function saveFilters() {
+        try {
+            var data = {};
+            filterEls().forEach(function (el) { data[el.id] = el.value; });
+            localStorage.setItem(filterKey(), JSON.stringify(data));
+        } catch (e) {}
+    }
+    function restoreFilters() {
+        try {
+            var raw = localStorage.getItem(filterKey()); if (!raw) return false;
+            var data = JSON.parse(raw); var any = false, monthEl = null;
+            filterEls().forEach(function (el) {
+                if (data[el.id] !== undefined && data[el.id] !== '') {
+                    el.value = data[el.id]; any = true;
+                    if (/month/i.test(el.id)) monthEl = monthEl || el;
+                }
+            });
+            // trigger one reload via a month filter's onchange (present on all list pages)
+            if (any) { var t = monthEl || document.getElementById('filterMonth'); if (t) t.dispatchEvent(new Event('change', { bubbles: true })); }
+            return any;
+        } catch (e) { return false; }
+    }
+    UX.clearFilters = function () { try { localStorage.removeItem(filterKey()); } catch (e) {} };
+
+    // ---------- Global search (top bar) ----------
+    function initGlobalSearch() {
+        var inp = document.getElementById('globalSearch');
+        var box = document.getElementById('globalSearchResults');
+        if (!inp || !box) return;
+        var timer = null, rows = [], active = -1;
+        function hide() { box.style.display = 'none'; active = -1; }
+        function go(url) { if (url) window.location.href = url; }
+        function render() {
+            if (!rows.length) { box.innerHTML = '<div class="text-muted small p-2">No matches</div>'; box.style.display = 'block'; return; }
+            var groups = {};
+            rows.forEach(function (r) { (groups[r.type] = groups[r.type] || []).push(r); });
+            var html = '', i = 0;
+            Object.keys(groups).forEach(function (g) {
+                html += '<div class="text-muted small fw-bold px-2 pt-1" style="text-transform:uppercase;font-size:.68rem;letter-spacing:.04em">' + g + '</div>';
+                groups[g].forEach(function (r) {
+                    html += '<a href="' + r.url + '" class="gs-row d-block text-decoration-none px-2 py-1" data-i="' + i + '" style="border-radius:7px;color:var(--text-dark,#3E2723)">' +
+                        '<i class="bi ' + (r.icon || 'bi-dot') + ' me-2" style="color:#B8860B"></i>' +
+                        '<span>' + r.label + '</span>' + (r.sub ? ' <span class="text-muted small">— ' + r.sub + '</span>' : '') + '</a>';
+                    i++;
+                });
+            });
+            box.innerHTML = html; box.style.display = 'block';
+            box.querySelectorAll('.gs-row').forEach(function (a) {
+                a.addEventListener('mouseenter', function () { setActive(parseInt(a.dataset.i)); });
+            });
+        }
+        var flat = function () { return Array.from(box.querySelectorAll('.gs-row')); };
+        function setActive(i) {
+            var f = flat(); if (!f.length) return;
+            active = (i + f.length) % f.length;
+            f.forEach(function (a, idx) { a.style.background = idx === active ? 'rgba(255,213,79,.35)' : ''; });
+        }
+        function search() {
+            var q = inp.value.trim();
+            if (q.length < 2) { hide(); return; }
+            fetch('/api/search?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (d) {
+                rows = (d && d.results) || []; render();
+            }).catch(hide);
+        }
+        inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 180); });
+        inp.addEventListener('focus', function () { if (inp.value.trim().length >= 2) search(); });
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+            else if (e.key === 'Enter') { var f = flat(); if (f.length) { e.preventDefault(); go(f[active < 0 ? 0 : active].getAttribute('href')); } }
+            else if (e.key === 'Escape') { hide(); inp.blur(); }
+        });
+        document.addEventListener('click', function (e) { if (!e.target.closest('.global-search')) hide(); });
+    }
+
+    // ---------- Keyboard shortcuts ----------
+    function onKey(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var t = e.target, tag = (t.tagName || '').toLowerCase();
+        var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable;
+        if (e.key === '/' && !typing) {
+            var gs = document.getElementById('globalSearch');
+            if (gs) { e.preventDefault(); gs.focus(); }
+        } else if ((e.key === 'n' || e.key === 'N') && !typing) {
+            // click the page's primary "add" button
+            var add = document.querySelector('[data-bs-target="#expenseModal"],[data-bs-target="#billModal"],[data-bs-target="#recvModal"],[data-quick-add]')
+                || Array.from(document.querySelectorAll('button')).find(function (b) { return /add (expense|fuel|bill|vehicle|driver|payment)/i.test(b.textContent); });
+            if (add) { e.preventDefault(); add.click(); }
+        }
+    }
+    document.addEventListener('keydown', onKey);
+
+    // ---------- Init ----------
+    window.addEventListener('load', function () {
+        try { enhanceSelects(); } catch (e) {}
+        try { initGlobalSearch(); } catch (e) {}
+        try { wireRememberFields(); } catch (e) {}
+        // save filters on any change; restore saved filters after the page's own init
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.id && e.target.id.indexOf('filter') === 0) saveFilters();
+        }, true);
+        setTimeout(restoreFilters, 350);
+        // Deep-link quick actions from the dashboard (?new=1 / ?pay=1)
+        try {
+            var qp = new URLSearchParams(location.search);
+            if (qp.get('new') === '1') {
+                var addBtn = document.querySelector('[data-bs-target="#expenseModal"],[data-bs-target="#fuelModal"],[data-bs-target="#billModal"]');
+                if (addBtn) setTimeout(function () { addBtn.click(); }, 400);
+            } else if (qp.get('pay') === '1') {
+                var payBtn = document.querySelector('[data-bs-target="#recvModal"]');
+                if (payBtn) setTimeout(function () { payBtn.click(); }, 400);
+            }
+        } catch (e) {}
+        // Billing/Expenses "Clear" also forgets saved filters
+        document.querySelectorAll('button').forEach(function (b) {
+            if (/^\s*clear\s*$/i.test(b.textContent)) b.addEventListener('click', UX.clearFilters);
+        });
+    });
+})();

@@ -30,6 +30,58 @@ async def test_page(request: Request):
     return templates.TemplateResponse(request=request, name="test.html")
 
 
+@router.get("/api/search")
+async def global_search(request: Request, q: str = ""):
+    """Top-bar global search across vehicles, drivers, vendors and invoices."""
+    user = get_user(request)
+    if not user:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Unauthorized"}, 401)
+    term = str(q).strip().lower()
+    results = []
+    if len(term) < 2:
+        return {"results": results}
+
+    def match(*vals):
+        return any(term in str(v or "").lower() for v in vals)
+
+    # Vehicles
+    for v in get_all_records("Vehicles"):
+        if match(v.get("VehicleNumber"), v.get("DefaultDriver"), v.get("DefaultVendor")):
+            results.append({"type": "Vehicle", "icon": "bi-truck",
+                            "label": v.get("VehicleNumber", ""),
+                            "sub": v.get("DefaultDriver", "") or v.get("VehicleType", ""),
+                            "url": f"/vehicles/details/{v.get('VehicleID','')}"})
+    # Drivers / employees
+    for d in get_all_records("Drivers"):
+        if match(d.get("DriverName"), d.get("MobileNumber"), d.get("AssignedVehicle")):
+            results.append({"type": "Employee", "icon": "bi-person",
+                            "label": d.get("DriverName", ""),
+                            "sub": (d.get("AssignedVehicle", "") or d.get("EmployeeType", "")),
+                            "url": "/drivers"})
+    # Vendors
+    for ve in get_all_records("Vendors"):
+        if match(ve.get("VendorName"), ve.get("ContactPerson"), ve.get("GSTNumber")):
+            results.append({"type": "Vendor", "icon": "bi-building",
+                            "label": ve.get("VendorName", ""),
+                            "sub": ve.get("ContactPerson", ""),
+                            "url": "/vendors"})
+    # Invoices (distinct invoice numbers)
+    seen_inv = set()
+    for b in get_all_records("Billing"):
+        inv = str(b.get("InvoiceNumber", "")).strip()
+        key = inv.upper()
+        if inv and key not in seen_inv and (term in key.lower() or match(b.get("VendorName"))):
+            seen_inv.add(key)
+            results.append({"type": "Invoice", "icon": "bi-receipt",
+                            "label": inv,
+                            "sub": b.get("VendorName", ""),
+                            "url": "/billing"})
+    # Cap and prioritise exact-ish matches first
+    results.sort(key=lambda r: (0 if str(r["label"]).lower().startswith(term) else 1, str(r["label"]).lower()))
+    return {"results": results[:25]}
+
+
 @router.get("/api/dashboard/stats")
 async def dashboard_stats(request: Request, month: str = ""):
     user = get_user(request)

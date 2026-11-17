@@ -82,8 +82,8 @@
                         <div class="col-md-3"><label class="form-label">Working Month<small class="text-muted ms-1">(vehicle worked)</small></label><input type="month" class="form-control glass-input" id="bWorkMonth" onchange="syncPayFromWork()"></div>
                         <div class="col-md-3"><label class="form-label">Payment Month *<small class="text-muted ms-1">(expected payment)</small></label><input type="month" class="form-control glass-input" id="bPayMonth" required></div>
                         <div class="col-md-3"><label class="form-label">Invoice Number <small class="text-muted">(one for all vehicles)</small></label><input type="text" class="form-control glass-input" id="bInvNum" placeholder="Auto-generated" list="invNumList" oninput="checkInvNum()"><datalist id="invNumList"></datalist><small id="invNumHint" class="text-success fw-semibold" style="display:none"><i class="bi bi-link-45deg"></i> Existing invoice — vehicles will be added to it</small></div>
-                        <div class="col-md-3"><label class="form-label">Vehicle *</label><select class="form-select glass-input" id="bVehicle" required onchange="autoFillVendor()"><option value="">-- Select --</option></select></div>
-                        <div class="col-md-3"><label class="form-label">Vendor *</label><select class="form-select glass-input" id="bVendor" required><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Vehicle *</label><select class="form-select glass-input searchable" id="bVehicle" required onchange="autoFillVendor()"><option value="">-- Select --</option></select></div>
+                        <div class="col-md-3"><label class="form-label">Vendor *</label><select class="form-select glass-input searchable" id="bVendor" required><option value="">-- Select --</option></select></div>
                         <div class="col-md-3"><label class="form-label">Bill Type</label><select class="form-select glass-input" id="bBillType"><option value="">-- Select --</option><option>Fixed</option><option>Variable</option><option>Tollgate</option><option>Taxi TM</option><option>Total Bill</option><option>Other</option></select></div>
                         <div class="col-md-3"><label class="form-label">Fixed Amount (₹)</label><input type="number" class="form-control glass-input" id="bFixed" min="0" step="0.01" value="0" oninput="calcBill()"></div>
                         <div class="col-md-3"><label class="form-label">Variable Amount (₹)</label><input type="number" class="form-control glass-input" id="bVariable" min="0" step="0.01" value="0" oninput="calcBill()"></div>
@@ -212,7 +212,7 @@ function syncPayFromWork(){
 }
 function autoFillVendor(){
     var sel=document.getElementById('bVehicle'),opt=sel.options[sel.selectedIndex];
-    if(opt&&opt.dataset.vendor) document.getElementById('bVendor').value=opt.dataset.vendor;
+    if(opt&&opt.dataset.vendor){ var bv=document.getElementById('bVendor'); bv.value=opt.dataset.vendor; if(bv._ss) bv._ss.refresh(); }
 }
 var billItems=[];
 var allInvoiceNumbers=[];
@@ -263,7 +263,7 @@ function addVehicleBillItem(){
     billItems.push(it);
     renderBillItems();
     // clear vehicle + amounts for the next entry (vendor kept — usually same)
-    document.getElementById('bVehicle').value='';
+    var bvh=document.getElementById('bVehicle'); bvh.value=''; if(bvh._ss) bvh._ss.refresh();
     ['bFixed','bVariable','bChallan','bTolls','bTDS'].forEach(id=>document.getElementById(id).value='0');
     delete document.getElementById('bTDS').dataset.userEdited;
     calcBill();
