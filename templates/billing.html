@@ -826,24 +826,41 @@ async function loadRecv(){
             '<table class="table table-sm table-hover glass-table mb-0 small">'+
             '<thead><tr><th>Receive Date</th><th>Payment Month</th><th>Vendor</th><th>Vehicle</th><th>Bill Type</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Description</th><th class="viewer-hide">Actions</th></tr></thead>'+
             '<tbody>'+
-            rows.map(function(r){
-                var pm=r.PaymentMonth||r.ReceiveDate.slice(0,7)||'—';
-                var pmCell = canEdit
-                    ? '<input type="month" class="form-control form-control-sm glass-input" style="width:140px" value="'+pm+'" onchange="savePayMonth(\''+r.ReceivableID+'\',this)">'
-                    : '<span class="badge bg-info text-dark">'+pm+'</span>';
-                return '<tr>'+
-                    '<td>'+r.ReceiveDate+'</td>'+
-                    '<td>'+pmCell+'</td>'+
-                    '<td>'+r.VendorName+'</td>'+
-                    '<td>'+(r.VehicleNumber||'—')+'</td>'+
-                    '<td>'+(r.BillType||'—')+'</td>'+
-                    '<td class="fw-bold text-success">'+fmt(r.Amount)+'</td>'+
-                    '<td>'+r.PaymentMode+'</td>'+
-                    '<td>'+(r.ReferenceNumber||'—')+'</td>'+
-                    '<td>'+(r.Description||'—')+'</td>'+
-                    '<td class="viewer-hide"><button class="btn btn-sm btn-outline-warning me-1" title="Edit payment" onclick="editRecv(\''+r.ReceivableID+'\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" title="Delete payment" onclick="deleteRecv(\''+r.ReceivableID+'\')"><i class="bi bi-trash"></i></button></td>'+
-                    '</tr>';
-            }).join('')+
+            (function(){
+                // group this invoice's rows by Receive Date so a payment that
+                // came in several times is shown as separate, labelled batches
+                var dg={}, dord=[];
+                rows.forEach(function(r){var dk=r.ReceiveDate||'—';if(!dg[dk]){dg[dk]=[];dord.push(dk);}dg[dk].push(r);});
+                var multi=dord.length>1;
+                function rowHtml(r){
+                    var pm=r.PaymentMonth||(r.ReceiveDate||'').slice(0,7)||'—';
+                    var pmCell = canEdit
+                        ? '<input type="month" class="form-control form-control-sm glass-input" style="width:140px" value="'+pm+'" onchange="savePayMonth(\''+r.ReceivableID+'\',this)">'
+                        : '<span class="badge bg-info text-dark">'+pm+'</span>';
+                    return '<tr>'+
+                        '<td>'+r.ReceiveDate+'</td>'+
+                        '<td>'+pmCell+'</td>'+
+                        '<td>'+r.VendorName+'</td>'+
+                        '<td>'+(r.VehicleNumber||'—')+'</td>'+
+                        '<td>'+(r.BillType||'—')+'</td>'+
+                        '<td class="fw-bold text-success">'+fmt(r.Amount)+'</td>'+
+                        '<td>'+r.PaymentMode+'</td>'+
+                        '<td>'+(r.ReferenceNumber||'—')+'</td>'+
+                        '<td>'+(r.Description||'—')+'</td>'+
+                        '<td class="viewer-hide"><button class="btn btn-sm btn-outline-warning me-1" title="Edit payment" onclick="editRecv(\''+r.ReceivableID+'\')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" title="Delete payment" onclick="deleteRecv(\''+r.ReceivableID+'\')"><i class="bi bi-trash"></i></button></td>'+
+                        '</tr>';
+                }
+                var out='';
+                dord.forEach(function(dk,bi){
+                    if(multi){
+                        var br=dg[dk], bt=br.reduce(function(s,r){return s+parseFloat(r.Amount||0);},0);
+                        out+='<tr class="recv-batch-band"><td colspan="10" style="background:rgba(13,110,253,0.10);font-weight:600;color:#0d6efd;padding:0.3rem 0.7rem;border-top:2px solid rgba(13,110,253,0.3)">'+
+                            '<i class="bi bi-calendar-check me-1"></i>Payment '+(bi+1)+' of '+dord.length+' &nbsp;·&nbsp; Received '+dk+' &nbsp;·&nbsp; '+br.length+' vehicle'+(br.length>1?'s':'')+' &nbsp;·&nbsp; <span class="text-success">'+fmt(bt)+'</span></td></tr>';
+                    }
+                    dg[dk].forEach(function(r){out+=rowHtml(r);});
+                });
+                return out;
+            })()+
             '</tbody></table></div></div>';
     });
     container.innerHTML=html;
