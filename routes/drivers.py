@@ -78,15 +78,23 @@ async def salaries_api(request: Request, month: str = ""):
     incentives = get_all_records("Incentives")
     result = []
     for d in drivers:
-        if str(d.get("Status", "Active")).strip().lower() == "inactive":
+        status = str(d.get("Status", "Active")).strip().lower()
+        exit_month = str(d.get("ExitDate", ""))[:7]
+        # An inactive (exited) driver still worked the months up to & including the one
+        # they left, so keep them visible for those months; only hide them for a month
+        # AFTER their exit. With no month filter (all-time view) always show them.
+        if status == "inactive" and month and (not exit_month or month > exit_month):
             continue
         if str(d.get("EmployeeType", "Driver")).strip().lower() != "driver":
             continue
         did = d.get("DriverID", "")
         name = str(d.get("DriverName", "")).strip()
+        name_l = name.lower()
         profile_salary = float(d.get("Salary", 0) or 0)
-        # Only Driver Expense category counts for salary calculation
-        drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip() == name and str(e.get("Category", "")) == "Driver Expense"]
+        # Only Driver Expense category counts for salary calculation.
+        # Match driver name case-insensitively so a casing/spacing slip in an expense
+        # row doesn't silently drop it from the salary calc.
+        drv_expenses = [e for e in expenses if str(e.get("DriverName", "")).strip().lower() == name_l and str(e.get("Category", "")) == "Driver Expense"]
         if month:
             drv_expenses = [e for e in drv_expenses if (e.get("ForMonth") or str(e.get("ExpenseDate", ""))[:7]) == month]
         salary_paid = sum(float(e.get("Amount", 0) or 0) for e in drv_expenses if e.get("SubCategory") == "Salary")
@@ -229,15 +237,18 @@ async def vehicle_salaries_api(request: Request, month: str = ""):
             if (vnum, dstr) in override_map:
                 drv_of_day = override_map[(vnum, dstr)]
             else:
-                cover = None
-                for (dname, s, e) in vranges:
-                    if s and s <= dstr and (not e or e >= dstr):
-                        cover = dname
-                        break
-                if cover:
+                # Ranges covering this day; on overlap the MOST RECENT assignment
+                # (latest StartDate) wins, instead of whichever row came first.
+                covers = [(s, dname) for (dname, s, e) in vranges
+                          if s and s <= dstr and (not e or e >= dstr)]
+                if covers:
+                    covers.sort(key=lambda c: c[0])
+                    cover = covers[-1][1]
                     if cover not in overridden_by_day.get(dstr, ()):  # not covering elsewhere that day
                         drv_of_day = cover
-                elif not vranges and default_driver:
+                elif default_driver:
+                    # No range covers this day -> the vehicle's standing (default)
+                    # driver gets it, so the monthly salary is never left unattributed.
                     if default_driver not in overridden_by_day.get(dstr, ()):
                         drv_of_day = default_driver
             if drv_of_day:
@@ -259,7 +270,7 @@ async def vehicle_salaries_api(request: Request, month: str = ""):
             first = dname not in seen_driver
             seen_driver.add(dname)
             drv_exp = [e for e in expenses
-                       if str(e.get("DriverName", "")).strip() == dname
+                       if str(e.get("DriverName", "")).strip().lower() == dname.lower()
                        and str(e.get("Category", "")) == "Driver Expense"
                        and (e.get("ForMonth") or str(e.get("ExpenseDate", ""))[:7]) == month]
             def s(sub):

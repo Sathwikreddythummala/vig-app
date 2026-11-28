@@ -18,10 +18,15 @@ def get_user(request: Request):
 
 
 def next_invoice_number():
+    # Continue the existing VIG-<n> sequence rather than emitting a different scheme.
+    import re
     records = get_all_records("Billing")
-    month = datetime.now(_IST).strftime("%y%m")
-    count = len([r for r in records if str(r.get("InvoiceNumber", "")).startswith(f"VE-{month}")]) + 1
-    return f"VE-{month}-{count:04d}"
+    nums = []
+    for r in records:
+        m = re.match(r"^VIG-(\d+)$", str(r.get("InvoiceNumber", "")).strip().upper())
+        if m:
+            nums.append(int(m.group(1)))
+    return f"VIG-{(max(nums) + 1) if nums else 1}"
 
 
 SETTLE_THRESHOLD = 10.0  # a remaining balance at/under this (once paid) is auto-marked Paid

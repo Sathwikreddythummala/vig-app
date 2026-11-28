@@ -49,22 +49,23 @@ async def list_attendance(request: Request, date: str = ""):
         if not date:
             return default_driver
         matches_v = lambda a: str(a.get("VehicleID", "")) == str(vid) or str(a.get("VehicleNumber", "")).strip() == vnum
-        single, rng, has_range = None, None, False
+        single, rng, rng_start = None, None, None
         for a in assignments:
             if matches_v(a):
                 s, e = str(a.get("StartDate", ""))[:10], str(a.get("EndDate", ""))[:10]
                 if s and s == e == date:
                     single = str(a.get("DriverName", "")).strip()
                 elif s != e or not e:  # a real range
-                    has_range = True
-                    if s and s <= date and (not e or e >= date) and rng is None:
+                    # On overlap the most recent assignment (latest StartDate) wins.
+                    if s and s <= date and (not e or e >= date) and (rng_start is None or s >= rng_start):
                         rng = str(a.get("DriverName", "")).strip()
+                        rng_start = s
         if single is not None:
             return single
         if rng is not None:
             return rng
-        # a vehicle with range history but no range covering this date has no driver that day
-        return "" if has_range else default_driver
+        # No range covers this date -> fall back to the vehicle's standing (default) driver.
+        return default_driver
 
     result = []
     for v in active_vehicles:
